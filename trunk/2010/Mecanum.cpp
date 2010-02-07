@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include "Vision/AxisCamera2010.h" 
 #include "PCVideoServer.h"
+#include "PIDController.h"
 
 #ifdef __GNUC__ 
 # ifndef alloca
@@ -156,6 +157,43 @@ static inline float SignedPowerFunction( const float x, const float gamma, const
 using namespace RobotMath;
 
 
+class SpeedEncoder : public Encoder, public PIDSource
+{
+	protected:
+	// Current encoder count value as of the most recent Update()...
+	INT32     m_iCurrentCount;
+
+	// Previous iteration count value...
+	INT32     m_iPreviousCount;
+
+	// Calculated speed, as of the most recent Update()...
+	float     m_speed;
+
+	public:
+	SpeedEncoder(DigitalSource *aSource, DigitalSource *bSource, bool reverseDirection, EncodingType encodingType) : Encoder(aSource, bSource, reverseDirection, encodingType) {}
+	void Update();
+	
+	virtual double PIDGet();
+
+	protected:
+};
+
+
+double SpeedEncoder::PIDGet()
+{
+	return (double)m_speed;
+}
+
+
+void SpeedEncoder::Update()
+{
+	m_iPreviousCount = m_iCurrentCount;
+	m_iCurrentCount = Get();
+	const INT32 iDeltaCount = m_iCurrentCount - m_iPreviousCount;
+	m_speed = (float) iDeltaCount;
+}
+
+
 class PrototypeController : public RobotBase
 {
 public:
@@ -215,8 +253,9 @@ protected:
 	DigitalInput*         m_pDigInTomEncoder_A;
 	DigitalInput*         m_pDigInTomEncoder_B;
 
-	Encoder* 			  m_pTomEncoder;
+	SpeedEncoder*         m_pTomEncoder;
 
+	PIDController*        m_pSpeedController;
 	
 	Joystick*             m_pJoy;            // Control joystick
 	Joystick*             m_pGamePad;            // Control joystick
@@ -292,8 +331,14 @@ PrototypeController::PrototypeController(void)
 	m_pDigInTomEncoder_A = new DigitalInput(7);
 	m_pDigInTomEncoder_B = new DigitalInput(8);
 
-	m_pTomEncoder        = new Encoder(m_pDigInTomEncoder_A, m_pDigInTomEncoder_B, true, Encoder::k4X);	//Optical Encoder on tom proto drive
+	m_pTomEncoder        = new SpeedEncoder(m_pDigInTomEncoder_A, m_pDigInTomEncoder_B, true, Encoder::k4X);	//Optical Encoder on tom proto drive
 	m_pTomEncoder->Start();
+
+	const float kP = 0.1f;
+	const float kI = 0.0f;
+	const float kD = 0.0f;
+	m_pSpeedController = new PIDController(kP, kI, kD, m_pTomEncoder, m_TomVictor);
+
 
     m_pCameraAzimuthServo = new Servo(5);
 	m_pCameraTiltServo    = new Servo(1);
@@ -450,9 +495,10 @@ void PrototypeController::ProcessDriveSystem()
 	
 	DS_PRINTF(0, "AZIM = %f", azimuth); // bla bla 
 	DS_PRINTF(1, "TILT = %f", tilt);
-	DS_PRINTF(2, "A: %d", m_pDigInTomEncoder_A->Get());
-	DS_PRINTF(3, "B: %d", m_pDigInTomEncoder_B->Get());
-	DS_PRINTF(4, "Encoder Count: %d", m_pTomEncoder->Get());
+	DS_PRINTF(2, "Encoder Count: %05d", m_pTomEncoder->Get());
+	DS_PRINTF(3, "Encoder Raw: %08d", m_pTomEncoder->GetRaw());
+	DS_PRINTF(4, "Speed: %04.4f", (float)m_pTomEncoder->PIDGet());
+
 
     m_pCameraAzimuthServo->Set(azimuth); 
 	m_pCameraTiltServo->Set(tilt);
@@ -500,6 +546,9 @@ void PrototypeController::ProcessCommon()
 
 	// Debug (development) stuff...
 	ProcessDebug();
+	
+	// Update velocity...
+	m_pTomEncoder->Update();
 	
 	// send text to driver station "user messages" window...
 	DriverStationLCD::GetInstance()->UpdateLCD();
