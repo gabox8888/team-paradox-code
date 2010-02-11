@@ -5,12 +5,16 @@
 #include <Algorithm>
 #include <stdlib.h>
 #include <assert.h>
-#include "VisionAPI.h"
 #include "nivision.h"
 #include <stdio.h>
-#include "Vision/AxisCamera2010.h" 
-#include "PCVideoServer.h"
+#include "Vision/AxisCamera.h" 
+#include "Vision/PCVideoServer.h" 
 #include "PIDController.h"
+#include "Notifier.h"
+#include "PIDSource.h"
+#include "Synchronized.h"
+#include "Base.h"
+#include "semLib.h"
 
 #ifdef __GNUC__ 
 # ifndef alloca
@@ -159,6 +163,12 @@ using namespace RobotMath;
 
 class SpeedEncoder : public Encoder, public PIDSource
 {
+	public:
+	enum Constants
+	{
+		kNumSamples = 20,
+	};
+	
 	protected:
 	// Current encoder count value as of the most recent Update()...
 	INT32     m_iCurrentCount;
@@ -169,9 +179,17 @@ class SpeedEncoder : public Encoder, public PIDSource
 	// Calculated speed, as of the most recent Update()...
 	float     m_speed;
 
+	INT32     m_iFrame;
+	float     m_rates[kNumSamples]; 
+	float     m_averageRate;
+	
 	public:
-	SpeedEncoder(DigitalSource *aSource, DigitalSource *bSource, bool reverseDirection, EncodingType encodingType) : Encoder(aSource, bSource, reverseDirection, encodingType) {}
+	SpeedEncoder(DigitalSource *aSource, DigitalSource *bSource, bool reverseDirection, EncodingType encodingType)
+		: Encoder(aSource, bSource, reverseDirection, encodingType), m_iFrame(0) {}
 	void Update();
+	float GetAveRate() const { return m_averageRate; }
+	
+	double GetRate() { return Encoder::GetRate() * 0.5f; }
 	
 	virtual double PIDGet();
 
@@ -191,7 +209,139 @@ void SpeedEncoder::Update()
 	m_iCurrentCount = Get();
 	const INT32 iDeltaCount = m_iCurrentCount - m_iPreviousCount;
 	m_speed = (float) iDeltaCount;
+
+	m_rates[m_iFrame % kNumSamples] = (float)GetRate();
+	float sumRates = 0.0f;
+	for (int i = 0; i < kNumSamples; i++)
+	{
+		sumRates += m_rates[i];
+	}
+	m_averageRate = sumRates / float(kNumSamples);
+
+	m_iFrame += 1;
 }
+
+
+
+class PIDSource;
+class Notifier;
+class ParadoxSpeedController
+{
+	protected:
+
+	bool             m_isEnabled;
+	float            m_P;
+	float            m_I;
+	float            m_D;
+	float            m_previousError;
+	double           m_errorIntegral;
+	float            m_setpoint;
+	float            m_error;
+	float            m_pwm;
+	float            m_dT;
+
+	SEM_ID           m_mutexSemaphore;
+	Notifier*        m_pNotifier;
+
+	PIDSource*       m_pPidInput;
+	SpeedController* m_pOutputSpeedController;
+
+	static void Main(void* const pController);
+	void Calculate();
+
+	public:
+	ParadoxSpeedController(float p, float i, float d, PIDSource* const pPidInput, SpeedController* const pOutputSpeedController, float dT = 0.025f);
+	~ParadoxSpeedController();
+	void SetSetpoint(float setpoint);
+	void SetEnabled(const bool is_enabled);
+};
+
+
+ParadoxSpeedController::ParadoxSpeedController(float Kp, float Ki, float Kd, PIDSource* const pPidInput, SpeedController* const pOutputSpeedController, float dT) : m_mutexSemaphore(0)
+{
+	m_mutexSemaphore = semBCreate(SEM_Q_PRIORITY, SEM_FULL);
+
+	m_pNotifier = new Notifier(ParadoxSpeedController::Main, this);
+
+	m_dT = dT;
+	m_pPidInput = pPidInput;
+	m_pOutputSpeedController = pOutputSpeedController;
+
+	m_P = Kp;
+	m_I = Ki;
+	m_D = Kd;
+
+	m_isEnabled = false;
+	m_setpoint = 0.0f;
+
+	m_previousError = 0.0f;
+	m_errorIntegral = 0.0;
+
+	m_pwm = 0.0f;
+
+	m_pNotifier->StartPeriodic(m_dT);
+}
+
+
+ParadoxSpeedController::~ParadoxSpeedController()
+{
+	semFlush(m_mutexSemaphore);
+	delete m_pNotifier;
+}
+
+
+void ParadoxSpeedController::Main(void* const pController)
+{
+	((ParadoxSpeedController*) pController)->Calculate();
+}
+
+
+void ParadoxSpeedController::Calculate()
+{
+CRITICAL_REGION(m_mutexSemaphore)
+{
+	if (m_isEnabled)
+	{
+		const float measured_point = m_pPidInput->PIDGet();
+		m_error = m_setpoint - measured_point;
+		m_errorIntegral += m_error * m_dT;
+		const float derivative = (m_error - m_previousError) / m_dT;
+		const float fManipulatedVariable = m_P * m_error + m_I * m_errorIntegral + m_D * derivative;
+		m_pwm += fManipulatedVariable;
+		m_previousError = m_error;
+		m_pOutputSpeedController->Set(m_pwm);
+	}
+}
+END_REGION;
+}
+
+
+void ParadoxSpeedController::SetSetpoint(const float setpoint)
+{
+CRITICAL_REGION(m_mutexSemaphore)
+{
+	m_setpoint = setpoint;
+}
+END_REGION;
+}
+
+
+void ParadoxSpeedController::SetEnabled(const bool is_enabled)
+{
+CRITICAL_REGION(m_mutexSemaphore)
+{
+	if ( m_isEnabled != is_enabled )
+	{
+		m_isEnabled = is_enabled;
+		if (!is_enabled)
+		{
+			m_pOutputSpeedController->Set(0.0f);
+		}
+	}
+}
+END_REGION;
+}
+
 
 
 class PrototypeController : public RobotBase
@@ -308,16 +458,25 @@ public:
 void InitializeCamera()
 {
 	// Create and set up a camera instance
-	AxisCamera &camera = AxisCamera::getInstance();
-	camera.writeResolution(k160x120);
-	camera.writeBrightness(0);
-	Wait(3.0);
+	AxisCamera &camera = AxisCamera::GetInstance();
+	camera.WriteResolution(AxisCamera::kResolution_320x240);
+	camera.WriteCompression(20);
+	camera.WriteBrightness(0);
 }
 
 
 PrototypeController::PrototypeController(void)
 {
-	// stop the watchdog if debugging
+//// GVV: Experimenting with different task priorities for the main robot task.  This was in an effort to track down the "glitch" in the main control loop.
+//// However, changing the priority didn't help.  I'll leave the code here for reference...
+//	const int myTaskID = taskIdSelf();
+//	taskPrioritySet(myTaskID, 0);
+//	int prio;
+//	taskPriorityGet(myTaskID, &prio);
+//	printf("robot thread prio=%d\n", prio);
+
+	// Optionally, enable the Watchdog...
+	GetWatchdog().SetExpiration(0.1);
 	GetWatchdog().SetEnabled(kWatchdogState); 			
 			
 	InitializeCamera();
@@ -331,7 +490,7 @@ PrototypeController::PrototypeController(void)
 	m_pDigInTomEncoder_A = new DigitalInput(7);
 	m_pDigInTomEncoder_B = new DigitalInput(8);
 
-	m_pTomEncoder        = new SpeedEncoder(m_pDigInTomEncoder_A, m_pDigInTomEncoder_B, true, Encoder::k4X);	//Optical Encoder on tom proto drive
+	m_pTomEncoder        = new SpeedEncoder(m_pDigInTomEncoder_A, m_pDigInTomEncoder_B, true, Encoder::k2X);	//Optical Encoder on tom proto drive
 	m_pTomEncoder->Start();
 
 	const float kP = 0.1f;
@@ -369,10 +528,6 @@ PrototypeController::PrototypeController(void)
 	m_coef_X_RL = 1.000000;
 	m_coef_Y_RL = -1.000000;
 	m_coef_Z_RL = 1.000000;
-
-
-	//Make sure write privaledges are allowed
-	Priv_SetWriteFileAllowed(1);   		
 
 	LoadDriveCoefficients();
 }
@@ -493,11 +648,12 @@ void PrototypeController::ProcessDriveSystem()
 	float azimuth = (azimuthJoy+1.0)/2.0;
 	float tilt = (tiltJoy+1.0)/2.0;
 	
-	DS_PRINTF(0, "AZIM = %f", azimuth); // bla bla 
+	DS_PRINTF(0, "AZIM = %f", azimuth);
 	DS_PRINTF(1, "TILT = %f", tilt);
-	DS_PRINTF(2, "Encoder Count: %05d", m_pTomEncoder->Get());
+	DS_PRINTF(2, "Encoder Dist: %.2f            ", (float)m_pTomEncoder->GetDistance());
 	DS_PRINTF(3, "Encoder Raw: %08d", m_pTomEncoder->GetRaw());
-	DS_PRINTF(4, "Speed: %04.4f", (float)m_pTomEncoder->PIDGet());
+	DS_PRINTF(4, "Speed: %.2f           ", (float)m_pTomEncoder->PIDGet());
+	DS_PRINTF(5, "Rate: %.2f           ", (float)m_pTomEncoder->GetAveRate());
 
 
     m_pCameraAzimuthServo->Set(azimuth); 
@@ -512,15 +668,10 @@ void PrototypeController::StartCompetition()
 	{
 		if ( IsDisabled() )
 		{
-			while (IsDisabled())
-			{
 				const float kDisabledWaitTime = 0.01f;
-				const int kNumInnerDisabled = (int) (0.25f / kDisabledWaitTime);
-				for ( int i = 0; ( (i < kNumInnerDisabled) && IsDisabled() ); i++)
-				{
-					Wait((double) kDisabledWaitTime);		// wait for robot to be enabled
-				}
-			}
+			GetWatchdog().SetEnabled(false); 			
+			while (IsDisabled()) Wait((double) kDisabledWaitTime);
+			GetWatchdog().SetEnabled(kWatchdogState); 			
 		}
 
 		ProcessCommon();
@@ -538,6 +689,12 @@ void PrototypeController::StartCompetition()
 
 void PrototypeController::ProcessCommon()
 {
+	// Feed the watchdog, if active...
+	if (kWatchdogState)
+	{
+		GetWatchdog().Feed();
+	}
+
 	// Process time...
 	ProcessTime();
 
