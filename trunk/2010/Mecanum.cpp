@@ -161,7 +161,7 @@ static inline float SignedPowerFunction( const float x, const float gamma, const
 using namespace RobotMath;
 
 
-class SpeedEncoder : public Encoder, public PIDSource
+class ParadoxEncoder : public Encoder, public PIDSource
 {
 	public:
 	enum Constants
@@ -170,46 +170,148 @@ class SpeedEncoder : public Encoder, public PIDSource
 	};
 	
 	protected:
-	// Current encoder count value as of the most recent Update()...
-	INT32     m_iCurrentCount;
-
-	// Previous iteration count value...
-	INT32     m_iPreviousCount;
-
-	// Calculated speed, as of the most recent Update()...
-	float     m_speed;
+	// Copy of Encoder::m_encodingType (which is private)...
+	EncodingType m_encodingTypeShadow;
 
 	INT32     m_iFrame;
 	float     m_rates[kNumSamples]; 
 	float     m_averageRate;
 	
 	public:
-	SpeedEncoder(DigitalSource *aSource, DigitalSource *bSource, bool reverseDirection, EncodingType encodingType)
-		: Encoder(aSource, bSource, reverseDirection, encodingType), m_iFrame(0) {}
+	ParadoxEncoder(DigitalSource *aSource, DigitalSource *bSource, bool reverseDirection, EncodingType encodingType)
+		: Encoder(aSource, bSource, reverseDirection, encodingType), m_encodingTypeShadow(encodingType), m_iFrame(0) {}
 	void Update();
+	void SetMovingAverageSize(unsigned int iSize);
 	float GetAveRate() const { return m_averageRate; }
 	
-	double GetRate() { return Encoder::GetRate() * 0.5f; }
-	
+	double GetRate();
 	virtual double PIDGet();
 
 	protected:
+	tEncoder* Get_FPGA_Encoder() const;
+	Counter* GetCounter() const;
+	tCounter* Get_FPGA_Counter(Counter* const pCounter) const;
 };
 
 
-double SpeedEncoder::PIDGet()
+class EncoderSpoof: public SensorBase, public CounterBase
 {
-	return (double)m_speed;
+	public:
+	DigitalSource *m_aSource;		// the A phase of the quad encoder
+	DigitalSource *m_bSource;		// the B phase of the quad encoder
+	bool m_allocatedASource;		// was the A source allocated locally?
+	bool m_allocatedBSource;		// was the B source allocated locally?
+	tEncoder* m_encoder;
+	UINT8 m_index;
+	double m_distancePerPulse;		// distance of travel for each encoder tick
+	Counter *m_counter;				// Counter object for 1x and 2x encoding
+	EncodingType m_encodingType;	// Encoding type
+
+
+	public:
+	virtual ~EncoderSpoof() {}
+	virtual void Start() {}
+	virtual INT32 Get() { return 0; }
+	virtual void Reset() {}
+	virtual void Stop() {}
+	virtual double GetPeriod() { return 0.0; }
+	virtual void SetMaxPeriod(double) {}
+	virtual bool GetStopped() { return false; }
+	virtual bool GetDirection() { return false; }
+};
+
+
+class CounterSpoof : public SensorBase, public CounterBase
+{
+	public:
+	DigitalSource *m_upSource;		///< What makes the counter count up.
+	DigitalSource *m_downSource;	///< What makes the counter count down.
+	bool m_allocatedUpSource;		///< Was the upSource allocated locally?
+	bool m_allocatedDownSource;	///< Was the downSource allocated locally?
+	tCounter *m_counter;				///< The FPGA counter object.
+	UINT32 m_index;					///< The index of this counter.
+
+	public:
+	virtual ~CounterSpoof() {}
+	virtual void Start() {}
+	virtual INT32 Get() { return 0; }
+	virtual void Reset() {}
+	virtual void Stop() {}
+	virtual double GetPeriod() { return 0.0; }
+	virtual void SetMaxPeriod(double) {}
+	virtual bool GetStopped() { return false; }
+	virtual bool GetDirection() { return false; }
+};
+
+
+tEncoder* ParadoxEncoder::Get_FPGA_Encoder() const
+{
+	assert(sizeof(EncoderSpoof) == sizeof(Encoder));
+	EncoderSpoof spoof;
+	return reinterpret_cast<tEncoder*>((UINT32)this + ((UINT32)&spoof.m_encoder - (UINT32)&spoof));
 }
 
 
-void SpeedEncoder::Update()
+Counter* ParadoxEncoder::GetCounter() const
 {
-	m_iPreviousCount = m_iCurrentCount;
-	m_iCurrentCount = Get();
-	const INT32 iDeltaCount = m_iCurrentCount - m_iPreviousCount;
-	m_speed = (float) iDeltaCount;
+	assert(sizeof(EncoderSpoof) == sizeof(Encoder));
+	EncoderSpoof spoof;
+	return reinterpret_cast<Counter*>((UINT32)this + ((UINT32)&spoof.m_counter - (UINT32)&spoof));
+}
 
+
+tCounter* ParadoxEncoder::Get_FPGA_Counter(Counter* const pCounter) const
+{
+	assert(sizeof(CounterSpoof) == sizeof(Counter));
+	CounterSpoof spoof;
+	return reinterpret_cast<tCounter*>((UINT32)pCounter + ((UINT32)&spoof.m_counter - (UINT32)&spoof));
+}
+
+
+void ParadoxEncoder::SetMovingAverageSize(unsigned int iSize)
+{
+	if (iSize > 127) iSize = 127;
+	Counter* const pCounter = GetCounter();
+	if (pCounter)
+	{
+		Get_FPGA_Counter(pCounter)->writeTimerConfig_AverageSize((unsigned char)iSize, &status);
+	}
+	else
+	{
+		Get_FPGA_Encoder()->writeTimerConfig_AverageSize((unsigned char)iSize, &status);
+	}
+	wpi_assertCleanStatus(status);
+}
+
+
+double ParadoxEncoder::GetRate()
+{
+	float correctiveFactor = 1.0f;
+	switch (m_encodingTypeShadow)
+	{
+		case k1X:
+			correctiveFactor = 0.5f; // TODO
+			break;
+		case k2X:
+			correctiveFactor = 0.5f; // TODO
+			break;
+		case k4X:
+			correctiveFactor = 0.5f; // TODO
+			break;
+	}
+	
+	return Encoder::GetRate() * correctiveFactor;
+}
+
+
+double ParadoxEncoder::PIDGet()
+{
+	return GetRate();
+}
+
+
+void ParadoxEncoder::Update()
+{
 	m_rates[m_iFrame % kNumSamples] = (float)GetRate();
 	float sumRates = 0.0f;
 	for (int i = 0; i < kNumSamples; i++)
@@ -403,7 +505,7 @@ protected:
 	DigitalInput*         m_pDigInTomEncoder_A;
 	DigitalInput*         m_pDigInTomEncoder_B;
 
-	SpeedEncoder*         m_pTomEncoder;
+	ParadoxEncoder*       m_pTomEncoder;
 
 	PIDController*        m_pSpeedController;
 	
@@ -490,7 +592,7 @@ PrototypeController::PrototypeController(void)
 	m_pDigInTomEncoder_A = new DigitalInput(7);
 	m_pDigInTomEncoder_B = new DigitalInput(8);
 
-	m_pTomEncoder        = new SpeedEncoder(m_pDigInTomEncoder_A, m_pDigInTomEncoder_B, true, Encoder::k2X);	//Optical Encoder on tom proto drive
+	m_pTomEncoder        = new ParadoxEncoder(m_pDigInTomEncoder_A, m_pDigInTomEncoder_B, true, Encoder::k2X);	//Optical Encoder on tom proto drive
 	m_pTomEncoder->Start();
 
 	const float kP = 0.1f;
@@ -652,8 +754,7 @@ void PrototypeController::ProcessDriveSystem()
 	DS_PRINTF(1, "TILT = %f", tilt);
 	DS_PRINTF(2, "Encoder Dist: %.2f            ", (float)m_pTomEncoder->GetDistance());
 	DS_PRINTF(3, "Encoder Raw: %08d", m_pTomEncoder->GetRaw());
-	DS_PRINTF(4, "Speed: %.2f           ", (float)m_pTomEncoder->PIDGet());
-	DS_PRINTF(5, "Rate: %.2f           ", (float)m_pTomEncoder->GetAveRate());
+	DS_PRINTF(4, "Rate: %.2f           ", (float)m_pTomEncoder->GetAveRate());
 
 
     m_pCameraAzimuthServo->Set(azimuth); 
