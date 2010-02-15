@@ -78,7 +78,7 @@ void DumpControlData( const FRCControlData &cd )
 
 	printf("dsDigitalIn = %02X\n", (unsigned int) cd.dsDigitalIn ); 
 
-	printf("teamID = %d\n", (unsigned int) cd.teamID );
+	printf("teamID = %d\n", (unsigned int) cd.teamID ); 
 
 	printf("dsID_Alliance = %02X\n", (unsigned int) cd.dsID_Alliance ); 
 	printf("dsID_Position = %02X\n", (unsigned int) cd.dsID_Position );
@@ -173,9 +173,9 @@ class ParadoxEncoder : public Encoder, public PIDSource
 	// Copy of Encoder::m_encodingType (which is private)...
 	EncodingType m_encodingTypeShadow;
 
-	INT32     m_iFrame;
-	float     m_rates[kNumSamples]; 
-	float     m_averageRate;
+	INT32        m_iFrame;
+	float        m_rates[kNumSamples]; 
+	float        m_averageRate;
 	
 	public:
 	ParadoxEncoder(DigitalSource *aSource, DigitalSource *bSource, bool reverseDirection, EncodingType encodingType)
@@ -498,16 +498,30 @@ protected:
 	Jaguar*               m_pFL_DriveMotor;           // Front Left drive Motor
 	Jaguar*               m_pRR_DriveMotor;           // Rear Right drive Motor
 	Jaguar*               m_pRL_DriveMotor;           // Rear Left drive Motor
-	Jaguar*               m_TomVictor;
+	Jaguar*               m_TowerJaguar;
+	Jaguar*               m_FisherPrice;
 	Servo*                m_pCameraAzimuthServo;
 	Servo*                m_pCameraTiltServo;
+	Solenoid*             m_pGabesolenoid; 
 
-	DigitalInput*         m_pDigInTomEncoder_A;
-	DigitalInput*         m_pDigInTomEncoder_B;
+	DigitalInput*         m_pDigInFREncoder_A;
+	DigitalInput*         m_pDigInFREncoder_B;
+	DigitalInput*         m_pDigInFLEncoder_A;
+	DigitalInput*         m_pDigInFLEncoder_B;
+	DigitalInput*         m_pDigInRREncoder_A;
+	DigitalInput*         m_pDigInRREncoder_B;
+	DigitalInput*         m_pDigInRLEncoder_A;
+	DigitalInput*         m_pDigInRLEncoder_B;
 
-	ParadoxEncoder*       m_pTomEncoder;
+	ParadoxEncoder*       m_pFREncoder;
+	ParadoxEncoder*       m_pFLEncoder;
+	ParadoxEncoder*       m_pRREncoder;
+	ParadoxEncoder*       m_pRLEncoder;
 
-	PIDController*        m_pSpeedController;
+	PIDController*        m_pSpeedController1;
+	PIDController*        m_pSpeedController2;
+	PIDController*        m_pSpeedController3;
+	PIDController*        m_pSpeedController4;
 	
 	Joystick*             m_pJoy;            // Control joystick
 	Joystick*             m_pGamePad;            // Control joystick
@@ -529,6 +543,9 @@ protected:
 	float                 m_coef_X_RL; 
 	float                 m_coef_Y_RL;
 	float                 m_coef_Z_RL;
+
+        float  				  joyXprint;
+        
 
 	UINT32                m_iTimestamp_uS;
 
@@ -586,20 +603,38 @@ PrototypeController::PrototypeController(void)
 	m_pFR_DriveMotor   = new Jaguar(6);           // Front Right drive Motor
 	m_pFL_DriveMotor   = new Jaguar(4);           // Front Left drive Motor
 	m_pRR_DriveMotor   = new Jaguar(8);           // Rear Right drive Motor
-	m_pRL_DriveMotor   = new Jaguar(10);           // Rear Left drive Motor
-	m_TomVictor = new Jaguar(2);
+	m_pRL_DriveMotor   = new Jaguar(10);          // Rear Left drive Motor
+	m_TowerJaguar      = new Jaguar(3);
+	m_FisherPrice      = new Jaguar(2);
 
-	m_pDigInTomEncoder_A = new DigitalInput(7);
-	m_pDigInTomEncoder_B = new DigitalInput(8);
+	m_pDigInFREncoder_A = new DigitalInput(1);
+	m_pDigInFREncoder_B = new DigitalInput(4);
+	m_pDigInFLEncoder_A = new DigitalInput(5);
+	m_pDigInFLEncoder_B = new DigitalInput(6); 
+	m_pDigInRREncoder_A = new DigitalInput(8);
+	m_pDigInRREncoder_B = new DigitalInput(9); 
+	m_pDigInRLEncoder_A = new DigitalInput(11);
+	m_pDigInRLEncoder_B = new DigitalInput(12);
 
-	m_pTomEncoder        = new ParadoxEncoder(m_pDigInTomEncoder_A, m_pDigInTomEncoder_B, true, Encoder::k2X);	//Optical Encoder on tom proto drive
-	m_pTomEncoder->Start();
+	m_pGabesolenoid     = new Solenoid (2);
+
+	m_pFREncoder        = new ParadoxEncoder(m_pDigInFREncoder_A, m_pDigInFREncoder_B, true, Encoder::k4X);        //Optical Encoder on tom proto drive
+	m_pFREncoder->Start();
+	m_pFLEncoder        = new ParadoxEncoder(m_pDigInFLEncoder_A, m_pDigInFLEncoder_B, true, Encoder::k4X);        //Optical Encoder on tom proto drive
+	m_pFLEncoder->Start();
+	m_pRREncoder        = new ParadoxEncoder(m_pDigInRREncoder_A, m_pDigInRREncoder_B, true, Encoder::k4X);        //Optical Encoder on tom proto drive
+	m_pRREncoder->Start();
+	m_pRLEncoder        = new ParadoxEncoder(m_pDigInRLEncoder_A, m_pDigInRLEncoder_B, true, Encoder::k4X);        //Optical Encoder on tom proto drive
+	m_pRLEncoder->Start();
+
 
 	const float kP = 0.1f;
 	const float kI = 0.0f;
 	const float kD = 0.0f;
-	m_pSpeedController = new PIDController(kP, kI, kD, m_pTomEncoder, m_TomVictor);
-
+	m_pSpeedController1 = new PIDController(kP, kI, kD, m_pFREncoder, m_pFR_DriveMotor);
+	m_pSpeedController2 = new PIDController(kP, kI, kD, m_pFLEncoder, m_pFL_DriveMotor);
+	m_pSpeedController3 = new PIDController(kP, kI, kD, m_pRREncoder, m_pRR_DriveMotor);
+	m_pSpeedController4 = new PIDController(kP, kI, kD, m_pRLEncoder, m_pRL_DriveMotor);
 
     m_pCameraAzimuthServo = new Servo(5);
 	m_pCameraTiltServo    = new Servo(1);
@@ -687,7 +722,7 @@ void PrototypeController::SaveDriveCoefficients()
 	FILE* fp_steeringConfig	= fopen("MecanumDriveCoefficients.ini", "wb");
 	if (fp_steeringConfig)
 	{
-		_LOG("Saving Drive Coefficients...\n");
+		_LOG("Saving Drive Coefficients...\n"); 
 		_LOG_FLUSH();
 
 		fprintf(fp_steeringConfig, "Drive Coefficients: \n");
@@ -744,17 +779,23 @@ void PrototypeController::ProcessDriveSystem()
 	m_pRR_DriveMotor->Set(pwm_RR * kRR_PwmModulation);
 	m_pRL_DriveMotor->Set(pwm_RL * kRL_PwmModulation);
 	//m_TomVictor->Set(1.0f);
-	m_TomVictor->Set(joyX);
+	//m_FisherPrice->Set(joyX);
 	float azimuthJoy=m_pGamePad->GetX();
 	float tiltJoy=m_pGamePad->GetY();
 	float azimuth = (azimuthJoy+1.0)/2.0;
 	float tilt = (tiltJoy+1.0)/2.0;
 	
+/*
+        DS_PRINTF(0, "Encoder Count FR: %05d", m_pFREncoder->Get());
+        DS_PRINTF(1, "Encoder Count FL: %05d", -(m_pFLEncoder->Get()));
+        DS_PRINTF(2, "Encoder Count RR: %05d", m_pRREncoder->Get());
+        DS_PRINTF(3, "Encoder Count RL: %05d", -(m_pRLEncoder->Get()));
+*/
 	DS_PRINTF(0, "AZIM = %f", azimuth);
 	DS_PRINTF(1, "TILT = %f", tilt);
-	DS_PRINTF(2, "Encoder Dist: %.2f            ", (float)m_pTomEncoder->GetDistance());
-	DS_PRINTF(3, "Encoder Raw: %08d", m_pTomEncoder->GetRaw());
-	DS_PRINTF(4, "Rate: %.2f           ", (float)m_pTomEncoder->GetAveRate());
+	DS_PRINTF(2, "Encoder Dist: %.2f            ", (float)m_pFREncoder->GetDistance());
+	DS_PRINTF(3, "Encoder Raw: %08d", m_pFREncoder->GetRaw());
+	DS_PRINTF(4, "Rate: %.2f           ", (float)m_pFREncoder->GetAveRate());
 
 
     m_pCameraAzimuthServo->Set(azimuth); 
@@ -769,7 +810,7 @@ void PrototypeController::StartCompetition()
 	{
 		if ( IsDisabled() )
 		{
-				const float kDisabledWaitTime = 0.01f;
+			const float kDisabledWaitTime = 0.01f;
 			GetWatchdog().SetEnabled(false); 			
 			while (IsDisabled()) Wait((double) kDisabledWaitTime);
 			GetWatchdog().SetEnabled(kWatchdogState); 			
@@ -804,9 +845,12 @@ void PrototypeController::ProcessCommon()
 
 	// Debug (development) stuff...
 	ProcessDebug();
-	
+
 	// Update velocity...
-	m_pTomEncoder->Update();
+	m_pFREncoder->Update();
+	m_pFLEncoder->Update();
+	m_pRREncoder->Update();
+	m_pRLEncoder->Update();
 	
 	// send text to driver station "user messages" window...
 	DriverStationLCD::GetInstance()->UpdateLCD();
@@ -817,7 +861,41 @@ void PrototypeController::ProcessAutonomous()
 {
 	AllStop();
 
-	while ( IsAutonomous() || IsDisabled() ) Wait(0.05);
+	while (IsDisabled() ) Wait(0.05);
+	if (IsAutonomous())
+	{
+		/*m_pFR_DriveMotor->Set(1 * kFR_PwmModulation);
+		m_pFL_DriveMotor->Set(1 * kFL_PwmModulation);
+		m_pRR_DriveMotor->Set(1 * kRR_PwmModulation);
+		m_pRL_DriveMotor->Set(1 * kRL_PwmModulation);
+		Wait (3);
+		m_pFR_DriveMotor->Set(-1 * kFR_PwmModulation);
+		m_pFL_DriveMotor->Set(-1 * kFL_PwmModulation);
+		m_pRR_DriveMotor->Set(-1 * kRR_PwmModulation);
+		m_pRL_DriveMotor->Set(-1 * kRL_PwmModulation);
+		Wait (3);
+		m_pFR_DriveMotor->Set(1 * kFR_PwmModulation);
+		m_pFL_DriveMotor->Set(1 * kFL_PwmModulation);
+		m_pRR_DriveMotor->Set(1 * kRR_PwmModulation);
+		m_pRL_DriveMotor->Set(1 * kRL_PwmModulation);
+		Wait (3);
+		m_pFR_DriveMotor->Set(.5 * kFR_PwmModulation);
+		m_pFL_DriveMotor->Set(-.5 * kFL_PwmModulation);
+		m_pRR_DriveMotor->Set(.5 * kRR_PwmModulation);
+		m_pRL_DriveMotor->Set(-.5 * kRL_PwmModulation);
+		Wait (3);
+		m_pFR_DriveMotor->Set(-.5 * kFR_PwmModulation);
+		m_pFL_DriveMotor->Set(-.5 * kFL_PwmModulation);
+		m_pRR_DriveMotor->Set(.5 * kRR_PwmModulation);
+		m_pRL_DriveMotor->Set(.5 * kRL_PwmModulation);
+		Wait (3);*/
+			
+
+		m_pGabesolenoid->Set(0);
+		Wait (3);
+		m_pGabesolenoid->Set(1);
+		Wait (3);
+	}
 }
 
 
