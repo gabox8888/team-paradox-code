@@ -49,6 +49,9 @@ static const bool         kWatchdogState                  = false;
 
 // Button assignments (note the button values are zero based (so subtract one from the number you see on the joystick)...
 static const unsigned int kB_TriggerCameraSnapshot        = 7;  // on turret joystick
+static const unsigned int kB_Trigger                      = 0;
+static const unsigned int kB_MainCylinderOut              = 2;
+static const unsigned int kB_MainCylinderIn               = 1;
 static const unsigned int kB_SaveDriveCoefficients        = 6; 
 
 class DriverStationSpoof : public SensorBase
@@ -502,7 +505,11 @@ protected:
 	Jaguar*               m_FisherPrice;
 	Servo*                m_pCameraAzimuthServo;
 	Servo*                m_pCameraTiltServo;
-	Solenoid*             m_pGabesolenoid; 
+	Solenoid*             m_pMainCylinderInSolenoid; 
+	Solenoid*             m_pMainCylinderOutSolenoid; 
+	Solenoid*             m_pTriggerSolenoid; 
+	
+	Compressor*           m_pCompressor;
 
 	DigitalInput*         m_pDigInFREncoder_A;
 	DigitalInput*         m_pDigInFREncoder_B;
@@ -564,6 +571,7 @@ protected:
 	void   ProcessCommon();
 	void   ProcessOperated();
 	void   ProcessDriveSystem();
+	void   ProcessKicker();
 	void   AllStop();
 	void   ProcessAutonomous();
 	void   LoadDriveCoefficients();
@@ -577,10 +585,12 @@ public:
 void InitializeCamera()
 {
 	// Create and set up a camera instance
+/*
 	AxisCamera &camera = AxisCamera::GetInstance();
 	camera.WriteResolution(AxisCamera::kResolution_320x240);
 	camera.WriteCompression(20);
 	camera.WriteBrightness(0);
+*/
 }
 
 
@@ -616,7 +626,12 @@ PrototypeController::PrototypeController(void)
 	m_pDigInRLEncoder_A = new DigitalInput(11);
 	m_pDigInRLEncoder_B = new DigitalInput(12);
 
-	m_pGabesolenoid     = new Solenoid (2);
+	m_pCompressor = new Compressor(6, 1);
+	m_pCompressor->Start();
+
+	m_pMainCylinderInSolenoid  = new Solenoid(3);
+	m_pMainCylinderOutSolenoid = new Solenoid(2);
+	m_pTriggerSolenoid         = new Solenoid(1);
 
 	m_pFREncoder        = new ParadoxEncoder(m_pDigInFREncoder_A, m_pDigInFREncoder_B, true, Encoder::k4X);        //Optical Encoder on tom proto drive
 	m_pFREncoder->Start();
@@ -759,6 +774,31 @@ static float Clamp(const float x, const float lo, const float hi)
 }
 
 
+void PrototypeController::ProcessKicker()
+{
+	const bool bPressed_Trigger = m_joyButtonState.GetState( kB_Trigger );
+	m_pTriggerSolenoid->Set(bPressed_Trigger);
+
+	const bool bPressed_MainCylinderOut = m_joyButtonState.GetState( kB_MainCylinderOut );
+	const bool bPressed_MainCylinderIn  = m_joyButtonState.GetState( kB_MainCylinderIn );
+	if (bPressed_MainCylinderOut)
+	{
+		m_pMainCylinderInSolenoid->Set(false);
+		m_pMainCylinderOutSolenoid->Set(true);;
+	}
+	else if (bPressed_MainCylinderIn)
+	{
+		m_pMainCylinderInSolenoid->Set(true);
+		m_pMainCylinderOutSolenoid->Set(false);;
+	}
+	else
+	{
+		m_pMainCylinderInSolenoid->Set(false);
+		m_pMainCylinderOutSolenoid->Set(false);
+	}
+}
+
+
 void PrototypeController::ProcessDriveSystem()
 {
 	const float joyX = m_pJoy->GetX();
@@ -889,12 +929,6 @@ void PrototypeController::ProcessAutonomous()
 		m_pRR_DriveMotor->Set(.5 * kRR_PwmModulation);
 		m_pRL_DriveMotor->Set(.5 * kRL_PwmModulation);
 		Wait (3);*/
-			
-
-		m_pGabesolenoid->Set(0);
-		Wait (3);
-		m_pGabesolenoid->Set(1);
-		Wait (3);
 	}
 }
 
@@ -903,6 +937,7 @@ void PrototypeController::ProcessAutonomous()
 void PrototypeController::ProcessOperated()
 {
 	ProcessDriveSystem();
+	ProcessKicker();
 
 	// Check if driver requesting save of coefficients...
 	if ( m_joyButtonState.GetLongHoldDown( kB_SaveDriveCoefficients, m_iTimestamp_uS ) )
