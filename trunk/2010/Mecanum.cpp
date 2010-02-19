@@ -837,7 +837,6 @@ Gabe...
 	}
 }
 
-
 void PrototypeController::ProcessDriveSystem()
 {
 	const float joyX = m_pJoy->GetX();
@@ -845,10 +844,10 @@ void PrototypeController::ProcessDriveSystem()
 	const float joyZ = m_pJoy->GetZ();
 
 	//Grouping encoders by orientation to compare later.  How does GetAveRate() Work?
-	const float Frnt_EncAveSpeed = fabs((m_pFREncoder->GetAveRate() + m_pFLEncoder->GetAveRate()) * 0.5);
-	const float Back_EncAveSpeed = fabs((m_pRREncoder->GetAveRate() + m_pRLEncoder->GetAveRate()) * 0.5);
-	const float Left_EncAveSpeed = fabs((m_pFLEncoder->GetAveRate() + m_pRLEncoder->GetAveRate()) * 0.5);
-	const float Rght_EncAveSpeed = fabs((m_pFREncoder->GetAveRate() + m_pRREncoder->GetAveRate()) * 0.5);
+	const float Frnt_EncSpeed = fabs((m_pFREncoder->GetRate() + m_pFLEncoder->GetRate()) * 0.5);
+	const float Back_EncSpeed = fabs((m_pRREncoder->GetRate() + m_pRLEncoder->GetRate()) * 0.5);
+	const float Left_EncSpeed = fabs((m_pFLEncoder->GetRate() + m_pRLEncoder->GetRate()) * 0.5);
+	const float Rght_EncSpeed = fabs((m_pFREncoder->GetRate() + m_pRREncoder->GetRate()) * 0.5);
 	
 	float FR_EncCoef = 1;
 	float FL_EncCoef = 1;
@@ -858,13 +857,29 @@ void PrototypeController::ProcessDriveSystem()
 	//Comparing based on a common direction; if using mecanum strafing, compare front and back instead of left and right.
 	if (fabs(joyX) > fabs(joyY) && fabs(joyX) > fabs(joyZ))
 	{
-		if (Frnt_EncAveSpeed > Back_EncAveSpeed) {FL_EncCoef = 0.9; FR_EncCoef = 0.9;};
-		if (Frnt_EncAveSpeed < Back_EncAveSpeed) {RL_EncCoef = 0.9; RR_EncCoef = 0.9;};
+		if (Frnt_EncSpeed > Back_EncSpeed)
+		{
+			FL_EncCoef = Back_EncSpeed / Frnt_EncSpeed;
+			FR_EncCoef = FL_EncCoef;
+		}
+		if (Frnt_EncSpeed < Back_EncSpeed)
+		{
+			RL_EncCoef = Frnt_EncSpeed / Back_EncSpeed;
+			RR_EncCoef = RL_EncCoef;
+		}
 	}
 	else
 	{
-		if (Left_EncAveSpeed < Rght_EncAveSpeed) {FR_EncCoef = 0.9; RR_EncCoef = 0.9;};
-		if (Left_EncAveSpeed > Rght_EncAveSpeed) {FL_EncCoef = 0.9; RL_EncCoef = 0.9;};
+		if (Left_EncSpeed > Rght_EncSpeed)
+		{
+			FL_EncCoef = Rght_EncSpeed / Left_EncSpeed;
+			RL_EncCoef = FR_EncCoef;
+		}
+		if (Left_EncSpeed < Rght_EncSpeed)
+		{
+			FR_EncCoef = Left_EncSpeed / Rght_EncSpeed;
+			RR_EncCoef = FR_EncCoef;
+		}
 	}
 	
 	printf("joyX = %f\n", joyX);
@@ -897,7 +912,8 @@ void PrototypeController::ProcessDriveSystem()
 */
 	DS_PRINTF(0, "Encoder Raw: %08d", m_pFREncoder->GetRaw());
 	DS_PRINTF(1, "Encoder Dist: %.2f            ", (float)m_pFREncoder->GetDistance());
-	DS_PRINTF(2, "Rate: %.2f           ", (float)m_pFREncoder->GetAveRate());
+	DS_PRINTF(2, "AveRate: %.2f           ", (float)m_pFREncoder->GetAveRate());
+	DS_PRINTF(3, "Rate: %.2f", (float)m_pFREncoder->GetRate());
 
 
     m_pCameraAzimuthServo->Set(azimuth); 
@@ -964,37 +980,23 @@ void PrototypeController::ProcessCommon()
 
 void PrototypeController::ProcessAutonomous()
 {
-	AllStop();
+        AllStop();
 
-	while (IsDisabled() ) Wait(0.05);
-	if (IsAutonomous())
-	{
-		/*m_pFR_DriveMotor->Set(1 * kFR_PwmModulation);
-		m_pFL_DriveMotor->Set(1 * kFL_PwmModulation);
-		m_pRR_DriveMotor->Set(1 * kRR_PwmModulation);
-		m_pRL_DriveMotor->Set(1 * kRL_PwmModulation);
-		Wait (3);
-		m_pFR_DriveMotor->Set(-1 * kFR_PwmModulation);
-		m_pFL_DriveMotor->Set(-1 * kFL_PwmModulation);
-		m_pRR_DriveMotor->Set(-1 * kRR_PwmModulation);
-		m_pRL_DriveMotor->Set(-1 * kRL_PwmModulation);
-		Wait (3);
-		m_pFR_DriveMotor->Set(1 * kFR_PwmModulation);
-		m_pFL_DriveMotor->Set(1 * kFL_PwmModulation);
-		m_pRR_DriveMotor->Set(1 * kRR_PwmModulation);
-		m_pRL_DriveMotor->Set(1 * kRL_PwmModulation);
-		Wait (3);
-		m_pFR_DriveMotor->Set(.5 * kFR_PwmModulation);
-		m_pFL_DriveMotor->Set(-.5 * kFL_PwmModulation);
-		m_pRR_DriveMotor->Set(.5 * kRR_PwmModulation);
-		m_pRL_DriveMotor->Set(-.5 * kRL_PwmModulation);
-		Wait (3);
-		m_pFR_DriveMotor->Set(-.5 * kFR_PwmModulation);
-		m_pFL_DriveMotor->Set(-.5 * kFL_PwmModulation);
-		m_pRR_DriveMotor->Set(.5 * kRR_PwmModulation);
-		m_pRL_DriveMotor->Set(.5 * kRL_PwmModulation);
-		Wait (3);*/
-	}
+        if (IsDisabled() ) Wait(0.05);
+        while (IsAutonomous())
+        {
+        	int numberofballs=3;
+        	while (numberofballs >=0)
+        	{
+  //      	ProcessKicker();
+        	m_pFR_DriveMotor->Set(.5 * kFR_PwmModulation);
+        	m_pFL_DriveMotor->Set(.5 * kFL_PwmModulation);
+        	m_pRR_DriveMotor->Set(-.5 * kRR_PwmModulation);
+            m_pRL_DriveMotor->Set(-.5 * kRL_PwmModulation);
+            Wait (2.5);
+        	};	
+        	Wait (15);
+        }
 }
 
 
