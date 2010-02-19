@@ -53,6 +53,10 @@ static const unsigned int kB_Trigger                      = 0;
 static const unsigned int kB_MainCylinderOut              = 2;
 static const unsigned int kB_MainCylinderIn               = 1;
 static const unsigned int kB_SaveDriveCoefficients        = 6; 
+static const unsigned int kB_TowerMotorUp                 = 3;
+static const unsigned int kB_TowerMotorDown               = 4;
+static const unsigned int kB_CompressorOn                 = 10;
+static const unsigned int kB_CompressorOff                = 11;
 
 class DriverStationSpoof : public SensorBase
 {
@@ -501,13 +505,14 @@ protected:
 	Jaguar*               m_pFL_DriveMotor;           // Front Left drive Motor
 	Jaguar*               m_pRR_DriveMotor;           // Rear Right drive Motor
 	Jaguar*               m_pRL_DriveMotor;           // Rear Left drive Motor
-	Jaguar*               m_TowerJaguar;
-	Jaguar*               m_FisherPrice;
+	Jaguar*               m_pTowerJaguar;
+	Jaguar*               m_pBallMagnet;
 	Servo*                m_pCameraAzimuthServo;
 	Servo*                m_pCameraTiltServo;
-	Solenoid*             m_pMainCylinderInSolenoid; 
-	Solenoid*             m_pMainCylinderOutSolenoid; 
-	Solenoid*             m_pTriggerSolenoid; 
+	Solenoid*             m_pMainCylinder_IN_Solenoid; 
+	Solenoid*             m_pMainCylinder_OUT_Solenoid; 
+	Solenoid*             m_pTriggerCylinder_IN_Solenoid; 
+	Solenoid*             m_pTriggerCylinder_OUT_Solenoid; 
 	
 	Compressor*           m_pCompressor;
 
@@ -614,8 +619,8 @@ PrototypeController::PrototypeController(void)
 	m_pFL_DriveMotor   = new Jaguar(4);           // Front Left drive Motor
 	m_pRR_DriveMotor   = new Jaguar(8);           // Rear Right drive Motor
 	m_pRL_DriveMotor   = new Jaguar(10);          // Rear Left drive Motor
-	m_TowerJaguar      = new Jaguar(3);
-	m_FisherPrice      = new Jaguar(2);
+	m_pTowerJaguar     = new Jaguar(3);
+	m_pBallMagnet      = new Jaguar(2);
 
 	m_pDigInFREncoder_A = new DigitalInput(1);
 	m_pDigInFREncoder_B = new DigitalInput(4);
@@ -627,11 +632,12 @@ PrototypeController::PrototypeController(void)
 	m_pDigInRLEncoder_B = new DigitalInput(12);
 
 	m_pCompressor = new Compressor(6, 1);
-	m_pCompressor->Start();
+	//m_pCompressor->Start();
 
-	m_pMainCylinderInSolenoid  = new Solenoid(3);
-	m_pMainCylinderOutSolenoid = new Solenoid(2);
-	m_pTriggerSolenoid         = new Solenoid(1);
+	m_pMainCylinder_IN_Solenoid     = new Solenoid(3);
+	m_pMainCylinder_OUT_Solenoid    = new Solenoid(2);
+	m_pTriggerCylinder_IN_Solenoid  = new Solenoid(1);
+	m_pTriggerCylinder_OUT_Solenoid = new Solenoid(4);
 
 	const Encoder::EncodingType iEncodingType = Encoder::k4X;
 	m_pFREncoder        = new ParadoxEncoder(m_pDigInFREncoder_A, m_pDigInFREncoder_B, true, iEncodingType);        //Optical Encoder on tom proto drive
@@ -656,7 +662,7 @@ PrototypeController::PrototypeController(void)
 	m_pCameraTiltServo    = new Servo(1);
 
 	m_pJoy             = new Joystick(kUSB_Port_GunnerStick);       // Gunner joystick
-	m_pGamePad             = new Joystick(kUSB_Port_GamePad);       // GamePad
+	m_pGamePad         = new Joystick(kUSB_Port_GamePad);       // GamePad
 
 	#ifdef USE_LOG_FILE
 	m_pRobotLogFile = fopen("2102LogFile.ini","ab");
@@ -778,24 +784,53 @@ static float Clamp(const float x, const float lo, const float hi)
 void PrototypeController::ProcessKicker()
 {
 	const bool bPressed_Trigger = m_joyButtonState.GetState( kB_Trigger );
-	m_pTriggerSolenoid->Set(bPressed_Trigger);
+	m_pTriggerCylinder_IN_Solenoid->Set(bPressed_Trigger);
+	m_pTriggerCylinder_OUT_Solenoid->Set(!bPressed_Trigger);
 
 	const bool bPressed_MainCylinderOut = m_joyButtonState.GetState( kB_MainCylinderOut );
 	const bool bPressed_MainCylinderIn  = m_joyButtonState.GetState( kB_MainCylinderIn );
 	if (bPressed_MainCylinderOut)
 	{
-		m_pMainCylinderInSolenoid->Set(false);
-		m_pMainCylinderOutSolenoid->Set(true);;
+		m_pMainCylinder_IN_Solenoid->Set(false);
+		m_pMainCylinder_OUT_Solenoid->Set(true);;
 	}
 	else if (bPressed_MainCylinderIn)
 	{
-		m_pMainCylinderInSolenoid->Set(true);
-		m_pMainCylinderOutSolenoid->Set(false);;
+		m_pMainCylinder_IN_Solenoid->Set(true);
+		m_pMainCylinder_OUT_Solenoid->Set(false);;
 	}
 	else
 	{
-		m_pMainCylinderInSolenoid->Set(false);
-		m_pMainCylinderOutSolenoid->Set(false);
+		m_pMainCylinder_IN_Solenoid->Set(false);
+		m_pMainCylinder_OUT_Solenoid->Set(false);
+	}
+/* Gabe...
+    if (bPressed_Trigger)
+    {
+   
+    	m_pSolenoidMain1->Set(1);
+    	m_pSolenoidKicker2->Set(1);
+    	m_pSolenoidMain1->Set(0);
+    	Wait (2);
+    	m_pSolenoidMain2->Set(1);
+    	m_pSolenoidKicker->Set(0);   }
+    else
+    {
+    	Wait (1);
+    	m_pSolenoidKicker->Set(1);
+    	m_pSolenoidMain1->Set(0);
+        m_pSolenoidMain2->Set(0);
+        m_pSolenoidKicker2->Set(0);
+    }
+          */
+
+	if (m_joyButtonState.GetDownStroke( kB_CompressorOn ))
+	{
+		m_pCompressor->Start();
+	}
+	else if (m_joyButtonState.GetDownStroke( kB_CompressorOff ))
+	{
+		m_pCompressor->Stop();            
 	}
 }
 
@@ -820,13 +855,13 @@ void PrototypeController::ProcessDriveSystem()
 	//Comparing based on a common direction; if using mecanum strafing, compare front and back instead of left and right.
 	if (fabs(joyX) > fabs(joyY) && fabs(joyX) > fabs(joyZ))
 	{
-		if (Frnt_EncAveSpeed > Back_EncAveSpeed) {FL_EncCoef = 0.9; FR_EncCoef = 0.9};
-		if (Frnt_EncAveSpeed < Back_EncAveSpeed) {RL_EncCoef = 0.9; RR_EncCoef = 0.9};
+		if (Frnt_EncAveSpeed > Back_EncAveSpeed) {FL_EncCoef = 0.9; FR_EncCoef = 0.9;};
+		if (Frnt_EncAveSpeed < Back_EncAveSpeed) {RL_EncCoef = 0.9; RR_EncCoef = 0.9;};
 	}
 	else
 	{
-		if (Left_EncAveSpeed < Rght_EncAveSpeed) {FR_EncCoef = 0.9; RR_EncCoef = 0.9};
-		if (Left_EncAveSpeed > Rght_EncAveSpeed) {FL_EncCoef = 0.9; RL_EncCoef = 0.9};
+		if (Left_EncAveSpeed < Rght_EncAveSpeed) {FR_EncCoef = 0.9; RR_EncCoef = 0.9;};
+		if (Left_EncAveSpeed > Rght_EncAveSpeed) {FL_EncCoef = 0.9; RL_EncCoef = 0.9;};
 	}
 	
 	printf("joyX = %f\n", joyX);
@@ -834,16 +869,16 @@ void PrototypeController::ProcessDriveSystem()
 	printf("joyZ = %f\n", joyZ);
 
 	const float pwm_FR = Clamp(m_coef_X_FR * joyY + m_coef_Y_FR * joyX + m_coef_Z_FR * joyZ, -1.0f, 1.0f);
-	const float pwm_FL = Clamp(m_coef_X_FL * joyY + m_coef_Y_FL * joyX + m_coef_Z_FL * joyZ, -1.0f, 1.0f);;
-	const float pwm_RR = Clamp(m_coef_X_RR * joyY + m_coef_Y_RR * joyX + m_coef_Z_RR * joyZ, -1.0f, 1.0f);;
-	const float pwm_RL = Clamp(m_coef_X_RL * joyY + m_coef_Y_RL * joyX + m_coef_Z_RL * joyZ, -1.0f, 1.0f);;
+	const float pwm_FL = Clamp(m_coef_X_FL * joyY + m_coef_Y_FL * joyX + m_coef_Z_FL * joyZ, -1.0f, 1.0f);
+	const float pwm_RR = Clamp(m_coef_X_RR * joyY + m_coef_Y_RR * joyX + m_coef_Z_RR * joyZ, -1.0f, 1.0f);
+	const float pwm_RL = Clamp(m_coef_X_RL * joyY + m_coef_Y_RL * joyX + m_coef_Z_RL * joyZ, -1.0f, 1.0f);
 
 	m_pFR_DriveMotor->Set(pwm_FR * FR_EncCoef * kFR_PwmModulation);
 	m_pFL_DriveMotor->Set(pwm_FL * FL_EncCoef * kFL_PwmModulation);
 	m_pRR_DriveMotor->Set(pwm_RR * RR_EncCoef * kRR_PwmModulation);
 	m_pRL_DriveMotor->Set(pwm_RL * RL_EncCoef * kRL_PwmModulation);
 	//m_TomVictor->Set(1.0f);
-	//m_FisherPrice->Set(joyX);
+	//m_pBallMagnet->Set(joyX);
 	float azimuthJoy=m_pGamePad->GetX();
 	float tiltJoy=m_pGamePad->GetY();
 	float azimuth = (azimuthJoy+1.0)/2.0;
@@ -866,7 +901,7 @@ void PrototypeController::ProcessDriveSystem()
 	m_pCameraTiltServo->Set(tilt);
 
 	float towerPower = m_pGamePad->GetThrottle();
-	m_TowerJaguar->Set(towerPower);
+	m_pTowerJaguar->Set(towerPower);
 }
 
 
