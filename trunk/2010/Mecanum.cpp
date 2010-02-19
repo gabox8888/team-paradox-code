@@ -50,8 +50,8 @@ static const bool         kWatchdogState                  = false;
 // Button assignments (note the button values are zero based (so subtract one from the number you see on the joystick)...
 static const unsigned int kB_TriggerCameraSnapshot        = 7;  // on turret joystick
 static const unsigned int kB_Trigger                      = 0;
-static const unsigned int kB_MainCylinderOut              = 2;
-static const unsigned int kB_MainCylinderIn               = 1;
+/*static const unsigned int kB_MainCylinderOut              = 2;
+static const unsigned int kB_MainCylinderIn               = 1;*/
 static const unsigned int kB_SaveDriveCoefficients        = 6; 
 static const unsigned int kB_TowerMotorUp                 = 3;
 static const unsigned int kB_TowerMotorDown               = 4;
@@ -784,10 +784,13 @@ static float Clamp(const float x, const float lo, const float hi)
 void PrototypeController::ProcessKicker()
 {
 	const bool bPressed_Trigger = m_joyButtonState.GetState( kB_Trigger );
-	m_pTriggerCylinder_IN_Solenoid->Set(bPressed_Trigger);
-	m_pTriggerCylinder_OUT_Solenoid->Set(!bPressed_Trigger);
+	m_pTriggerCylinder_OUT_Solenoid->Set(bPressed_Trigger);
+	m_pTriggerCylinder_IN_Solenoid->Set(!bPressed_Trigger);
+	m_pMainCylinder_OUT_Solenoid->Set(bPressed_Trigger);
+	m_pMainCylinder_IN_Solenoid->Set(!bPressed_Trigger);
 
-	const bool bPressed_MainCylinderOut = m_joyButtonState.GetState( kB_MainCylinderOut );
+	/*
+	 * const bool bPressed_MainCylinderOut = m_joyButtonState.GetState( kB_MainCylinderOut );
 	const bool bPressed_MainCylinderIn  = m_joyButtonState.GetState( kB_MainCylinderIn );
 	if (bPressed_MainCylinderOut)
 	{
@@ -801,10 +804,10 @@ void PrototypeController::ProcessKicker()
 	}
 	else
 	{
-		m_pMainCylinder_IN_Solenoid->Set(false);
+		m_pMainCylinder_IN_Solenoid->Set(true);
 		m_pMainCylinder_OUT_Solenoid->Set(false);
 	}
-/* Gabe...
+Gabe...
     if (bPressed_Trigger)
     {
    
