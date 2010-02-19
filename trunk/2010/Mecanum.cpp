@@ -299,7 +299,7 @@ double ParadoxEncoder::GetRate()
 			correctiveFactor = 0.5f; // TODO
 			break;
 		case k4X:
-			correctiveFactor = 0.5f; // TODO
+			correctiveFactor = 1.0f / 8.0f; // TODO
 			break;
 	}
 	
@@ -633,13 +633,14 @@ PrototypeController::PrototypeController(void)
 	m_pMainCylinderOutSolenoid = new Solenoid(2);
 	m_pTriggerSolenoid         = new Solenoid(1);
 
-	m_pFREncoder        = new ParadoxEncoder(m_pDigInFREncoder_A, m_pDigInFREncoder_B, true, Encoder::k4X);        //Optical Encoder on tom proto drive
+	const Encoder::EncodingType iEncodingType = Encoder::k4X;
+	m_pFREncoder        = new ParadoxEncoder(m_pDigInFREncoder_A, m_pDigInFREncoder_B, true, iEncodingType);        //Optical Encoder on tom proto drive
 	m_pFREncoder->Start();
-	m_pFLEncoder        = new ParadoxEncoder(m_pDigInFLEncoder_A, m_pDigInFLEncoder_B, true, Encoder::k4X);        //Optical Encoder on tom proto drive
+	m_pFLEncoder        = new ParadoxEncoder(m_pDigInFLEncoder_A, m_pDigInFLEncoder_B, true, iEncodingType);        //Optical Encoder on tom proto drive
 	m_pFLEncoder->Start();
-	m_pRREncoder        = new ParadoxEncoder(m_pDigInRREncoder_A, m_pDigInRREncoder_B, true, Encoder::k4X);        //Optical Encoder on tom proto drive
+	m_pRREncoder        = new ParadoxEncoder(m_pDigInRREncoder_A, m_pDigInRREncoder_B, true, iEncodingType);        //Optical Encoder on tom proto drive
 	m_pRREncoder->Start();
-	m_pRLEncoder        = new ParadoxEncoder(m_pDigInRLEncoder_A, m_pDigInRLEncoder_B, true, Encoder::k4X);        //Optical Encoder on tom proto drive
+	m_pRLEncoder        = new ParadoxEncoder(m_pDigInRLEncoder_A, m_pDigInRLEncoder_B, true, iEncodingType);        //Optical Encoder on tom proto drive
 	m_pRLEncoder->Start();
 
 
@@ -824,6 +825,8 @@ void PrototypeController::ProcessDriveSystem()
 	float tiltJoy=m_pGamePad->GetY();
 	float azimuth = (azimuthJoy+1.0)/2.0;
 	float tilt = (tiltJoy+1.0)/2.0;
+	//DS_PRINTF(0, "AZIM = %f", azimuth);
+	//DS_PRINTF(1, "TILT = %f", tilt);
 	
 /*
         DS_PRINTF(0, "Encoder Count FR: %05d", m_pFREncoder->Get());
@@ -831,15 +834,16 @@ void PrototypeController::ProcessDriveSystem()
         DS_PRINTF(2, "Encoder Count RR: %05d", m_pRREncoder->Get());
         DS_PRINTF(3, "Encoder Count RL: %05d", -(m_pRLEncoder->Get()));
 */
-	DS_PRINTF(0, "AZIM = %f", azimuth);
-	DS_PRINTF(1, "TILT = %f", tilt);
-	DS_PRINTF(2, "Encoder Dist: %.2f            ", (float)m_pFREncoder->GetDistance());
-	DS_PRINTF(3, "Encoder Raw: %08d", m_pFREncoder->GetRaw());
-	DS_PRINTF(4, "Rate: %.2f           ", (float)m_pFREncoder->GetAveRate());
+	DS_PRINTF(0, "Encoder Raw: %08d", m_pFREncoder->GetRaw());
+	DS_PRINTF(1, "Encoder Dist: %.2f            ", (float)m_pFREncoder->GetDistance());
+	DS_PRINTF(2, "Rate: %.2f           ", (float)m_pFREncoder->GetAveRate());
 
 
     m_pCameraAzimuthServo->Set(azimuth); 
 	m_pCameraTiltServo->Set(tilt);
+
+	float towerPower = m_pGamePad->GetThrottle();
+	m_TowerJaguar->Set(towerPower);
 }
 
 
