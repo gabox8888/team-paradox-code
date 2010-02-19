@@ -806,6 +806,29 @@ void PrototypeController::ProcessDriveSystem()
 	const float joyY = -m_pJoy->GetY();
 	const float joyZ = m_pJoy->GetZ();
 
+	//Grouping encoders by orientation to compare later.  How does GetAveRate() Work?
+	const float Frnt_EncAveSpeed = fabs((m_pFREncoder->GetAveRate() + m_pFLEncoder->GetAveRate()) * 0.5);
+	const float Back_EncAveSpeed = fabs((m_pRREncoder->GetAveRate() + m_pRLEncoder->GetAveRate()) * 0.5);
+	const float Left_EncAveSpeed = fabs((m_pFLEncoder->GetAveRate() + m_pRLEncoder->GetAveRate()) * 0.5);
+	const float Rght_EncAveSpeed = fabs((m_pFREncoder->GetAveRate() + m_pRREncoder->GetAveRate()) * 0.5);
+	
+	float FR_EncCoef = 1;
+	float FL_EncCoef = 1;
+	float RR_EncCoef = 1;
+	float RL_EncCoef = 1;
+	
+	//Comparing based on a common direction; if using mecanum strafing, compare front and back instead of left and right.
+	if (fabs(joyX) > fabs(joyY) && fabs(joyX) > fabs(joyZ))
+	{
+		if (Frnt_EncAveSpeed > Back_EncAveSpeed) {FL_EncCoef = 0.9; FR_EncCoef = 0.9};
+		if (Frnt_EncAveSpeed < Back_EncAveSpeed) {RL_EncCoef = 0.9; RR_EncCoef = 0.9};
+	}
+	else
+	{
+		if (Left_EncAveSpeed < Rght_EncAveSpeed) {FR_EncCoef = 0.9; RR_EncCoef = 0.9};
+		if (Left_EncAveSpeed > Rght_EncAveSpeed) {FL_EncCoef = 0.9; RL_EncCoef = 0.9};
+	}
+	
 	printf("joyX = %f\n", joyX);
 	printf("joyY = %f\n", joyY); 
 	printf("joyZ = %f\n", joyZ);
@@ -815,10 +838,10 @@ void PrototypeController::ProcessDriveSystem()
 	const float pwm_RR = Clamp(m_coef_X_RR * joyY + m_coef_Y_RR * joyX + m_coef_Z_RR * joyZ, -1.0f, 1.0f);;
 	const float pwm_RL = Clamp(m_coef_X_RL * joyY + m_coef_Y_RL * joyX + m_coef_Z_RL * joyZ, -1.0f, 1.0f);;
 
-	m_pFR_DriveMotor->Set(pwm_FR * kFR_PwmModulation);
-	m_pFL_DriveMotor->Set(pwm_FL * kFL_PwmModulation);
-	m_pRR_DriveMotor->Set(pwm_RR * kRR_PwmModulation);
-	m_pRL_DriveMotor->Set(pwm_RL * kRL_PwmModulation);
+	m_pFR_DriveMotor->Set(pwm_FR * FR_EncCoef * kFR_PwmModulation);
+	m_pFL_DriveMotor->Set(pwm_FL * FL_EncCoef * kFL_PwmModulation);
+	m_pRR_DriveMotor->Set(pwm_RR * RR_EncCoef * kRR_PwmModulation);
+	m_pRL_DriveMotor->Set(pwm_RL * RL_EncCoef * kRL_PwmModulation);
 	//m_TomVictor->Set(1.0f);
 	//m_FisherPrice->Set(joyX);
 	float azimuthJoy=m_pGamePad->GetX();
