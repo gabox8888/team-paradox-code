@@ -51,7 +51,6 @@ static const bool         kWatchdogState                  = false;
 static const unsigned int kB_TriggerCameraSnapshot        = 7;  // on turret joystick
 static const unsigned int kB_SaveDriveCoefficients        = 6;
 static const unsigned int kB_Trigger        = 0;
-static const unsigned int kB_Trigger2        = 0;
 static const unsigned int kB_Tower        = 1;
 static const unsigned int kB_TowerMotorUp        = 3;
 static const unsigned int kB_TowerMotorDown        = 4;
@@ -514,7 +513,8 @@ protected:
 	
 	Solenoid*             m_pSolenoidMain1;
 	Solenoid*             m_pSolenoidMain2;
-    Solenoid*             m_pSolenoidTower;
+    Solenoid*             m_pSolenoidKicker;
+    Solenoid*             m_pSolenoidKicker2;
     
     Relay*                m_pCompressorSpike;
     
@@ -635,7 +635,8 @@ PrototypeController::PrototypeController(void)
 
 	m_pSolenoidMain1     = new Solenoid (2);
 	m_pSolenoidMain2     = new Solenoid (3);
-	m_pSolenoidTower     = new Solenoid (1);
+	m_pSolenoidKicker     = new Solenoid (1);
+	m_pSolenoidKicker2    = new Solenoid (4);
 	
 	m_pCompressorSpike   = new Relay(1);
 	
@@ -898,31 +899,21 @@ void PrototypeController::ProcessOperated()
 	const bool bPressed_Trigger = m_joyButtonState.GetState( kB_Trigger );
     if (bPressed_Trigger)
     {
+   
     	m_pSolenoidMain1->Set(1);
-    }
+    	m_pSolenoidKicker2->Set(1);
+    	m_pSolenoidMain1->Set(0);
+    	Wait (2);
+    	m_pSolenoidMain2->Set(1);
+    	m_pSolenoidKicker->Set(0);   }
     else
     {
+    	Wait (1);
+    	m_pSolenoidKicker->Set(1);
     	m_pSolenoidMain1->Set(0);
+        m_pSolenoidMain2->Set(0);
+        m_pSolenoidKicker2->Set(0);
     }
-    const bool bPressed_Trigger2 = m_joyButtonState.GetState( kB_Trigger2 );
-        if (bPressed_Trigger)
-        {
-        	m_pSolenoidMain2->Set(0);
-        }
-        else
-        {
-        	m_pSolenoidMain2->Set(1);
-        }
-
-const bool bPressed_Tower = m_joyButtonState.GetState( kB_Tower );
-     if (bPressed_Tower)
-     {
-     	m_pSolenoidTower->Set(1);
-     }
-     else
-     {
-     	m_pSolenoidTower->Set(0);
-     }
 const bool bPressed_CompressorOn = m_joyButtonState.GetState( kB_CompressorOn );
           if (bPressed_CompressorOn)
           {
