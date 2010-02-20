@@ -42,8 +42,12 @@ static const float        kFL_PwmModulation     = -1.0f;
 static const float        kRR_PwmModulation     =  1.0f;
 static const float        kRL_PwmModulation     = -1.0f;
 
+static const float        kPulsesPerRevolution  = 250.0f;
+static const float        kRevolutionsPerPulse  = 1.0f / kPulsesPerRevolution;
+
 static const unsigned int kUSB_Port_GunnerStick           = 1;
-static const unsigned int kUSB_Port_GamePad               = 2;
+static const unsigned int kUSB_Port_FlightQuadrant        = 2;
+static const unsigned int kUSB_Port_GamePad               = 3;
 static const bool         kWatchdogState                  = false;
 
 
@@ -58,20 +62,29 @@ static const unsigned int kB_TowerMotorDown               = 4;
 static const unsigned int kB_CompressorOn                 = 10;
 static const unsigned int kB_CompressorOff                = 11;
 
-class DriverStationSpoof : public SensorBase
+enum FlightQuadrantButtons
 {
-public:
-	struct FRCControlData *m_controlData;
-	char *m_userControl;
-	char *m_userStatus;
-	UINT8 m_digitalOut;
-	AnalogChannel *m_batteryChannel;
-	Task m_task;
-	Dashboard m_dashboard;
+	kFQB_T1,
+	kFQB_T2,
+	kFQB_T3,
+	kFQB_T4,
+	kFQB_T5,
+	kFQB_T6,
+
+	kFQB_LeverSwitch_LEFT,
+	kFQB_LeverSwitch_MIDDLE,
+	kFQB_LeverSwitch_RIGHT,
 };
 
 
-void DumpControlData( const FRCControlData &cd )
+class DriverStationSpoof : public SensorBase
+{
+public:
+	struct FRCCommonControlData *m_controlData;
+};
+
+
+void DumpControlData( const FRCCommonControlData &cd )
 {
 	printf("packetIndex = %04X\n", (unsigned int) cd.packetIndex );
 
@@ -187,6 +200,9 @@ class ParadoxEncoder : public Encoder, public PIDSource
 	public:
 	ParadoxEncoder(DigitalSource *aSource, DigitalSource *bSource, bool reverseDirection, EncodingType encodingType)
 		: Encoder(aSource, bSource, reverseDirection, encodingType), m_encodingTypeShadow(encodingType), m_iFrame(0) {}
+
+	static ParadoxEncoder* NewWheelEncoder(DigitalSource* const aSource, DigitalSource* const bSource);
+	
 	void Update();
 	void SetMovingAverageSize(unsigned int iSize);
 	float GetAveRate() const { return m_averageRate; }
@@ -199,6 +215,17 @@ class ParadoxEncoder : public Encoder, public PIDSource
 	Counter* GetCounter() const;
 	tCounter* Get_FPGA_Counter(Counter* const pCounter) const;
 };
+
+
+ParadoxEncoder* ParadoxEncoder::NewWheelEncoder(DigitalSource* const aSource, DigitalSource* const bSource)
+{
+	const Encoder::EncodingType iEncodingType = Encoder::k4X;
+	const unsigned int kMovingAverageSize = 16;
+	ParadoxEncoder* const pEncoder = new ParadoxEncoder(aSource, bSource, true, iEncodingType);        //Optical Encoder on tom proto drive
+	pEncoder->SetMovingAverageSize(kMovingAverageSize);
+	pEncoder->Start();
+	return pEncoder;
+}
 
 
 class EncoderSpoof: public SensorBase, public CounterBase
@@ -297,13 +324,13 @@ double ParadoxEncoder::GetRate()
 	switch (m_encodingTypeShadow)
 	{
 		case k1X:
-			correctiveFactor = 0.5f; // TODO
+			correctiveFactor = 1.0f / 2.0f;
 			break;
 		case k2X:
-			correctiveFactor = 0.5f; // TODO
+			correctiveFactor = 1.0f / 8.0f;
 			break;
 		case k4X:
-			correctiveFactor = 1.0f / 8.0f; // TODO
+			correctiveFactor = 1.0f / 8.0f;
 			break;
 	}
 	
@@ -486,6 +513,7 @@ public:
 		ControllerButtonState();
 		void UpdateButtonState( DriverStation* const pDriverStation, const UINT32 port, const UINT32 iTimestamp_uS );
 
+		inline UINT16 GetAllState()                                const { return m_state; }
 		inline bool GetState( const unsigned int iButton )         const { return ( m_state & ( 1 << iButton ) ) != 0; }
 		inline bool GetPreviousState( const unsigned int iButton ) const { return ( m_previousState & ( 1 << iButton ) ) != 0; }
 		inline bool GetChangeState( const unsigned int iButton )   const { return ( m_changeState & ( 1 << iButton ) ) != 0; }
@@ -524,19 +552,24 @@ protected:
 	DigitalInput*         m_pDigInRREncoder_B;
 	DigitalInput*         m_pDigInRLEncoder_A;
 	DigitalInput*         m_pDigInRLEncoder_B;
+	DigitalInput*         m_pDigInTowerEncoder_A;
+	DigitalInput*         m_pDigInTowerEncoder_B;
+
 
 	ParadoxEncoder*       m_pFREncoder;
 	ParadoxEncoder*       m_pFLEncoder;
 	ParadoxEncoder*       m_pRREncoder;
 	ParadoxEncoder*       m_pRLEncoder;
+	ParadoxEncoder*       m_pTowerEncoder;
 
 	PIDController*        m_pSpeedController1;
 	PIDController*        m_pSpeedController2;
 	PIDController*        m_pSpeedController3;
 	PIDController*        m_pSpeedController4;
 	
-	Joystick*             m_pJoy;            // Control joystick
-	Joystick*             m_pGamePad;            // Control joystick
+	Joystick*             m_pJoy;            // Main Control joystick
+	Joystick*             m_pFlightQuadrant; // Flight quadrant (lever box).
+	Joystick*             m_pGamePad;        // Game Controller
 	
 	DriverStation*        m_pDriverStation;           //Driver Station
 	
@@ -562,6 +595,8 @@ protected:
 	UINT32                m_iTimestamp_uS;
 
 	ControllerButtonState m_joyButtonState;
+	ControllerButtonState m_flightQuadrantButtonState;
+	ControllerButtonState m_gamePadButtonState;
 	
 	#ifdef USE_LOG_FILE
 	FILE*				  m_pRobotLogFile; 
@@ -576,6 +611,9 @@ protected:
 	void   ProcessCommon();
 	void   ProcessOperated();
 	void   ProcessDriveSystem();
+	void   ProcessTower();
+	void   ProcessBallMagnet();
+	void   ProcessCamera();
 	void   ProcessKicker();
 	void   AllStop();
 	void   ProcessAutonomous();
@@ -624,12 +662,15 @@ PrototypeController::PrototypeController(void)
 
 	m_pDigInFREncoder_A = new DigitalInput(1);
 	m_pDigInFREncoder_B = new DigitalInput(4);
-	m_pDigInFLEncoder_A = new DigitalInput(5);
-	m_pDigInFLEncoder_B = new DigitalInput(6); 
+	m_pDigInFLEncoder_A = new DigitalInput(2); // 5
+	m_pDigInFLEncoder_B = new DigitalInput(3); // 6
 	m_pDigInRREncoder_A = new DigitalInput(8);
 	m_pDigInRREncoder_B = new DigitalInput(9); 
 	m_pDigInRLEncoder_A = new DigitalInput(11);
 	m_pDigInRLEncoder_B = new DigitalInput(12);
+
+	m_pDigInTowerEncoder_A = new DigitalInput(5);
+	m_pDigInTowerEncoder_B = new DigitalInput(6);
 
 	m_pCompressor = new Compressor(6, 1);
 	//m_pCompressor->Start();
@@ -639,15 +680,15 @@ PrototypeController::PrototypeController(void)
 	m_pTriggerCylinder_IN_Solenoid  = new Solenoid(1);
 	m_pTriggerCylinder_OUT_Solenoid = new Solenoid(4);
 
-	const Encoder::EncodingType iEncodingType = Encoder::k4X;
-	m_pFREncoder        = new ParadoxEncoder(m_pDigInFREncoder_A, m_pDigInFREncoder_B, true, iEncodingType);        //Optical Encoder on tom proto drive
-	m_pFREncoder->Start();
-	m_pFLEncoder        = new ParadoxEncoder(m_pDigInFLEncoder_A, m_pDigInFLEncoder_B, true, iEncodingType);        //Optical Encoder on tom proto drive
-	m_pFLEncoder->Start();
-	m_pRREncoder        = new ParadoxEncoder(m_pDigInRREncoder_A, m_pDigInRREncoder_B, true, iEncodingType);        //Optical Encoder on tom proto drive
-	m_pRREncoder->Start();
-	m_pRLEncoder        = new ParadoxEncoder(m_pDigInRLEncoder_A, m_pDigInRLEncoder_B, true, iEncodingType);        //Optical Encoder on tom proto drive
-	m_pRLEncoder->Start();
+	m_pFREncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInFREncoder_A, m_pDigInFREncoder_B);
+	m_pFLEncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInFLEncoder_A, m_pDigInFLEncoder_B);
+	m_pRREncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInRREncoder_A, m_pDigInRREncoder_B);
+	m_pRLEncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInRLEncoder_A, m_pDigInRLEncoder_B);
+
+	m_pTowerEncoder     = new ParadoxEncoder(m_pDigInTowerEncoder_A, m_pDigInTowerEncoder_B, true, Encoder::k4X);
+	m_pTowerEncoder->SetMovingAverageSize(16);
+	m_pTowerEncoder->Start();
+
 
 
 	const float kP = 0.1f;
@@ -661,8 +702,9 @@ PrototypeController::PrototypeController(void)
     m_pCameraAzimuthServo = new Servo(5);
 	m_pCameraTiltServo    = new Servo(1);
 
-	m_pJoy             = new Joystick(kUSB_Port_GunnerStick);       // Gunner joystick
-	m_pGamePad         = new Joystick(kUSB_Port_GamePad);       // GamePad
+	m_pJoy             = new Joystick(kUSB_Port_GunnerStick);    // Main Control joystick
+	m_pFlightQuadrant  = new Joystick(kUSB_Port_FlightQuadrant); // Flight quadrant (lever box).
+	m_pGamePad         = new Joystick(kUSB_Port_GamePad);        // Game Controller
 
 	#ifdef USE_LOG_FILE
 	m_pRobotLogFile = fopen("2102LogFile.ini","ab");
@@ -882,9 +924,9 @@ void PrototypeController::ProcessDriveSystem()
 		}
 	}
 	
-	printf("joyX = %f\n", joyX);
-	printf("joyY = %f\n", joyY); 
-	printf("joyZ = %f\n", joyZ);
+	//printf("joyX = %f\n", joyX);
+	//printf("joyY = %f\n", joyY); 
+	//printf("joyZ = %f\n", joyZ);
 
 	const float pwm_FR = Clamp(m_coef_X_FR * joyY + m_coef_Y_FR * joyX + m_coef_Z_FR * joyZ, -1.0f, 1.0f);
 	const float pwm_FL = Clamp(m_coef_X_FL * joyY + m_coef_Y_FL * joyX + m_coef_Z_FL * joyZ, -1.0f, 1.0f);
@@ -895,14 +937,6 @@ void PrototypeController::ProcessDriveSystem()
 	m_pFL_DriveMotor->Set(pwm_FL * FL_EncCoef * kFL_PwmModulation);
 	m_pRR_DriveMotor->Set(pwm_RR * RR_EncCoef * kRR_PwmModulation);
 	m_pRL_DriveMotor->Set(pwm_RL * RL_EncCoef * kRL_PwmModulation);
-	//m_TomVictor->Set(1.0f);
-	//m_pBallMagnet->Set(joyX);
-	float azimuthJoy=m_pGamePad->GetX();
-	float tiltJoy=m_pGamePad->GetY();
-	float azimuth = (azimuthJoy+1.0)/2.0;
-	float tilt = (tiltJoy+1.0)/2.0;
-	//DS_PRINTF(0, "AZIM = %f", azimuth);
-	//DS_PRINTF(1, "TILT = %f", tilt);
 	
 /*
         DS_PRINTF(0, "Encoder Count FR: %05d", m_pFREncoder->Get());
@@ -910,17 +944,56 @@ void PrototypeController::ProcessDriveSystem()
         DS_PRINTF(2, "Encoder Count RR: %05d", m_pRREncoder->Get());
         DS_PRINTF(3, "Encoder Count RL: %05d", -(m_pRLEncoder->Get()));
 */
-	DS_PRINTF(0, "Encoder Raw: %08d", m_pFREncoder->GetRaw());
-	DS_PRINTF(1, "Encoder Dist: %.2f            ", (float)m_pFREncoder->GetDistance());
-	DS_PRINTF(2, "AveRate: %.2f           ", (float)m_pFREncoder->GetAveRate());
-	DS_PRINTF(3, "Rate: %.2f", (float)m_pFREncoder->GetRate());
+}
 
 
+void PrototypeController::ProcessBallMagnet()
+{
+	//m_pBallMagnet->Set(joyX);
+}
+
+
+void PrototypeController::ProcessCamera()
+{
+	float azimuthJoy=m_pGamePad->GetX();
+	float tiltJoy=m_pGamePad->GetY();
+	float azimuth = (azimuthJoy+1.0)/2.0;
+	float tilt = (tiltJoy+1.0)/2.0;
+	//DS_PRINTF(0, "AZIM = %f", azimuth);
+	//DS_PRINTF(1, "TILT = %f", tilt);
     m_pCameraAzimuthServo->Set(azimuth); 
 	m_pCameraTiltServo->Set(tilt);
+}
 
-	float towerPower = m_pGamePad->GetThrottle();
+
+void PrototypeController::ProcessTower()
+{
+	//DS_PRINTF(0, "Encoder Raw: %08d", m_pTowerEncoder->GetRaw());
+	//DS_PRINTF(2, "BUTTONS: %04x", (int)m_flightQuadrantButtonState.GetAllState());
+	const float distanceInRevolutions = kRevolutionsPerPulse * (float)m_pTowerEncoder->GetDistance();
+	const float speedInRPS = kRevolutionsPerPulse * (float)m_pTowerEncoder->GetRate();
+	DS_PRINTF(0, "Encoder Dist: %.2f            ", distanceInRevolutions);
+	DS_PRINTF(1, "Rate: %.2f           ", speedInRPS);
+
+	float towerPower = m_pFlightQuadrant->GetThrottle();
 	m_pTowerJaguar->Set(towerPower);
+
+/*
+	static unsigned int s_iMovingAverage = 1;
+	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T5 ))
+	{
+		s_iMovingAverage += 1;
+		if (s_iMovingAverage > 127) s_iMovingAverage = 127;
+		m_pTowerEncoder->SetMovingAverageSize(s_iMovingAverage);
+	}
+	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T6 ))
+	{
+		s_iMovingAverage -= 1;
+		if (s_iMovingAverage < 1) s_iMovingAverage = 1;
+		m_pTowerEncoder->SetMovingAverageSize(s_iMovingAverage);
+	}
+	DS_PRINTF(2, "MAS: %04d           ", s_iMovingAverage);
+*/
 }
 
 
@@ -972,6 +1045,7 @@ void PrototypeController::ProcessCommon()
 	m_pFLEncoder->Update();
 	m_pRREncoder->Update();
 	m_pRLEncoder->Update();
+	m_pTowerEncoder->Update();
 	
 	// send text to driver station "user messages" window...
 	DriverStationLCD::GetInstance()->UpdateLCD();
@@ -1005,6 +1079,9 @@ void PrototypeController::ProcessOperated()
 {
 	ProcessDriveSystem();
 	ProcessKicker();
+	ProcessTower();
+	ProcessBallMagnet();
+	ProcessCamera();
 
 	// Check if driver requesting save of coefficients...
 	if ( m_joyButtonState.GetLongHoldDown( kB_SaveDriveCoefficients, m_iTimestamp_uS ) )
@@ -1025,6 +1102,8 @@ void PrototypeController::ProcessTime()
 void PrototypeController::ProcessControllers()
 {
 	m_joyButtonState.UpdateButtonState( m_pDriverStation, kUSB_Port_GunnerStick, m_iTimestamp_uS );
+	m_flightQuadrantButtonState.UpdateButtonState( m_pDriverStation, kUSB_Port_FlightQuadrant, m_iTimestamp_uS );
+	m_gamePadButtonState.UpdateButtonState( m_pDriverStation, kUSB_Port_GamePad, m_iTimestamp_uS );
 }
 
 
@@ -1032,7 +1111,7 @@ void PrototypeController::ProcessDebug()
 {
 	//const bool bPressed_SnapshotButton = m_joyButtonState.GetDownStroke( kB_TriggerCameraSnapshot );
 	
-	//const FRCControlData &cd = *(((DriverStationSpoof*)m_pDriverStation)->m_controlData);
+	//const FRCCommonControlData &cd = *(((DriverStationSpoof*)m_pDriverStation)->m_controlData);
 	//DumpControlData( cd );
 }
 
