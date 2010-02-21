@@ -51,17 +51,6 @@ static const unsigned int kUSB_Port_GamePad               = 3;
 static const bool         kWatchdogState                  = false;
 
 
-// Button assignments (note the button values are zero based (so subtract one from the number you see on the joystick)...
-static const unsigned int kB_TriggerCameraSnapshot        = 7;  // on turret joystick
-static const unsigned int kB_Trigger                      = 0;
-/*static const unsigned int kB_MainCylinderOut              = 2;
-static const unsigned int kB_MainCylinderIn               = 1;*/
-static const unsigned int kB_SaveDriveCoefficients        = 6; 
-static const unsigned int kB_TowerMotorUp                 = 3;
-static const unsigned int kB_TowerMotorDown               = 4;
-static const unsigned int kB_CompressorOn                 = 10;
-static const unsigned int kB_CompressorOff                = 11;
-
 enum FlightQuadrantButtons
 {
 	kFQB_T1,
@@ -76,6 +65,35 @@ enum FlightQuadrantButtons
 	kFQB_LeverSwitch_RIGHT,
 };
 
+
+enum ThrustMasterButtons
+{
+	kJOY_Trigger,            // 0
+	kJOY_ThumbTriggerCenter, // 1
+	kJOY_ThumbTriggerLeft,   // 2
+	kJOY_ThumbTriggerRight,  // 3
+	kJOY_Button5,            // 4
+	kJOY_Button6,            // 5
+	kJOY_Button7,            // 6
+	kJOY_Button8,            // 7
+	kJOY_Button9,            // 8
+	kJOY_Button10,           // 9
+	kJOY_Button11,           // 10
+	kJOY_Button12,           // 11
+	kJOY_Button13,           // 12
+	kJOY_Button14,           // 13
+	kJOY_Button15,           // 14
+	kJOY_Button16,           // 15
+};
+
+// Button assignments (note the button values are zero based (so subtract one from the number you see on the joystick)...
+static const unsigned int kB_CalibrateButton              = kJOY_Button8;
+static const unsigned int kB_Trigger                      = kJOY_Trigger;
+//static const unsigned int kB_MainCylinderOut              = 2;
+//static const unsigned int kB_MainCylinderIn               = 1;
+static const unsigned int kB_LoadDriveCoefficients        = kJOY_Button7; 
+static const unsigned int kB_CompressorOn                 = kJOY_Button11;
+static const unsigned int kB_CompressorOff                = kJOY_Button12;
 
 class DriverStationSpoof : public SensorBase
 {
@@ -205,10 +223,13 @@ class ParadoxEncoder : public Encoder, public PIDSource
 	
 	void Update();
 	void SetMovingAverageSize(unsigned int iSize);
-	float GetAveRate() const { return m_averageRate; }
+	inline float GetAveRateRPS() const { return m_averageRate; }
 	
 	double GetRate();
 	virtual double PIDGet();
+
+	inline float GetRateRPS() { return kRevolutionsPerPulse * (float)GetRate(); }
+	inline float GetRevolutions() { return kRevolutionsPerPulse * (float)GetDistance(); }
 
 	protected:
 	tEncoder* Get_FPGA_Encoder() const;
@@ -340,13 +361,13 @@ double ParadoxEncoder::GetRate()
 
 double ParadoxEncoder::PIDGet()
 {
-	return GetRate();
+	return GetRateRPS();
 }
 
 
 void ParadoxEncoder::Update()
 {
-	m_rates[m_iFrame % kNumSamples] = (float)GetRate();
+	m_rates[m_iFrame % kNumSamples] = (float)GetRateRPS();
 	float sumRates = 0.0f;
 	for (int i = 0; i < kNumSamples; i++)
 	{
@@ -390,6 +411,8 @@ class ParadoxSpeedController
 	~ParadoxSpeedController();
 	void SetSetpoint(float setpoint);
 	void SetEnabled(const bool is_enabled);
+	inline bool IsEnabled() const { return m_isEnabled; }
+	inline float GetSetpoint() const { return m_setpoint; }
 };
 
 
@@ -502,11 +525,14 @@ public:
 		// Which buttons have changed state since the last iteration (1 = state changed; 0 = no state change)...
 		UINT16    m_changeState;
 
+		// Which buttons have been held down for kHoldDownTime_uS (single trigger)...
+		UINT16    m_longHoldState;
+
 		// Passively initialize on  the first poll...
 		bool      m_bHasBeenInitialized;
 
-		// Timestamp where button changed state...
-		UINT32    m_stateTimestamp[16];
+		// Ellapsed time in the down state (or a big negative number if m_longHoldState has been triggered )...
+		INT32     m_downTime[16];
 
 	public:
 
@@ -517,13 +543,9 @@ public:
 		inline bool GetState( const unsigned int iButton )         const { return ( m_state & ( 1 << iButton ) ) != 0; }
 		inline bool GetPreviousState( const unsigned int iButton ) const { return ( m_previousState & ( 1 << iButton ) ) != 0; }
 		inline bool GetChangeState( const unsigned int iButton )   const { return ( m_changeState & ( 1 << iButton ) ) != 0; }
-		inline UINT32 GetChangeTime( const unsigned int iButton )  const { return m_stateTimestamp[iButton]; }
 		inline bool GetDownStroke( const unsigned int iButton )    const { return ( ( m_state & m_changeState ) & ( 1 << iButton ) ) != 0; }
 		inline bool GetUpStroke( const unsigned int iButton )      const { return ( ( ~m_state & m_changeState ) & ( 1 << iButton ) ) != 0; }
-		inline bool GetLongHoldDown( const unsigned int iButton, const UINT32 iTimestamp_uS ) const
-		{
-			return ( GetState( iButton ) && ( (INT32) ( iTimestamp_uS - GetChangeTime( iButton ) ) > kHoldDownTime_uS ) );
-		}
+		inline bool GetLongHoldDown( const unsigned int iButton )  const { return ( m_longHoldState & ( 1 << iButton ) ) != 0; }
 	};
 
 
@@ -562,10 +584,14 @@ protected:
 	ParadoxEncoder*       m_pRLEncoder;
 	ParadoxEncoder*       m_pTowerEncoder;
 
-	PIDController*        m_pSpeedController1;
-	PIDController*        m_pSpeedController2;
-	PIDController*        m_pSpeedController3;
-	PIDController*        m_pSpeedController4;
+	ParadoxSpeedController* m_pSpeedController_FR;
+	ParadoxSpeedController* m_pSpeedController_FL;
+	ParadoxSpeedController* m_pSpeedController_RR;
+	ParadoxSpeedController* m_pSpeedController_RL;
+
+	ParadoxSpeedController* m_pTestSpeedController;
+
+	PIDController*        m_pTowerPositionController;
 	
 	Joystick*             m_pJoy;            // Main Control joystick
 	Joystick*             m_pFlightQuadrant; // Flight quadrant (lever box).
@@ -589,10 +615,18 @@ protected:
 	float                 m_coef_Y_RL;
 	float                 m_coef_Z_RL;
 
-        float  				  joyXprint;
+	// Maximum wheel speed (revolutions per second).  This is actually the minimum of all eight wheel speed calibration measurements (4 wheels x 2 directions).
+	// So this represents the fastest set point wheel attempt on the wheel speed controllers.  The idea is that even the slowest wheel can reach this speed...
+	float                 m_maxWheelRPS;        
         
-
+	// FPGA time (uS) as of the most recent ProcessTime() call...
 	UINT32                m_iTimestamp_uS;
+
+	// Delta FPGA time (uS) as of the most recent ProcessTime() call (time of last iteration)...
+	INT32                 m_iDeltaTime_uS;
+
+	// m_iDeltaTime_uS, in seconds...
+	float                 m_dT;
 
 	ControllerButtonState m_joyButtonState;
 	ControllerButtonState m_flightQuadrantButtonState;
@@ -615,6 +649,7 @@ protected:
 	void   ProcessBallMagnet();
 	void   ProcessCamera();
 	void   ProcessKicker();
+	void   Calibrate();
 	void   AllStop();
 	void   ProcessAutonomous();
 	void   LoadDriveCoefficients();
@@ -651,6 +686,10 @@ PrototypeController::PrototypeController(void)
 	GetWatchdog().SetExpiration(0.1);
 	GetWatchdog().SetEnabled(kWatchdogState); 			
 			
+	m_iTimestamp_uS = GetFPGATime();
+	m_iDeltaTime_uS = 0;
+	m_dT = 0.0f;
+	
 	InitializeCamera();
 	
 	m_pFR_DriveMotor   = new Jaguar(6);           // Front Right drive Motor
@@ -662,15 +701,15 @@ PrototypeController::PrototypeController(void)
 
 	m_pDigInFREncoder_A = new DigitalInput(1);
 	m_pDigInFREncoder_B = new DigitalInput(4);
-	m_pDigInFLEncoder_A = new DigitalInput(2); // 5
-	m_pDigInFLEncoder_B = new DigitalInput(3); // 6
+	m_pDigInFLEncoder_A = new DigitalInput(5);
+	m_pDigInFLEncoder_B = new DigitalInput(6);
 	m_pDigInRREncoder_A = new DigitalInput(8);
 	m_pDigInRREncoder_B = new DigitalInput(9); 
 	m_pDigInRLEncoder_A = new DigitalInput(11);
 	m_pDigInRLEncoder_B = new DigitalInput(12);
 
-	m_pDigInTowerEncoder_A = new DigitalInput(5);
-	m_pDigInTowerEncoder_B = new DigitalInput(6);
+	m_pDigInTowerEncoder_A = new DigitalInput(2);
+	m_pDigInTowerEncoder_B = new DigitalInput(3);
 
 	m_pCompressor = new Compressor(6, 1);
 	//m_pCompressor->Start();
@@ -694,10 +733,14 @@ PrototypeController::PrototypeController(void)
 	const float kP = 0.1f;
 	const float kI = 0.0f;
 	const float kD = 0.0f;
-	m_pSpeedController1 = new PIDController(kP, kI, kD, m_pFREncoder, m_pFR_DriveMotor);
-	m_pSpeedController2 = new PIDController(kP, kI, kD, m_pFLEncoder, m_pFL_DriveMotor);
-	m_pSpeedController3 = new PIDController(kP, kI, kD, m_pRREncoder, m_pRR_DriveMotor);
-	m_pSpeedController4 = new PIDController(kP, kI, kD, m_pRLEncoder, m_pRL_DriveMotor);
+	m_pSpeedController_FR = new ParadoxSpeedController(kP, kI, kD, m_pFREncoder, m_pFR_DriveMotor);
+	m_pSpeedController_FL = new ParadoxSpeedController(kP, kI, kD, m_pFLEncoder, m_pFL_DriveMotor);
+	m_pSpeedController_RR = new ParadoxSpeedController(kP, kI, kD, m_pRREncoder, m_pRR_DriveMotor);
+	m_pSpeedController_RL = new ParadoxSpeedController(kP, kI, kD, m_pRLEncoder, m_pRL_DriveMotor);
+
+	m_pTestSpeedController = new ParadoxSpeedController(kP, kI, kD, m_pTowerEncoder, m_pTowerJaguar);
+
+	//m_pTowerPositionController = new PIDController(kP, kI, kD, m_pTowerEncoder, m_pTowerJaguar);
 
     m_pCameraAzimuthServo = new Servo(5);
 	m_pCameraTiltServo    = new Servo(1);
@@ -707,7 +750,7 @@ PrototypeController::PrototypeController(void)
 	m_pGamePad         = new Joystick(kUSB_Port_GamePad);        // Game Controller
 
 	#ifdef USE_LOG_FILE
-	m_pRobotLogFile = fopen("2102LogFile.ini","ab");
+	m_pRobotLogFile = fopen("2102LogFile.txt","ab");
 	#endif
 
 	_LOG("**********************************************************************************************\n");
@@ -730,6 +773,9 @@ PrototypeController::PrototypeController(void)
 	m_coef_Y_RL = -1.000000;
 	m_coef_Z_RL = 1.000000;
 
+	// Hard default for max wheel speed...
+	m_maxWheelRPS = 5.0f; // RPS
+	
 	LoadDriveCoefficients();
 }
 
@@ -759,7 +805,7 @@ void PrototypeController::LoadDriveCoefficients()
 
 		fclose(fp_steeringConfig);
 
-		_LOG("Drive Coefficients\n");
+		_LOG("Loaded Drive Coefficients\n");
 		_LOG("\tm_coef_X_FR = %f\n", m_coef_X_FR);
 		_LOG("\tm_coef_Y_FR = %f\n", m_coef_Y_FR);
 		_LOG("\tm_coef_Z_FR = %f\n", m_coef_Z_FR);
@@ -885,11 +931,11 @@ void PrototypeController::ProcessDriveSystem()
 	const float joyY = -m_pJoy->GetY();
 	const float joyZ = m_pJoy->GetZ();
 
-	//Grouping encoders by orientation to compare later.  How does GetAveRate() Work?
-	const float Frnt_EncSpeed = fabs((m_pFREncoder->GetRate() + m_pFLEncoder->GetRate()) * 0.5);
-	const float Back_EncSpeed = fabs((m_pRREncoder->GetRate() + m_pRLEncoder->GetRate()) * 0.5);
-	const float Left_EncSpeed = fabs((m_pFLEncoder->GetRate() + m_pRLEncoder->GetRate()) * 0.5);
-	const float Rght_EncSpeed = fabs((m_pFREncoder->GetRate() + m_pRREncoder->GetRate()) * 0.5);
+	//Grouping encoders by orientation to compare later.  How does GetAveRateRPS() Work?
+	const float Frnt_EncSpeed = fabs((m_pFREncoder->GetRateRPS() + m_pFLEncoder->GetRateRPS()) * 0.5);
+	const float Back_EncSpeed = fabs((m_pRREncoder->GetRateRPS() + m_pRLEncoder->GetRateRPS()) * 0.5);
+	const float Left_EncSpeed = fabs((m_pFLEncoder->GetRateRPS() + m_pRLEncoder->GetRateRPS()) * 0.5);
+	const float Rght_EncSpeed = fabs((m_pFREncoder->GetRateRPS() + m_pRREncoder->GetRateRPS()) * 0.5);
 	
 	float FR_EncCoef = 1;
 	float FL_EncCoef = 1;
@@ -970,13 +1016,33 @@ void PrototypeController::ProcessTower()
 {
 	//DS_PRINTF(0, "Encoder Raw: %08d", m_pTowerEncoder->GetRaw());
 	//DS_PRINTF(2, "BUTTONS: %04x", (int)m_flightQuadrantButtonState.GetAllState());
-	const float distanceInRevolutions = kRevolutionsPerPulse * (float)m_pTowerEncoder->GetDistance();
-	const float speedInRPS = kRevolutionsPerPulse * (float)m_pTowerEncoder->GetRate();
-	DS_PRINTF(0, "Encoder Dist: %.2f            ", distanceInRevolutions);
-	DS_PRINTF(1, "Rate: %.2f           ", speedInRPS);
+	const float distanceInRevolutions = m_pTowerEncoder->GetRevolutions();
+	const float speedInRPS = m_pTowerEncoder->GetAveRateRPS();
+	DS_PRINTF(0, "Encodr: %.2f (%.1f)", speedInRPS, distanceInRevolutions );
 
-	float towerPower = m_pFlightQuadrant->GetThrottle();
+	const float towerPower = -m_pFlightQuadrant->GetThrottle();
+	static bool s_bUseSpeedController = false;
+	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T5 ))
+	{
+		s_bUseSpeedController = true;
+	}
+	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T6 ))
+	{
+		s_bUseSpeedController = false;
+	}
+
+	m_pTestSpeedController->SetEnabled(s_bUseSpeedController);
+	if (s_bUseSpeedController)
+	{
+		const float setPoint = towerPower * m_maxWheelRPS;
+		m_pTestSpeedController->SetSetpoint(setPoint);
+		DS_PRINTF(1, "SP: %.2f", setPoint );
+	}
+	else
+	{
 	m_pTowerJaguar->Set(towerPower);
+	}
+
 
 /*
 	static unsigned int s_iMovingAverage = 1;
@@ -1084,33 +1150,97 @@ void PrototypeController::ProcessOperated()
 	ProcessCamera();
 
 	// Check if driver requesting save of coefficients...
-	if ( m_joyButtonState.GetLongHoldDown( kB_SaveDriveCoefficients, m_iTimestamp_uS ) )
+	if ( m_joyButtonState.GetLongHoldDown( kB_LoadDriveCoefficients ) )
 	{
 		LoadDriveCoefficients();
 	}
 
+	if ( m_joyButtonState.GetLongHoldDown( kB_CalibrateButton ) )
+	{
+		Calibrate();
+	}
+	
 	Wait(0.025);
+}
+
+
+void PrototypeController::Calibrate()
+{
+	_LOG("********************* BEGIN CALIBRATION *********************\n");
+	const bool bSaveTestSpeedControllerIsEnabled = m_pTestSpeedController->IsEnabled();
+	m_pTestSpeedController->SetEnabled(false); // Need to disable the speed controller since it runs in another thread.
+	m_pTowerJaguar->Set(1.0f);
+	Wait(0.5); // let motor spin up.
+	const unsigned int kNumSamples = 8;
+	const float kSamplePeriod = 0.25f;
+	const float kSampleSleep = kSamplePeriod / float(kNumSamples);
+	float forwardSpeedSum = 0.0f;
+	for (unsigned int i = 0; i < kNumSamples; i++)
+	{
+		forwardSpeedSum += m_pTowerEncoder->GetRateRPS();
+		Wait((double)kSampleSleep);
+	}
+	const float maxForwardSpeed = forwardSpeedSum / float(kNumSamples);
+
+
+
+	m_pTowerJaguar->Set(-1.0f);
+	Wait(0.5); // let motor spin up.
+	float reverseSpeedSum = 0.0f;
+	for (unsigned int i = 0; i < kNumSamples; i++)
+	{
+		reverseSpeedSum += m_pTowerEncoder->GetRateRPS();
+		Wait((double)kSampleSleep);
+	}
+	const float maxReverseSpeed = reverseSpeedSum / float(kNumSamples);
+
+	_LOG("maxForwardSpeed = %f\n", maxForwardSpeed);
+	_LOG("maxReverseSpeed = %f\n", maxReverseSpeed);
+
+	m_pTestSpeedController->SetEnabled(bSaveTestSpeedControllerIsEnabled); // restore speed controller state.
+
+	m_maxWheelRPS = 9999999.0f;
+	if ( fabs(maxForwardSpeed) < m_maxWheelRPS )
+	{
+		m_maxWheelRPS = fabs(maxForwardSpeed);
+	}
+
+	if ( fabs(maxReverseSpeed) < m_maxWheelRPS )
+	{
+		m_maxWheelRPS = fabs(maxReverseSpeed);
+	}
+
+	// We de-rate the maximum wheel speed by a constant.  This is because we do our calibration on the bench with the wheels raised off the ground.
+	// To get a decent estimate of the max wheel speed under load, on carpet, we factor in this constant...
+	const float kDerateMaxWheelSpeed = 0.8f;
+	m_maxWheelRPS *= kDerateMaxWheelSpeed;
+
+	_LOG("m_maxWheelRPS = %f\n", m_maxWheelRPS);
+	_LOG("Calibration Complete.\n");
+
+	_LOG_FLUSH();
 }
 
 
 void PrototypeController::ProcessTime()
 {
-	m_iTimestamp_uS = GetFPGATime();
+	UINT32 iCurrentTime = GetFPGATime();
+	m_iDeltaTime_uS = (iCurrentTime >= m_iTimestamp_uS) ? (iCurrentTime - m_iTimestamp_uS) : (1 + iCurrentTime + (0xFFFFFFFF - m_iTimestamp_uS));
+	m_dT = float(m_iDeltaTime_uS) / 1000000.0f;
+	m_iTimestamp_uS = iCurrentTime;
 }
 
 
 void PrototypeController::ProcessControllers()
 {
-	m_joyButtonState.UpdateButtonState( m_pDriverStation, kUSB_Port_GunnerStick, m_iTimestamp_uS );
-	m_flightQuadrantButtonState.UpdateButtonState( m_pDriverStation, kUSB_Port_FlightQuadrant, m_iTimestamp_uS );
-	m_gamePadButtonState.UpdateButtonState( m_pDriverStation, kUSB_Port_GamePad, m_iTimestamp_uS );
+	m_joyButtonState.UpdateButtonState( m_pDriverStation, kUSB_Port_GunnerStick, m_iDeltaTime_uS );
+	m_flightQuadrantButtonState.UpdateButtonState( m_pDriverStation, kUSB_Port_FlightQuadrant, m_iDeltaTime_uS );
+	m_gamePadButtonState.UpdateButtonState( m_pDriverStation, kUSB_Port_GamePad, m_iDeltaTime_uS );
 }
 
 
 void PrototypeController::ProcessDebug()
 {
-	//const bool bPressed_SnapshotButton = m_joyButtonState.GetDownStroke( kB_TriggerCameraSnapshot );
-	
 	//const FRCCommonControlData &cd = *(((DriverStationSpoof*)m_pDriverStation)->m_controlData);
 	//DumpControlData( cd );
 }
@@ -1122,7 +1252,7 @@ PrototypeController::ControllerButtonState::ControllerButtonState()
 }
 
 
-void PrototypeController::ControllerButtonState::UpdateButtonState( DriverStation* const pDriverStation, const UINT32 port, const UINT32 iTimestamp_uS )
+void PrototypeController::ControllerButtonState::UpdateButtonState( DriverStation* const pDriverStation, const UINT32 port, const UINT32 iDeltaTime_uS )
 {
 	// Get button state bits for given port from driver station...
 	UINT16 buttonState = pDriverStation->GetStickButtons( port );
@@ -1144,12 +1274,26 @@ void PrototypeController::ControllerButtonState::UpdateButtonState( DriverStatio
 	m_changeState = m_state ^ m_previousState;
 
 	// If the state has changed, record the time that it changed...
-	UINT16 mask = m_changeState;
-	for ( unsigned int i = 0; i < 16; i++, mask >>= 1 )
+	UINT16 maskChangeState = m_changeState;
+	UINT16 maskState = m_state;
+	UINT16 mask = 1;
+	m_longHoldState = 0;
+	for ( unsigned int i = 0; i < 16; i++, maskChangeState >>= 1, maskState >>= 1, mask <<= 1 )
 	{
-		if ( mask )
+		if ( maskState & 1 )
 		{
-			m_stateTimestamp[i] = iTimestamp_uS;
+			if ( maskChangeState & 1 )
+			{
+				m_downTime[i] = 0;
+			}
+
+			if ( m_downTime[i] > kHoldDownTime_uS )
+			{
+				m_longHoldState |= mask;
+				m_downTime[i] = -(1U<<31); // Kludge to avoid multiple long hold down triggers
+			}
+
+			m_downTime[i] += iDeltaTime_uS;
 		}
 	}
 }
