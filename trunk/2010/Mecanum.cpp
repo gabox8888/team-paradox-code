@@ -45,6 +45,10 @@ static const float        kRL_PwmModulation     = -1.0f;
 static const float        kPulsesPerRevolution  = 250.0f;
 static const float        kRevolutionsPerPulse  = 1.0f / kPulsesPerRevolution;
 
+static const float        kDefaultWheel_P       = 0.1f;
+static const float        kDefaultWheel_I       = 0.0f;
+static const float        kDefaultWheel_D       = 0.0f;
+
 static const unsigned int kUSB_Port_GunnerStick           = 1;
 static const unsigned int kUSB_Port_FlightQuadrant        = 2;
 static const unsigned int kUSB_Port_GamePad               = 3;
@@ -379,7 +383,7 @@ void ParadoxEncoder::Update()
 }
 
 
-
+static const float kDefaultMaxWheelSpeed = 5.0f; // RPS
 class PIDSource;
 class Notifier;
 class ParadoxSpeedController
@@ -396,6 +400,7 @@ class ParadoxSpeedController
 	float            m_error;
 	float            m_pwm;
 	float            m_dT;
+	float            m_fMaxSpeed;
 
 	SEM_ID           m_mutexSemaphore;
 	Notifier*        m_pNotifier;
@@ -411,12 +416,14 @@ class ParadoxSpeedController
 	~ParadoxSpeedController();
 	void SetSetpoint(float setpoint);
 	void SetEnabled(const bool is_enabled);
+	void SetMaxSpeed(const float fMaxSpeed);
+	void SetPID(const float kP, const float kI, const float kD);
 	inline bool IsEnabled() const { return m_isEnabled; }
 	inline float GetSetpoint() const { return m_setpoint; }
 };
 
 
-ParadoxSpeedController::ParadoxSpeedController(float Kp, float Ki, float Kd, PIDSource* const pPidInput, SpeedController* const pOutputSpeedController, float dT) : m_mutexSemaphore(0)
+ParadoxSpeedController::ParadoxSpeedController(float kP, float kI, float kD, PIDSource* const pPidInput, SpeedController* const pOutputSpeedController, float dT) : m_mutexSemaphore(0)
 {
 	m_mutexSemaphore = semBCreate(SEM_Q_PRIORITY, SEM_FULL);
 
@@ -426,9 +433,9 @@ ParadoxSpeedController::ParadoxSpeedController(float Kp, float Ki, float Kd, PID
 	m_pPidInput = pPidInput;
 	m_pOutputSpeedController = pOutputSpeedController;
 
-	m_P = Kp;
-	m_I = Ki;
-	m_D = Kd;
+	m_P = kP;
+	m_I = kI;
+	m_D = kD;
 
 	m_isEnabled = false;
 	m_setpoint = 0.0f;
@@ -459,11 +466,19 @@ void ParadoxSpeedController::Calculate()
 {
 CRITICAL_REGION(m_mutexSemaphore)
 {
-	if (m_isEnabled)
+	if ( m_isEnabled && DriverStation::GetInstance()->IsEnabled() )
 	{
 		const float measured_point = m_pPidInput->PIDGet();
 		m_error = m_setpoint - measured_point;
 		m_errorIntegral += m_error * m_dT;
+
+		// Put a limit on the max integral to limit the effects of "integral windup"...
+		const float fMaxIntegral = 1.5f * m_fMaxSpeed;
+		if (fabs(m_errorIntegral) > fMaxIntegral)
+		{
+			m_errorIntegral = (m_errorIntegral > 0.0f) ? fMaxIntegral : -fMaxIntegral;
+		}
+		
 		const float derivative = (m_error - m_previousError) / m_dT;
 		const float fManipulatedVariable = m_P * m_error + m_I * m_errorIntegral + m_D * derivative;
 		m_pwm += fManipulatedVariable;
@@ -480,6 +495,10 @@ void ParadoxSpeedController::SetSetpoint(const float setpoint)
 CRITICAL_REGION(m_mutexSemaphore)
 {
 	m_setpoint = setpoint;
+	if (fabs(m_setpoint) > m_fMaxSpeed)
+	{
+		m_setpoint = (m_setpoint > 0.0f) ? m_fMaxSpeed : -m_fMaxSpeed;
+	}
 }
 END_REGION;
 }
@@ -501,6 +520,28 @@ CRITICAL_REGION(m_mutexSemaphore)
 END_REGION;
 }
 
+
+void ParadoxSpeedController::SetMaxSpeed(const float fMaxSpeed)
+{
+CRITICAL_REGION(m_mutexSemaphore)
+{
+	m_fMaxSpeed = fMaxSpeed;
+	if (m_fMaxSpeed < 0.0f) m_fMaxSpeed = 0.0f;
+}
+END_REGION;
+}
+
+
+void ParadoxSpeedController::SetPID(const float kP, const float kI, const float kD)
+{
+CRITICAL_REGION(m_mutexSemaphore)
+{
+	m_P = kP;
+	m_I = kI;
+	m_D = kD;
+}
+END_REGION;
+}
 
 
 class PrototypeController : public RobotBase
@@ -599,6 +640,7 @@ protected:
 	
 	DriverStation*        m_pDriverStation;           //Driver Station
 	
+	// Mecanum drive coefficients...
 	float                 m_coef_X_FR;
 	float                 m_coef_Y_FR;
 	float                 m_coef_Z_FR;
@@ -619,6 +661,11 @@ protected:
 	// So this represents the fastest set point wheel attempt on the wheel speed controllers.  The idea is that even the slowest wheel can reach this speed...
 	float                 m_maxWheelRPS;        
         
+	// PID constants for wheel speed controller...
+	float                 m_wheel_kP;
+	float                 m_wheel_kI;
+	float                 m_wheel_kD;
+
 	// FPGA time (uS) as of the most recent ProcessTime() call...
 	UINT32                m_iTimestamp_uS;
 
@@ -654,6 +701,9 @@ protected:
 	void   ProcessAutonomous();
 	void   LoadDriveCoefficients();
 	void   SaveDriveCoefficients();
+	static ParadoxSpeedController* NewWheelSpeedController(PIDSource* const pPidInput, SpeedController* const pOutputSpeedController);
+	void   SetWheelSpeedLimits(const float wheelSpeedLimit);
+	void   SetWheelPID(const float kP, const float kI, const float kD);
 
 public:
 	PrototypeController(void);
@@ -730,15 +780,12 @@ PrototypeController::PrototypeController(void)
 
 
 
-	const float kP = 0.1f;
-	const float kI = 0.0f;
-	const float kD = 0.0f;
-	m_pSpeedController_FR = new ParadoxSpeedController(kP, kI, kD, m_pFREncoder, m_pFR_DriveMotor);
-	m_pSpeedController_FL = new ParadoxSpeedController(kP, kI, kD, m_pFLEncoder, m_pFL_DriveMotor);
-	m_pSpeedController_RR = new ParadoxSpeedController(kP, kI, kD, m_pRREncoder, m_pRR_DriveMotor);
-	m_pSpeedController_RL = new ParadoxSpeedController(kP, kI, kD, m_pRLEncoder, m_pRL_DriveMotor);
+	m_pSpeedController_FR = NewWheelSpeedController(m_pFREncoder, m_pFR_DriveMotor);
+	m_pSpeedController_FL = NewWheelSpeedController(m_pFLEncoder, m_pFL_DriveMotor);
+	m_pSpeedController_RR = NewWheelSpeedController(m_pRREncoder, m_pRR_DriveMotor);
+	m_pSpeedController_RL = NewWheelSpeedController(m_pRLEncoder, m_pRL_DriveMotor);
 
-	m_pTestSpeedController = new ParadoxSpeedController(kP, kI, kD, m_pTowerEncoder, m_pTowerJaguar);
+	m_pTestSpeedController = NewWheelSpeedController(m_pTowerEncoder, m_pTowerJaguar);
 
 	//m_pTowerPositionController = new PIDController(kP, kI, kD, m_pTowerEncoder, m_pTowerJaguar);
 
@@ -774,8 +821,16 @@ PrototypeController::PrototypeController(void)
 	m_coef_Z_RL = 1.000000;
 
 	// Hard default for max wheel speed...
-	m_maxWheelRPS = 5.0f; // RPS
+	m_maxWheelRPS = kDefaultMaxWheelSpeed; // RPS
+	SetWheelSpeedLimits(m_maxWheelRPS);
 	
+	// Set default wheel PID constants...
+	m_wheel_kP = kDefaultWheel_P;
+	m_wheel_kI = kDefaultWheel_I;
+	m_wheel_kD = kDefaultWheel_D;
+	SetWheelPID(m_wheel_kP, m_wheel_kI, m_wheel_kD);
+	
+	// Load mecanum drive coefficients from file...
 	LoadDriveCoefficients();
 }
 
@@ -1215,6 +1270,9 @@ void PrototypeController::Calibrate()
 	const float kDerateMaxWheelSpeed = 0.8f;
 	m_maxWheelRPS *= kDerateMaxWheelSpeed;
 
+	// Update wheel speed limits...
+	SetWheelSpeedLimits(m_maxWheelRPS);
+
 	_LOG("m_maxWheelRPS = %f\n", m_maxWheelRPS);
 	_LOG("Calibration Complete.\n");
 
@@ -1243,6 +1301,25 @@ void PrototypeController::ProcessDebug()
 {
 	//const FRCCommonControlData &cd = *(((DriverStationSpoof*)m_pDriverStation)->m_controlData);
 	//DumpControlData( cd );
+
+/*
+	static bool s_bFirstTime = true;
+	static float s_tweakP, s_tweakI;
+	const float flight_P = m_pFlightQuadrant->GetX() / 5.0f;
+	const float flight_I = m_pFlightQuadrant->GetY() / 5.0f;
+	if (s_bFirstTime)
+	{
+		s_tweakP = kDefaultWheel_P - flight_P;
+		s_tweakI = kDefaultWheel_I - flight_I;
+		s_bFirstTime = false;
+	}
+	m_wheel_kP = s_tweakP + flight_P;
+	m_wheel_kI = s_tweakI + flight_I;
+	if (m_wheel_kP < 0.0f) m_wheel_kP = 0.0f;
+	if (m_wheel_kI < 0.0f) m_wheel_kI = 0.0f;
+	SetWheelPID(m_wheel_kP, m_wheel_kI, m_wheel_kD);
+	DS_PRINTF(3, "P:%.2f, I:%.2f", m_wheel_kP, m_wheel_kI);
+*/
 }
 
 
@@ -1306,6 +1383,36 @@ void PrototypeController::AllStop()
 	m_pFL_DriveMotor->Set(0.0f);
 	m_pRR_DriveMotor->Set(0.0f);
 	m_pRL_DriveMotor->Set(0.0f);
+}
+
+
+ParadoxSpeedController* PrototypeController::NewWheelSpeedController(PIDSource* const pPidInput, SpeedController* const pOutputSpeedController)
+{
+	ParadoxSpeedController* const pSpeedController = new ParadoxSpeedController(kDefaultWheel_P, kDefaultWheel_I, kDefaultWheel_D, pPidInput, pOutputSpeedController);
+	pSpeedController->SetMaxSpeed(kDefaultMaxWheelSpeed);
+	return pSpeedController;
+}
+
+
+void PrototypeController::SetWheelSpeedLimits(const float wheelSpeedLimit)
+{
+	m_pSpeedController_FR->SetMaxSpeed(wheelSpeedLimit);
+	m_pSpeedController_FL->SetMaxSpeed(wheelSpeedLimit);
+	m_pSpeedController_RR->SetMaxSpeed(wheelSpeedLimit);
+	m_pSpeedController_RL->SetMaxSpeed(wheelSpeedLimit);
+
+	m_pTestSpeedController->SetMaxSpeed(wheelSpeedLimit);
+}
+
+
+void PrototypeController::SetWheelPID(const float kP, const float kI, const float kD)
+{
+	m_pSpeedController_FR->SetPID(kP, kI, kD);
+	m_pSpeedController_FL->SetPID(kP, kI, kD);
+	m_pSpeedController_RR->SetPID(kP, kI, kD);
+	m_pSpeedController_RL->SetPID(kP, kI, kD);
+
+	m_pTestSpeedController->SetPID(kP, kI, kD);
 }
 
 
