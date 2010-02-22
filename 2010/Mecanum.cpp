@@ -679,6 +679,9 @@ protected:
 	ControllerButtonState m_flightQuadrantButtonState;
 	ControllerButtonState m_gamePadButtonState;
 	
+	// true when speed controllers are enabled, false uses direct PWM...
+	bool                  m_bUseSpeedController;
+	
 	#ifdef USE_LOG_FILE
 	FILE*				  m_pRobotLogFile; 
 	#endif
@@ -704,6 +707,7 @@ protected:
 	static ParadoxSpeedController* NewWheelSpeedController(PIDSource* const pPidInput, SpeedController* const pOutputSpeedController);
 	void   SetWheelSpeedLimits(const float wheelSpeedLimit);
 	void   SetWheelPID(const float kP, const float kI, const float kD);
+	void   SetEnableWheelSpeedControllers(const bool bEnable);
 
 public:
 	PrototypeController(void);
@@ -739,6 +743,8 @@ PrototypeController::PrototypeController(void)
 	m_iTimestamp_uS = GetFPGATime();
 	m_iDeltaTime_uS = 0;
 	m_dT = 0.0f;
+	
+	m_bUseSpeedController = false;
 	
 	InitializeCamera();
 	
@@ -807,18 +813,18 @@ PrototypeController::PrototypeController(void)
 	m_pDriverStation = DriverStation::GetInstance();				//Intialize the Driver Station
 
 	// Initialize the hard defaults for drive system coefficients...
-	m_coef_X_FR = 1.000000;
-	m_coef_Y_FR = 1.000000;
-	m_coef_Z_FR = -1.000000;
+	m_coef_X_FR = -1.000000;
+	m_coef_Y_FR = -1.000000;
+	m_coef_Z_FR = 1.000000;
 	m_coef_X_FL = 1.000000;
-	m_coef_Y_FL = 1.000000;
-	m_coef_Z_FL = 1.000000;
+	m_coef_Y_FL = -1.000000;
+	m_coef_Z_FL = -1.000000;
 	m_coef_X_RR = 1.000000;
 	m_coef_Y_RR = -1.000000;
-	m_coef_Z_RR = -1.000000;
-	m_coef_X_RL = 1.000000;
+	m_coef_Z_RR = 1.000000;
+	m_coef_X_RL = -1.000000;
 	m_coef_Y_RL = -1.000000;
-	m_coef_Z_RL = 1.000000;
+	m_coef_Z_RL = -1.000000;
 
 	// Hard default for max wheel speed...
 	m_maxWheelRPS = kDefaultMaxWheelSpeed; // RPS
@@ -980,6 +986,7 @@ Gabe...
 	}
 }
 
+
 void PrototypeController::ProcessDriveSystem()
 {
 	const float joyX = m_pJoy->GetX();
@@ -992,12 +999,13 @@ void PrototypeController::ProcessDriveSystem()
 	const float Left_EncSpeed = fabs((m_pFLEncoder->GetRateRPS() + m_pRLEncoder->GetRateRPS()) * 0.5);
 	const float Rght_EncSpeed = fabs((m_pFREncoder->GetRateRPS() + m_pRREncoder->GetRateRPS()) * 0.5);
 	
-	float FR_EncCoef = 1;
-	float FL_EncCoef = 1;
-	float RR_EncCoef = 1;
-	float RL_EncCoef = 1;
+	float FR_EncCoef = 1.0f;
+	float FL_EncCoef = 1.0f;
+	float RR_EncCoef = 1.0f;
+	float RL_EncCoef = 1.0f;
 	
 	//Comparing based on a common direction; if using mecanum strafing, compare front and back instead of left and right.
+/*
 	if (fabs(joyX) > fabs(joyY) && fabs(joyX) > fabs(joyZ))
 	{
 		if (Frnt_EncSpeed > Back_EncSpeed)
@@ -1024,20 +1032,32 @@ void PrototypeController::ProcessDriveSystem()
 			RR_EncCoef = FR_EncCoef;
 		}
 	}
+*/
 	
 	//printf("joyX = %f\n", joyX);
 	//printf("joyY = %f\n", joyY); 
 	//printf("joyZ = %f\n", joyZ);
 
-	const float pwm_FR = Clamp(m_coef_X_FR * joyY + m_coef_Y_FR * joyX + m_coef_Z_FR * joyZ, -1.0f, 1.0f);
-	const float pwm_FL = Clamp(m_coef_X_FL * joyY + m_coef_Y_FL * joyX + m_coef_Z_FL * joyZ, -1.0f, 1.0f);
-	const float pwm_RR = Clamp(m_coef_X_RR * joyY + m_coef_Y_RR * joyX + m_coef_Z_RR * joyZ, -1.0f, 1.0f);
-	const float pwm_RL = Clamp(m_coef_X_RL * joyY + m_coef_Y_RL * joyX + m_coef_Z_RL * joyZ, -1.0f, 1.0f);
+	const float pwm_FR = Clamp(m_coef_X_FR * joyX + m_coef_Y_FR * joyY + m_coef_Z_FR * joyZ, -1.0f, 1.0f) * FR_EncCoef * kFR_PwmModulation;
+	const float pwm_FL = Clamp(m_coef_X_FL * joyX + m_coef_Y_FL * joyY + m_coef_Z_FL * joyZ, -1.0f, 1.0f) * FL_EncCoef * kFL_PwmModulation;
+	const float pwm_RR = Clamp(m_coef_X_RR * joyX + m_coef_Y_RR * joyY + m_coef_Z_RR * joyZ, -1.0f, 1.0f) * RR_EncCoef * kRR_PwmModulation;
+	const float pwm_RL = Clamp(m_coef_X_RL * joyX + m_coef_Y_RL * joyY + m_coef_Z_RL * joyZ, -1.0f, 1.0f) * RL_EncCoef * kRL_PwmModulation;
 
-	m_pFR_DriveMotor->Set(pwm_FR * FR_EncCoef * kFR_PwmModulation);
-	m_pFL_DriveMotor->Set(pwm_FL * FL_EncCoef * kFL_PwmModulation);
-	m_pRR_DriveMotor->Set(pwm_RR * RR_EncCoef * kRR_PwmModulation);
-	m_pRL_DriveMotor->Set(pwm_RL * RL_EncCoef * kRL_PwmModulation);
+
+	if (m_bUseSpeedController)
+	{
+		m_pSpeedController_FR->SetSetpoint(pwm_FR * m_maxWheelRPS);
+		m_pSpeedController_FL->SetSetpoint(pwm_FL * m_maxWheelRPS);
+		m_pSpeedController_RR->SetSetpoint(pwm_RR * m_maxWheelRPS);
+		m_pSpeedController_RL->SetSetpoint(pwm_RL * m_maxWheelRPS);
+	}
+	else
+	{
+		m_pFR_DriveMotor->Set(pwm_FR);
+		m_pFL_DriveMotor->Set(pwm_FL);
+		m_pRR_DriveMotor->Set(pwm_RR);
+		m_pRL_DriveMotor->Set(pwm_RL);
+	}
 	
 /*
         DS_PRINTF(0, "Encoder Count FR: %05d", m_pFREncoder->Get());
@@ -1076,18 +1096,7 @@ void PrototypeController::ProcessTower()
 	DS_PRINTF(0, "Encodr: %.2f (%.1f)", speedInRPS, distanceInRevolutions );
 
 	const float towerPower = -m_pFlightQuadrant->GetThrottle();
-	static bool s_bUseSpeedController = false;
-	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T5 ))
-	{
-		s_bUseSpeedController = true;
-	}
-	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T6 ))
-	{
-		s_bUseSpeedController = false;
-	}
-
-	m_pTestSpeedController->SetEnabled(s_bUseSpeedController);
-	if (s_bUseSpeedController)
+	if (m_bUseSpeedController)
 	{
 		const float setPoint = towerPower * m_maxWheelRPS;
 		m_pTestSpeedController->SetSetpoint(setPoint);
@@ -1168,6 +1177,9 @@ void PrototypeController::ProcessCommon()
 	m_pRLEncoder->Update();
 	m_pTowerEncoder->Update();
 	
+	// Keep wheel encoder state in sync...
+	SetEnableWheelSpeedControllers(m_bUseSpeedController);
+	
 	// send text to driver station "user messages" window...
 	DriverStationLCD::GetInstance()->UpdateLCD();
 }
@@ -1215,6 +1227,15 @@ void PrototypeController::ProcessOperated()
 		Calibrate();
 	}
 	
+	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T5 ))
+	{
+		m_bUseSpeedController = true;
+	}
+	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T6 ))
+	{
+		m_bUseSpeedController = false;
+	}
+	
 	Wait(0.025);
 }
 
@@ -1222,8 +1243,7 @@ void PrototypeController::ProcessOperated()
 void PrototypeController::Calibrate()
 {
 	_LOG("********************* BEGIN CALIBRATION *********************\n");
-	const bool bSaveTestSpeedControllerIsEnabled = m_pTestSpeedController->IsEnabled();
-	m_pTestSpeedController->SetEnabled(false); // Need to disable the speed controller since it runs in another thread.
+	SetEnableWheelSpeedControllers(false); // Need to disable the speed controllers since they run in separate threads.
 	m_pTowerJaguar->Set(1.0f);
 	Wait(0.5); // let motor spin up.
 	const unsigned int kNumSamples = 8;
@@ -1252,7 +1272,7 @@ void PrototypeController::Calibrate()
 	_LOG("maxForwardSpeed = %f\n", maxForwardSpeed);
 	_LOG("maxReverseSpeed = %f\n", maxReverseSpeed);
 
-	m_pTestSpeedController->SetEnabled(bSaveTestSpeedControllerIsEnabled); // restore speed controller state.
+	SetEnableWheelSpeedControllers(m_bUseSpeedController); // restore speed controller state.
 
 	m_maxWheelRPS = 9999999.0f;
 	if ( fabs(maxForwardSpeed) < m_maxWheelRPS )
@@ -1415,5 +1435,15 @@ void PrototypeController::SetWheelPID(const float kP, const float kI, const floa
 	m_pTestSpeedController->SetPID(kP, kI, kD);
 }
 
+
+void PrototypeController::SetEnableWheelSpeedControllers(const bool bEnable)
+{
+	m_pSpeedController_FR->SetEnabled(bEnable);
+	m_pSpeedController_FL->SetEnabled(bEnable);
+	m_pSpeedController_RR->SetEnabled(bEnable);
+	m_pSpeedController_RL->SetEnabled(bEnable);
+
+	m_pTestSpeedController->SetEnabled(bEnable);
+}
 
 START_ROBOT_CLASS(PrototypeController);
