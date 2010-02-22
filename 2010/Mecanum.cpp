@@ -228,6 +228,7 @@ class ParadoxEncoder : public Encoder, public PIDSource
 	void Update();
 	void SetMovingAverageSize(unsigned int iSize);
 	inline float GetAveRateRPS() const { return m_averageRate; }
+	void DumpEncoderData(unsigned int iLine);
 	
 	double GetRate();
 	virtual double PIDGet();
@@ -244,12 +245,21 @@ class ParadoxEncoder : public Encoder, public PIDSource
 
 ParadoxEncoder* ParadoxEncoder::NewWheelEncoder(DigitalSource* const aSource, DigitalSource* const bSource)
 {
-	const Encoder::EncodingType iEncodingType = Encoder::k4X;
+	const Encoder::EncodingType iEncodingType = Encoder::k1X; // REMEMBER!  There is a limit of eight counters (1x, 2x) and four 4x encoders (FPGA limit)!!
 	const unsigned int kMovingAverageSize = 16;
 	ParadoxEncoder* const pEncoder = new ParadoxEncoder(aSource, bSource, true, iEncodingType);        //Optical Encoder on tom proto drive
 	pEncoder->SetMovingAverageSize(kMovingAverageSize);
 	pEncoder->Start();
 	return pEncoder;
+}
+
+
+void ParadoxEncoder::DumpEncoderData(unsigned int iLine)
+{
+	const float distanceInRevolutions = GetRevolutions();
+	const float speedInRPS = GetRateRPS();
+	DS_PRINTF(iLine, "Encodr: %.2f (%.1f)   ", speedInRPS, distanceInRevolutions );
+	//DS_PRINTF(0, "Encoder Raw: %08d", GetRaw());
 }
 
 
@@ -780,7 +790,7 @@ PrototypeController::PrototypeController(void)
 	m_pRREncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInRREncoder_A, m_pDigInRREncoder_B);
 	m_pRLEncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInRLEncoder_A, m_pDigInRLEncoder_B);
 
-	m_pTowerEncoder     = new ParadoxEncoder(m_pDigInTowerEncoder_A, m_pDigInTowerEncoder_B, true, Encoder::k4X);
+	m_pTowerEncoder     = new ParadoxEncoder(m_pDigInTowerEncoder_A, m_pDigInTowerEncoder_B, true, Encoder::k1X);
 	m_pTowerEncoder->SetMovingAverageSize(16);
 	m_pTowerEncoder->Start();
 
@@ -1043,13 +1053,20 @@ void PrototypeController::ProcessDriveSystem()
 	const float pwm_RR = Clamp(m_coef_X_RR * joyX + m_coef_Y_RR * joyY + m_coef_Z_RR * joyZ, -1.0f, 1.0f) * RR_EncCoef * kRR_PwmModulation;
 	const float pwm_RL = Clamp(m_coef_X_RL * joyX + m_coef_Y_RL * joyY + m_coef_Z_RL * joyZ, -1.0f, 1.0f) * RL_EncCoef * kRL_PwmModulation;
 
-
+	//m_pRLEncoder->DumpEncoderData(0);
 	if (m_bUseSpeedController)
 	{
-		m_pSpeedController_FR->SetSetpoint(pwm_FR * m_maxWheelRPS);
-		m_pSpeedController_FL->SetSetpoint(pwm_FL * m_maxWheelRPS);
-		m_pSpeedController_RR->SetSetpoint(pwm_RR * m_maxWheelRPS);
-		m_pSpeedController_RL->SetSetpoint(pwm_RL * m_maxWheelRPS);
+		const float setPoint_FR = pwm_FR * m_maxWheelRPS;
+		const float setPoint_FL = pwm_FL * m_maxWheelRPS;
+		const float setPoint_RR = pwm_RR * m_maxWheelRPS;
+		const float setPoint_RL = pwm_RL * m_maxWheelRPS;
+
+		//DS_PRINTF(1, "SP: %.2f", setPoint_RL );
+
+		m_pSpeedController_FR->SetSetpoint(setPoint_FR);
+		m_pSpeedController_FL->SetSetpoint(setPoint_FL);
+		m_pSpeedController_RR->SetSetpoint(setPoint_RR);
+		m_pSpeedController_RL->SetSetpoint(setPoint_RL);
 	}
 	else
 	{
@@ -1089,11 +1106,8 @@ void PrototypeController::ProcessCamera()
 
 void PrototypeController::ProcessTower()
 {
-	//DS_PRINTF(0, "Encoder Raw: %08d", m_pTowerEncoder->GetRaw());
 	//DS_PRINTF(2, "BUTTONS: %04x", (int)m_flightQuadrantButtonState.GetAllState());
-	const float distanceInRevolutions = m_pTowerEncoder->GetRevolutions();
-	const float speedInRPS = m_pTowerEncoder->GetAveRateRPS();
-	DS_PRINTF(0, "Encodr: %.2f (%.1f)", speedInRPS, distanceInRevolutions );
+	m_pTowerEncoder->DumpEncoderData(0);
 
 	const float towerPower = -m_pFlightQuadrant->GetThrottle();
 	if (m_bUseSpeedController)
