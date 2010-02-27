@@ -557,6 +557,14 @@ END_REGION;
 class PrototypeController : public RobotBase
 {
 public:
+	enum KickerState
+	{
+		kKickState_ExtendingMainCylinder,
+		kKickState_PostLatchPause,
+		kKickState_WaitingForFire,
+		kKickState_PostFirePause,
+		kKickState_PostLatchEngagePause,
+	};
 	
 	class ControllerButtonState
 	{
@@ -614,6 +622,7 @@ protected:
 	Solenoid*             m_pMainCylinder_OUT_Solenoid; 
 	Solenoid*             m_pTriggerCylinder_IN_Solenoid; 
 	Solenoid*             m_pTriggerCylinder_OUT_Solenoid; 
+	Solenoid*             m_pTowerSolenoid;
 	
 	Compressor*           m_pCompressor;
 
@@ -627,6 +636,7 @@ protected:
 	DigitalInput*         m_pDigInRLEncoder_B;
 	DigitalInput*         m_pDigInTowerEncoder_A;
 	DigitalInput*         m_pDigInTowerEncoder_B;
+	DigitalInput*         m_pKickerSwitch;
 
 
 	ParadoxEncoder*       m_pFREncoder;
@@ -692,6 +702,11 @@ protected:
 	// true when speed controllers are enabled, false uses direct PWM...
 	bool                  m_bUseSpeedController;
 	
+	KickerState           m_kickerState;
+	float                 m_timePostLatchReleasePauseCountdown;
+	float                 m_timePostFirePauseCountdown;
+	float                 m_timePostLatchEngagePauseCountdown;
+	
 	#ifdef USE_LOG_FILE
 	FILE*				  m_pRobotLogFile; 
 	#endif
@@ -756,6 +771,11 @@ PrototypeController::PrototypeController(void)
 	
 	m_bUseSpeedController = false;
 	
+	m_kickerState = kKickState_ExtendingMainCylinder;
+	m_timePostLatchReleasePauseCountdown = 0.0f;
+	m_timePostFirePauseCountdown = 0.0f;
+	m_timePostLatchEngagePauseCountdown = 0.0f;
+	
 	InitializeCamera();
 	
 	m_pFR_DriveMotor   = new Jaguar(6);           // Front Right drive Motor
@@ -765,8 +785,8 @@ PrototypeController::PrototypeController(void)
 	m_pTowerJaguar     = new Jaguar(3);
 	m_pBallMagnet      = new Jaguar(2);
 
-	m_pDigInFREncoder_A = new DigitalInput(1);
-	m_pDigInFREncoder_B = new DigitalInput(4);
+	m_pDigInFREncoder_A = new DigitalInput(2);
+	m_pDigInFREncoder_B = new DigitalInput(3);
 	m_pDigInFLEncoder_A = new DigitalInput(5);
 	m_pDigInFLEncoder_B = new DigitalInput(6);
 	m_pDigInRREncoder_A = new DigitalInput(8);
@@ -774,16 +794,18 @@ PrototypeController::PrototypeController(void)
 	m_pDigInRLEncoder_A = new DigitalInput(11);
 	m_pDigInRLEncoder_B = new DigitalInput(12);
 
-	m_pDigInTowerEncoder_A = new DigitalInput(2);
-	m_pDigInTowerEncoder_B = new DigitalInput(3);
+	m_pDigInTowerEncoder_A = new DigitalInput(4);
+	m_pDigInTowerEncoder_B = new DigitalInput(7);
+	m_pKickerSwitch     = new DigitalInput(13);
 
-	m_pCompressor = new Compressor(6, 1);
+	m_pCompressor = new Compressor(1, 1);
 	//m_pCompressor->Start();
 
 	m_pMainCylinder_IN_Solenoid     = new Solenoid(3);
 	m_pMainCylinder_OUT_Solenoid    = new Solenoid(2);
 	m_pTriggerCylinder_IN_Solenoid  = new Solenoid(1);
 	m_pTriggerCylinder_OUT_Solenoid = new Solenoid(4);
+	m_pTowerSolenoid                = new Solenoid(5);
 
 	m_pFREncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInFREncoder_A, m_pDigInFREncoder_B);
 	m_pFLEncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInFLEncoder_A, m_pDigInFLEncoder_B);
@@ -942,49 +964,105 @@ static float Clamp(const float x, const float lo, const float hi)
 
 void PrototypeController::ProcessKicker()
 {
-	const bool bPressed_Trigger = m_joyButtonState.GetState( kB_Trigger );
+/*
 	m_pTriggerCylinder_OUT_Solenoid->Set(bPressed_Trigger);
 	m_pTriggerCylinder_IN_Solenoid->Set(!bPressed_Trigger);
 	m_pMainCylinder_OUT_Solenoid->Set(bPressed_Trigger);
 	m_pMainCylinder_IN_Solenoid->Set(!bPressed_Trigger);
+*/
 
-	/*
-	 * const bool bPressed_MainCylinderOut = m_joyButtonState.GetState( kB_MainCylinderOut );
-	const bool bPressed_MainCylinderIn  = m_joyButtonState.GetState( kB_MainCylinderIn );
-	if (bPressed_MainCylinderOut)
+	DS_PRINTF(4,"Switch=%01d",(int)m_pKickerSwitch->Get());
+	switch (m_kickerState)
 	{
+		default:
+		case kKickState_ExtendingMainCylinder:
+	{
+			m_pTriggerCylinder_OUT_Solenoid->Set(false);
+			m_pTriggerCylinder_IN_Solenoid->Set(true);
+			m_pMainCylinder_OUT_Solenoid->Set(true);
 		m_pMainCylinder_IN_Solenoid->Set(false);
-		m_pMainCylinder_OUT_Solenoid->Set(true);;
+			const bool bKickerSwitch_ON = (m_pKickerSwitch->Get()==1);
+			if (bKickerSwitch_ON)
+			{
+				const float kPostLatchPauseTime = 0.5f;
+				m_timePostLatchReleasePauseCountdown = kPostLatchPauseTime;
+				m_kickerState = kKickState_PostLatchPause;
+			}
+			DS_PRINTF(5, "EXTEND            ");
+			break;
 	}
-	else if (bPressed_MainCylinderIn)
+		
+		case kKickState_PostLatchPause:
+		{
+			m_timePostLatchReleasePauseCountdown -= m_dT;
+			if (m_timePostLatchReleasePauseCountdown <= 0.0f)
 	{
+				m_timePostLatchReleasePauseCountdown = 0.0f;
+
+				m_pMainCylinder_OUT_Solenoid->Set(false);
 		m_pMainCylinder_IN_Solenoid->Set(true);
-		m_pMainCylinder_OUT_Solenoid->Set(false);;
+
+				m_kickerState = kKickState_WaitingForFire;
+			}
+
+			DS_PRINTF(5, "POST-UNLATCH PAUSE");
+			
+			break;
 	}
-	else
+		
+		case kKickState_WaitingForFire:
+		{
+			const bool bPressed_Trigger = m_joyButtonState.GetState( kB_Trigger );
+			if (bPressed_Trigger)
 	{
-		m_pMainCylinder_IN_Solenoid->Set(true);
-		m_pMainCylinder_OUT_Solenoid->Set(false);
+				m_pTriggerCylinder_OUT_Solenoid->Set(true);
+				m_pTriggerCylinder_IN_Solenoid->Set(false);
+				const float kPostFirePauseTime = 0.5f;
+				m_timePostFirePauseCountdown = kPostFirePauseTime;
+				m_kickerState = kKickState_PostFirePause;
+			}
+			
+			DS_PRINTF(5, "WAITING FOR FIRE  ");
+
+			break;
 	}
-Gabe...
-    if (bPressed_Trigger)
+
+		case kKickState_PostFirePause:
+		{
+			m_timePostFirePauseCountdown -= m_dT;
+			if (m_timePostFirePauseCountdown <= 0.0f)
     {
+				m_timePostFirePauseCountdown = 0.0f;
+
+				m_pTriggerCylinder_OUT_Solenoid->Set(false);
+				m_pTriggerCylinder_IN_Solenoid->Set(true);
+
+				const float kPostLatchEngagePauseTime = 0.5f;
+				m_timePostLatchEngagePauseCountdown = kPostLatchEngagePauseTime;
+
+				m_kickerState = kKickState_PostLatchEngagePause;
+			}
+			
+			DS_PRINTF(5, "POST-FIRE PAUSE   ");
    
-    	m_pSolenoidMain1->Set(1);
-    	m_pSolenoidKicker2->Set(1);
-    	m_pSolenoidMain1->Set(0);
-    	Wait (2);
-    	m_pSolenoidMain2->Set(1);
-    	m_pSolenoidKicker->Set(0);   }
-    else
+			break;
+		}
+		case kKickState_PostLatchEngagePause:
+		{
+			m_timePostLatchEngagePauseCountdown -= m_dT;
+			if (m_timePostLatchEngagePauseCountdown <= 0.0f)
     {
-    	Wait (1);
-    	m_pSolenoidKicker->Set(1);
-    	m_pSolenoidMain1->Set(0);
-        m_pSolenoidMain2->Set(0);
-        m_pSolenoidKicker2->Set(0);
+				m_timePostLatchEngagePauseCountdown = 0.0f;
+
+				m_kickerState = kKickState_ExtendingMainCylinder;
+			}
+			
+			DS_PRINTF(5, "POST-LATCH PAUSE  ");
+
+			break;
     }
-          */
+	};
+
 
 	if (m_joyButtonState.GetDownStroke( kB_CompressorOn ))
 	{
@@ -1004,10 +1082,10 @@ void PrototypeController::ProcessDriveSystem()
 	const float joyZ = m_pJoy->GetZ();
 
 	//Grouping encoders by orientation to compare later.  How does GetAveRateRPS() Work?
-	const float Frnt_EncSpeed = fabs((m_pFREncoder->GetRateRPS() + m_pFLEncoder->GetRateRPS()) * 0.5);
-	const float Back_EncSpeed = fabs((m_pRREncoder->GetRateRPS() + m_pRLEncoder->GetRateRPS()) * 0.5);
-	const float Left_EncSpeed = fabs((m_pFLEncoder->GetRateRPS() + m_pRLEncoder->GetRateRPS()) * 0.5);
-	const float Rght_EncSpeed = fabs((m_pFREncoder->GetRateRPS() + m_pRREncoder->GetRateRPS()) * 0.5);
+	//const float Frnt_EncSpeed = fabs((m_pFREncoder->GetRateRPS() + m_pFLEncoder->GetRateRPS()) * 0.5);
+	//const float Back_EncSpeed = fabs((m_pRREncoder->GetRateRPS() + m_pRLEncoder->GetRateRPS()) * 0.5);
+	//const float Left_EncSpeed = fabs((m_pFLEncoder->GetRateRPS() + m_pRLEncoder->GetRateRPS()) * 0.5);
+	//const float Rght_EncSpeed = fabs((m_pFREncoder->GetRateRPS() + m_pRREncoder->GetRateRPS()) * 0.5);
 	
 	float FR_EncCoef = 1.0f;
 	float FL_EncCoef = 1.0f;
@@ -1087,7 +1165,7 @@ void PrototypeController::ProcessDriveSystem()
 
 void PrototypeController::ProcessBallMagnet()
 {
-	//m_pBallMagnet->Set(joyX);
+	m_pBallMagnet->Set(m_pFlightQuadrant->GetY());
 }
 
 
@@ -1121,6 +1199,10 @@ void PrototypeController::ProcessTower()
 	m_pTowerJaguar->Set(towerPower);
 	}
 
+
+	//const bool bPressed_Tower = m_joyButtonState.GetState(kB_TowerUP);
+    //m_pTowerSolenoid->Set(bPressed_Tower);
+	
 
 /*
 	static unsigned int s_iMovingAverage = 1;
@@ -1461,3 +1543,83 @@ void PrototypeController::SetEnableWheelSpeedControllers(const bool bEnable)
 }
 
 START_ROBOT_CLASS(PrototypeController);
+
+
+
+
+/*  GVV: This is test code that I'm going to post to Chief Delphi to try and figure out the robot stall bug...
+#include "Timer.h"
+#include "Base.h"
+#include "Task.h"
+#include "Watchdog.h"
+#include "DriverStation.h"
+#include "NetworkCommunication/FRCComm.h"
+#include "NetworkCommunication/symModuleLink.h"
+#include "Utility.h"
+#include <moduleLib.h>
+#include <taskLib.h>
+#include <unldLib.h>
+
+static void robotTask(FUNCPTR factory, Task *task)
+{
+	SpeedController* pJag = new Jaguar(3);
+	printf("Hello world 2...\n");
+
+	while (1)
+	{
+		if (DriverStation::GetInstance()->IsDisabled())
+		{
+			while (DriverStation::GetInstance()->IsDisabled()) Wait(.01);
+		}
+		else
+		{
+			while (DriverStation::GetInstance()->IsOperatorControl())
+			{
+				pJag->Set(0.5f);
+				Wait(0.005);				// wait for a motor update time
+			}
+		}
+	}
+}
+
+
+extern "C"
+{
+INT32 FRC_UserProgram_StartupLibraryInit()
+{
+	// Check for startup code already running
+	INT32 oldId = taskNameToId("FRC_RobotTask");
+	if (oldId != ERROR)
+	{
+		// Find the startup code module.
+		char moduleName[256];
+		moduleNameFindBySymbolName("FRC_UserProgram_StartupLibraryInit", moduleName);
+		MODULE_ID startupModId = moduleFindByName(moduleName);
+		if (startupModId != NULL)
+		{
+			// Remove the startup code.
+			unldByModuleId(startupModId, 0);
+			printf("!!!   Error: Default code was still running... It was unloaded for you... Please try again.\n");
+			return 0;
+		}
+		// This case should no longer get hit.
+		printf("!!!   Error: Other robot code is still running... Unload it and then try again.\n");
+		return 0;
+	}
+
+	// Let the framework know that we are starting a new user program so the Driver Station can disable.
+	FRC_NetworkCommunication_observeUserProgramStarting();
+
+	// Start robot task
+	// This is done to ensure that the C++ robot task is spawned with the floating point
+	// context save parameter.
+//	static const UINT32 kPrio = 1;
+//	Task *task = new Task("RobotTask", (FUNCPTR)robotTask, kPrio, 64000);
+//	task->Start(0, (INT32)task);
+robotTask(0,0);
+
+	return 0;
+}
+}
+*/
+
