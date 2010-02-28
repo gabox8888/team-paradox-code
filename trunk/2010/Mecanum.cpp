@@ -35,7 +35,7 @@
 	#define _LOG_FLUSH()
 #endif
 
-#define DS_PRINTF(lineNum, ...) DriverStationLCD::GetInstance()->Printf((DriverStationLCD::Line)(lineNum), 1, __VA_ARGS__)
+#define DS_PRINTF(lineNum, columnNum, ...) DriverStationLCD::GetInstance()->Printf((DriverStationLCD::Line)(lineNum), (columnNum)+1, __VA_ARGS__)
 
 static const float        kFR_PwmModulation     =  1.0f;
 static const float        kFL_PwmModulation     = -1.0f;
@@ -45,6 +45,8 @@ static const float        kRL_PwmModulation     = -1.0f;
 static const float        kPulsesPerRevolution  = 250.0f;
 static const float        kRevolutionsPerPulse  = 1.0f / kPulsesPerRevolution;
 
+// Oddly enough, a P-only PID controller seems to work pretty well for the wheel speed.  My theory is that it's because the encoder speed is so noisy.
+// It tends to shoot above and below the setpoint.  This has the effect of replacing the setpoint overshoot that normally comes from integral windup...
 static const float        kDefaultWheel_P       = 0.1f;
 static const float        kDefaultWheel_I       = 0.0f;
 static const float        kDefaultWheel_D       = 0.0f;
@@ -258,8 +260,8 @@ void ParadoxEncoder::DumpEncoderData(unsigned int iLine)
 {
 	const float distanceInRevolutions = GetRevolutions();
 	const float speedInRPS = GetRateRPS();
-	DS_PRINTF(iLine, "Encodr: %.2f (%.1f)   ", speedInRPS, distanceInRevolutions );
-	//DS_PRINTF(0, "Encoder Raw: %08d", GetRaw());
+	DS_PRINTF(iLine, 0, "Encodr: %.2f (%.1f)   ", speedInRPS, distanceInRevolutions );
+	//DS_PRINTF(5, 0, "Encoder Raw: %08d", GetRaw());
 }
 
 
@@ -400,15 +402,15 @@ class ParadoxSpeedController
 {
 	protected:
 
-	bool             m_isEnabled;
+	volatile bool    m_isEnabled;
 	float            m_P;
 	float            m_I;
 	float            m_D;
 	float            m_previousError;
 	double           m_errorIntegral;
-	float            m_setpoint;
+	volatile float   m_setpoint;
 	float            m_error;
-	float            m_pwm;
+	volatile float   m_pwm;
 	float            m_dT;
 	float            m_fMaxSpeed;
 
@@ -430,6 +432,7 @@ class ParadoxSpeedController
 	void SetPID(const float kP, const float kI, const float kD);
 	inline bool IsEnabled() const { return m_isEnabled; }
 	inline float GetSetpoint() const { return m_setpoint; }
+	inline float GetPWM() const { return m_pwm; }
 };
 
 
@@ -650,8 +653,6 @@ protected:
 	ParadoxSpeedController* m_pSpeedController_RR;
 	ParadoxSpeedController* m_pSpeedController_RL;
 
-	ParadoxSpeedController* m_pTestSpeedController;
-
 	PIDController*        m_pTowerPositionController;
 	
 	Joystick*             m_pJoy;            // Main Control joystick
@@ -702,6 +703,9 @@ protected:
 	// true when speed controllers are enabled, false uses direct PWM...
 	bool                  m_bUseSpeedController;
 	
+	// true when tower motor control is absolute, false when it is relative...
+	bool                  m_bUseAbsoluteTowerMotorControl;
+	
 	KickerState           m_kickerState;
 	float                 m_timePostLatchReleasePauseCountdown;
 	float                 m_timePostFirePauseCountdown;
@@ -717,13 +721,14 @@ protected:
 	void   ProcessDebug();
 	void   ProcessTime();
 	void   ProcessControllers();
-	void   ProcessCommon();
+	void   ProcessAutoAndTeleopCommon();
 	void   ProcessOperated();
 	void   ProcessDriveSystem();
 	void   ProcessTower();
 	void   ProcessBallMagnet();
 	void   ProcessCamera();
 	void   ProcessKicker();
+	void   ProcessEndOfMainLoop();
 	void   Calibrate();
 	void   AllStop();
 	void   ProcessAutonomous();
@@ -733,6 +738,7 @@ protected:
 	void   SetWheelSpeedLimits(const float wheelSpeedLimit);
 	void   SetWheelPID(const float kP, const float kI, const float kD);
 	void   SetEnableWheelSpeedControllers(const bool bEnable);
+	void   SendDashboardData();
 
 public:
 	PrototypeController(void);
@@ -770,6 +776,7 @@ PrototypeController::PrototypeController(void)
 	m_dT = 0.0f;
 	
 	m_bUseSpeedController = false;
+	m_bUseAbsoluteTowerMotorControl = false;
 	
 	m_kickerState = kKickState_ExtendingMainCylinder;
 	m_timePostLatchReleasePauseCountdown = 0.0f;
@@ -778,6 +785,71 @@ PrototypeController::PrototypeController(void)
 	
 	InitializeCamera();
 	
+	/*
+	Channel assignments, sorted by channel:
+		On the Digital sidecar:
+			DIGITAL I/O:
+				1    Compressor pressure sensor switch.
+				2    Front-right wheel encoder "A"
+				3    Front-right wheel encoder "B"
+				4    Tower motor encoder "A"
+				5    Front-left wheel encoder "A"
+				6    Front-left wheel encoder "B"
+				7    Tower motor encoder "B" 
+				8    Rear-right wheel encoder "A"
+				9    Rear-right wheel encoder "B" 
+				10   UNUSED
+				11   Rear-left wheel encoder "A"
+				12   Rear-left wheel encoder "B" 
+				13   Kicker latch switch.
+				14   UNUSED
+				
+			PWM OUT:
+				1    Camera Tilt Servo (DON'T USE FOR JAG WITHOUT REMOVING JUMPER)
+				2    Ball magnet.
+				3    Tower motor.
+				4    Front left wheel motor.
+				5    Camera Azimuth Servo (DON'T USE FOR JAG WITHOUT REMOVING JUMPER)
+				6    Front right wheel motor.
+				7    UNUSED
+				8    Rear right wheel motor.
+				9    UNUSED
+				10   Rear left wheel motor.
+
+			RELAY:
+				1    Compressor Relay
+				2    UNUSED
+				3    UNUSED
+				4    UNUSED
+				5    UNUSED
+				6    UNUSED
+				7    UNUSED
+				8    UNUSED
+
+		On the Pneumatics bumper:
+			Pneumatic Relays:
+				
+				1    Kicker Trigger Cylinder IN
+				2    Kicker Main Cylinder OUT
+				3    Kicker Main Cylinder IN
+				4    Kicker Trigger Cylinder OUT
+				5    Tower Cylinder OUT
+				6    Tower Cylinder IN
+				7    UNUSED
+				8    UNUSED
+
+		On the Analog Bumper:
+			ANALOG IN:
+				1    UNUSED
+				2    UNUSED
+				3    UNUSED
+				4    UNUSED
+				5    UNUSED
+				6    UNUSED
+				7    UNUSED
+				8    Battery Voltage Sensor
+	*/
+
 	m_pFR_DriveMotor   = new Jaguar(6);           // Front Right drive Motor
 	m_pFL_DriveMotor   = new Jaguar(4);           // Front Left drive Motor
 	m_pRR_DriveMotor   = new Jaguar(8);           // Rear Right drive Motor
@@ -823,9 +895,10 @@ PrototypeController::PrototypeController(void)
 	m_pSpeedController_RR = NewWheelSpeedController(m_pRREncoder, m_pRR_DriveMotor);
 	m_pSpeedController_RL = NewWheelSpeedController(m_pRLEncoder, m_pRL_DriveMotor);
 
-	m_pTestSpeedController = NewWheelSpeedController(m_pTowerEncoder, m_pTowerJaguar);
-
-	//m_pTowerPositionController = new PIDController(kP, kI, kD, m_pTowerEncoder, m_pTowerJaguar);
+	const float kTower_P = 0.1f;
+	const float kTower_I = 0.0f;
+	const float kTower_D = 0.0f;
+	m_pTowerPositionController = new PIDController(kTower_P, kTower_I, kTower_D, m_pTowerEncoder, m_pTowerJaguar);
 
     m_pCameraAzimuthServo = new Servo(5);
 	m_pCameraTiltServo    = new Servo(1);
@@ -971,7 +1044,11 @@ void PrototypeController::ProcessKicker()
 	m_pMainCylinder_IN_Solenoid->Set(!bPressed_Trigger);
 */
 
-	DS_PRINTF(4,"Switch=%01d",(int)m_pKickerSwitch->Get());
+	if (m_pKickerSwitch->Get())
+	{
+		DS_PRINTF(3, 0, "KS");
+	}
+	
 	switch (m_kickerState)
 	{
 		default:
@@ -988,7 +1065,7 @@ void PrototypeController::ProcessKicker()
 				m_timePostLatchReleasePauseCountdown = kPostLatchPauseTime;
 				m_kickerState = kKickState_PostLatchPause;
 			}
-			DS_PRINTF(5, "EXTEND            ");
+			DS_PRINTF(3, 2, "EXTEND            ");
 			break;
 	}
 		
@@ -1005,7 +1082,7 @@ void PrototypeController::ProcessKicker()
 				m_kickerState = kKickState_WaitingForFire;
 			}
 
-			DS_PRINTF(5, "POST-UNLATCH PAUSE");
+			DS_PRINTF(3, 2, "POST-UNLATCH PAUSE");
 			
 			break;
 	}
@@ -1022,7 +1099,7 @@ void PrototypeController::ProcessKicker()
 				m_kickerState = kKickState_PostFirePause;
 			}
 			
-			DS_PRINTF(5, "WAITING FOR FIRE  ");
+			DS_PRINTF(3, 2, "WAITING FOR FIRE  ");
 
 			break;
 	}
@@ -1043,7 +1120,7 @@ void PrototypeController::ProcessKicker()
 				m_kickerState = kKickState_PostLatchEngagePause;
 			}
 			
-			DS_PRINTF(5, "POST-FIRE PAUSE   ");
+			DS_PRINTF(3, 2, "POST-FIRE PAUSE   ");
    
 			break;
 		}
@@ -1057,7 +1134,7 @@ void PrototypeController::ProcessKicker()
 				m_kickerState = kKickState_ExtendingMainCylinder;
 			}
 			
-			DS_PRINTF(5, "POST-LATCH PAUSE  ");
+			DS_PRINTF(3, 2, "POST-LATCH PAUSE  ");
 
 			break;
     }
@@ -1126,12 +1203,19 @@ void PrototypeController::ProcessDriveSystem()
 	//printf("joyY = %f\n", joyY); 
 	//printf("joyZ = %f\n", joyZ);
 
+	#if defined(TEST_WHEEL_ENCODER)
+	const float pwm_FR = -m_pFlightQuadrant->GetY(); // Simple method of testing wheel speed setpoint...  use flight quadrant lever.
+	#else
 	const float pwm_FR = Clamp(m_coef_X_FR * joyX + m_coef_Y_FR * joyY + m_coef_Z_FR * joyZ, -1.0f, 1.0f) * FR_EncCoef * kFR_PwmModulation;
+	#endif
 	const float pwm_FL = Clamp(m_coef_X_FL * joyX + m_coef_Y_FL * joyY + m_coef_Z_FL * joyZ, -1.0f, 1.0f) * FL_EncCoef * kFL_PwmModulation;
 	const float pwm_RR = Clamp(m_coef_X_RR * joyX + m_coef_Y_RR * joyY + m_coef_Z_RR * joyZ, -1.0f, 1.0f) * RR_EncCoef * kRR_PwmModulation;
 	const float pwm_RL = Clamp(m_coef_X_RL * joyX + m_coef_Y_RL * joyY + m_coef_Z_RL * joyZ, -1.0f, 1.0f) * RL_EncCoef * kRL_PwmModulation;
 
-	//m_pRLEncoder->DumpEncoderData(0);
+	#if defined(TEST_WHEEL_ENCODER)
+	m_pFREncoder->DumpEncoderData(5);
+	#endif
+	
 	if (m_bUseSpeedController)
 	{
 		const float setPoint_FR = pwm_FR * m_maxWheelRPS;
@@ -1139,7 +1223,11 @@ void PrototypeController::ProcessDriveSystem()
 		const float setPoint_RR = pwm_RR * m_maxWheelRPS;
 		const float setPoint_RL = pwm_RL * m_maxWheelRPS;
 
-		//DS_PRINTF(1, "SP: %.2f", setPoint_RL );
+		DS_PRINTF(0, 0, "SC" ); // Speed control enabled.
+
+		#if defined(TEST_WHEEL_ENCODER)
+		DS_PRINTF(4, 0, "SP: %.2f", setPoint_FR );
+		#endif
 
 		m_pSpeedController_FR->SetSetpoint(setPoint_FR);
 		m_pSpeedController_FL->SetSetpoint(setPoint_FL);
@@ -1148,18 +1236,12 @@ void PrototypeController::ProcessDriveSystem()
 	}
 	else
 	{
+		DS_PRINTF(0, 0, "  " ); // Speed control disabled.
 		m_pFR_DriveMotor->Set(pwm_FR);
 		m_pFL_DriveMotor->Set(pwm_FL);
 		m_pRR_DriveMotor->Set(pwm_RR);
 		m_pRL_DriveMotor->Set(pwm_RL);
 	}
-	
-/*
-        DS_PRINTF(0, "Encoder Count FR: %05d", m_pFREncoder->Get());
-        DS_PRINTF(1, "Encoder Count FL: %05d", -(m_pFLEncoder->Get()));
-        DS_PRINTF(2, "Encoder Count RR: %05d", m_pRREncoder->Get());
-        DS_PRINTF(3, "Encoder Count RL: %05d", -(m_pRLEncoder->Get()));
-*/
 }
 
 
@@ -1175,8 +1257,7 @@ void PrototypeController::ProcessCamera()
 	float tiltJoy=m_pGamePad->GetY();
 	float azimuth = (azimuthJoy+1.0)/2.0;
 	float tilt = (tiltJoy+1.0)/2.0;
-	//DS_PRINTF(0, "AZIM = %f", azimuth);
-	//DS_PRINTF(1, "TILT = %f", tilt);
+	//DS_PRINTF(5, 0, "AZ = %.2f; TI = %f", azimuth, tilt);
     m_pCameraAzimuthServo->Set(azimuth); 
 	m_pCameraTiltServo->Set(tilt);
 }
@@ -1184,21 +1265,32 @@ void PrototypeController::ProcessCamera()
 
 void PrototypeController::ProcessTower()
 {
-	//DS_PRINTF(2, "BUTTONS: %04x", (int)m_flightQuadrantButtonState.GetAllState());
-	m_pTowerEncoder->DumpEncoderData(0);
-
-	const float towerPower = -m_pFlightQuadrant->GetThrottle();
-	if (m_bUseSpeedController)
+	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T5 ))
 	{
-		const float setPoint = towerPower * m_maxWheelRPS;
-		m_pTestSpeedController->SetSetpoint(setPoint);
-		DS_PRINTF(1, "SP: %.2f", setPoint );
+		m_bUseAbsoluteTowerMotorControl = true;
+	}
+	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T6 ))
+	{
+		m_bUseAbsoluteTowerMotorControl = false;
+	}
+
+	m_pTowerEncoder->DumpEncoderData(5);
+	const float towerPower = -m_pFlightQuadrant->GetThrottle();
+	if (m_bUseAbsoluteTowerMotorControl)
+	{
+		DS_PRINTF(0, 2, "AT" ); // Absolute tower control enabled.
+		const float kTowerEncoderMaxCount = 100.0f;
+		const float setPoint = (towerPower + 1.0f) * 0.5f * kTowerEncoderMaxCount;
+		m_pTowerPositionController->SetSetpoint(setPoint);
+		m_pTowerPositionController->Enable();
+		DS_PRINTF(4, 0, "SP: %.2f", setPoint );
 	}
 	else
 	{
+		DS_PRINTF(0, 2, "  " ); // Absolute tower control disabled.
+		m_pTowerPositionController->Disable();
 	m_pTowerJaguar->Set(towerPower);
 	}
-
 
 	//const bool bPressed_Tower = m_joyButtonState.GetState(kB_TowerUP);
     //m_pTowerSolenoid->Set(bPressed_Tower);
@@ -1218,25 +1310,37 @@ void PrototypeController::ProcessTower()
 		if (s_iMovingAverage < 1) s_iMovingAverage = 1;
 		m_pTowerEncoder->SetMovingAverageSize(s_iMovingAverage);
 	}
-	DS_PRINTF(2, "MAS: %04d           ", s_iMovingAverage);
+	DS_PRINTF(5, 0, "MAS: %04d           ", s_iMovingAverage);
 */
+}
+
+
+void PrototypeController::ProcessEndOfMainLoop()
+{
+	// Update the dashboard.  Note: it doesn't matter which Solenoid instance we pass in...
+	SendDashboardData();
+
+	// Feed the watchdog, if active...
+	if (kWatchdogState)
+	{
+		GetWatchdog().Feed();
+	}
+
+	// This is our main loop wait.  Because many of the robot functions are processed via a state machine in the main robot thread, this should
+	// be the only Wait(...) call in the main thread (unless Watchdog is disabled -- in the Calibrate function, for example)...
+	const float kMainLoopWaitTime = 0.025f;
+	Wait(kMainLoopWaitTime);
 }
 
 
 void PrototypeController::StartCompetition()
 {
 	AllStop();
-	while (1)
+	while (true)
 	{
-		if ( IsDisabled() )
+		if (!IsDisabled())
 		{
-			const float kDisabledWaitTime = 0.01f;
-			GetWatchdog().SetEnabled(false); 			
-			while (IsDisabled()) Wait((double) kDisabledWaitTime);
-			GetWatchdog().SetEnabled(kWatchdogState); 			
-		}
-
-		ProcessCommon();
+			ProcessAutoAndTeleopCommon();
 		if (IsAutonomous())
 		{
 			ProcessAutonomous();
@@ -1246,17 +1350,15 @@ void PrototypeController::StartCompetition()
 			ProcessOperated();
 		}
 	}
+		
+		// This function gets called each iteration, EVEN IF ROBOT IS DISABLED (so be careful what you put in it)...
+		ProcessEndOfMainLoop();
+	}
 }
 
 
-void PrototypeController::ProcessCommon()
+void PrototypeController::ProcessAutoAndTeleopCommon()
 {
-	// Feed the watchdog, if active...
-	if (kWatchdogState)
-	{
-		GetWatchdog().Feed();
-	}
-
 	// Process time...
 	ProcessTime();
 
@@ -1283,6 +1385,7 @@ void PrototypeController::ProcessCommon()
 
 void PrototypeController::ProcessAutonomous()
 {
+	// TODO: Needs to be made into a state machine...
         AllStop();
 
         if (IsDisabled() ) Wait(0.05);
@@ -1323,22 +1426,24 @@ void PrototypeController::ProcessOperated()
 		Calibrate();
 	}
 	
-	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T5 ))
+	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T3 ))
 	{
 		m_bUseSpeedController = true;
 	}
-	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T6 ))
+	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T4 ))
 	{
 		m_bUseSpeedController = false;
 	}
-	
-	Wait(0.025);
 }
 
 
 void PrototypeController::Calibrate()
 {
 	_LOG("********************* BEGIN CALIBRATION *********************\n");
+	// Because we're going to do "Waits" in this function, we need to disable the watchdog.  basically, this function will take over the
+	// system while it completes the calibration.  No other robot functions will work during calibration...
+	GetWatchdog().SetEnabled(false); 			
+
 	SetEnableWheelSpeedControllers(false); // Need to disable the speed controllers since they run in separate threads.
 	m_pTowerJaguar->Set(1.0f);
 	Wait(0.5); // let motor spin up.
@@ -1393,6 +1498,9 @@ void PrototypeController::Calibrate()
 	_LOG("Calibration Complete.\n");
 
 	_LOG_FLUSH();
+
+	// Reenable the watchdog for normal robot operation...
+	GetWatchdog().SetEnabled(kWatchdogState); 			
 }
 
 
@@ -1434,8 +1542,9 @@ void PrototypeController::ProcessDebug()
 	if (m_wheel_kP < 0.0f) m_wheel_kP = 0.0f;
 	if (m_wheel_kI < 0.0f) m_wheel_kI = 0.0f;
 	SetWheelPID(m_wheel_kP, m_wheel_kI, m_wheel_kD);
-	DS_PRINTF(3, "P:%.2f, I:%.2f", m_wheel_kP, m_wheel_kI);
+	DS_PRINTF(5, 0, "P:%.2f, I:%.2f", m_wheel_kP, m_wheel_kI);
 */
+	//DS_PRINTF(5, 0, "BUTTONS: %04x", (int)m_flightQuadrantButtonState.GetAllState());
 }
 
 
@@ -1499,6 +1608,8 @@ void PrototypeController::AllStop()
 	m_pFL_DriveMotor->Set(0.0f);
 	m_pRR_DriveMotor->Set(0.0f);
 	m_pRL_DriveMotor->Set(0.0f);
+	m_pTowerJaguar->Set(0.0f);
+	m_pBallMagnet->Set(0.0f);
 }
 
 
@@ -1516,8 +1627,6 @@ void PrototypeController::SetWheelSpeedLimits(const float wheelSpeedLimit)
 	m_pSpeedController_FL->SetMaxSpeed(wheelSpeedLimit);
 	m_pSpeedController_RR->SetMaxSpeed(wheelSpeedLimit);
 	m_pSpeedController_RL->SetMaxSpeed(wheelSpeedLimit);
-
-	m_pTestSpeedController->SetMaxSpeed(wheelSpeedLimit);
 }
 
 
@@ -1527,8 +1636,6 @@ void PrototypeController::SetWheelPID(const float kP, const float kI, const floa
 	m_pSpeedController_FL->SetPID(kP, kI, kD);
 	m_pSpeedController_RR->SetPID(kP, kI, kD);
 	m_pSpeedController_RL->SetPID(kP, kI, kD);
-
-	m_pTestSpeedController->SetPID(kP, kI, kD);
 }
 
 
@@ -1538,47 +1645,173 @@ void PrototypeController::SetEnableWheelSpeedControllers(const bool bEnable)
 	m_pSpeedController_FL->SetEnabled(bEnable);
 	m_pSpeedController_RR->SetEnabled(bEnable);
 	m_pSpeedController_RL->SetEnabled(bEnable);
-
-	m_pTestSpeedController->SetEnabled(bEnable);
 }
+
+
+void PrototypeController::SendDashboardData()
+{
+	Dashboard &dash_packet_1 = DriverStation::GetInstance()->GetLowPriorityDashboardPacker();
+	dash_packet_1.AddCluster();
+	{
+		dash_packet_1.AddCluster();
+		{ //analog modules 
+			dash_packet_1.AddCluster();
+			{
+				for (int i = 1; i <= 8; i++)
+				{
+					dash_packet_1.AddFloat((float) AnalogModule::GetInstance(1)->GetAverageVoltage(i));
+					//dash_packet_1.AddFloat((float) i * 5.0 / 8.0);
+				}
+			}
+			dash_packet_1.FinalizeCluster();
+			dash_packet_1.AddCluster();
+			{
+				for (int i = 1; i <= 8; i++)
+				{
+					//dash_packet_1.AddFloat((float) AnalogModule::GetInstance(2)->GetAverageVoltage(i));
+					dash_packet_1.AddFloat((float) i * 5.0 / 8.0);  // 2nd analog module not installed.
+				}
+			}
+			dash_packet_1.FinalizeCluster();
+		}
+		dash_packet_1.FinalizeCluster();
+
+		dash_packet_1.AddCluster();
+		{ //digital modules
+			dash_packet_1.AddCluster();
+			{
+				dash_packet_1.AddCluster();
+				{
+					int module = 4;
+					dash_packet_1.AddU8(DigitalModule::GetInstance(module)->GetRelayForward());
+					dash_packet_1.AddU8(DigitalModule::GetInstance(module)->GetRelayReverse());
+
+					UINT16 DIO = 0;
+					UINT16 DIODirection = 0;
+					for (int iChannel = 14; iChannel >= 1; iChannel-- )
+					{
+						DIO <<= 1;
+						DIODirection <<= 1;
+						if (DigitalModule::GetInstance(module)->GetDIO(iChannel))
+						{
+							DIO |= 1;
+						}
+						if (DigitalModule::GetInstance(module)->GetDIODirection(iChannel))
+						{
+							DIODirection |= 1;
+						}
+}
+
+					dash_packet_1.AddU16(DIO);
+					dash_packet_1.AddU16(DIODirection);
+					dash_packet_1.AddCluster();
+					{
+						for (int i = 1; i <= 10; i++)
+						{
+							dash_packet_1.AddU8((unsigned char) DigitalModule::GetInstance(module)->GetPWM(i));
+						}
+					}
+					dash_packet_1.FinalizeCluster();
+				}
+				dash_packet_1.FinalizeCluster();
+			}
+			dash_packet_1.FinalizeCluster();
+
+			dash_packet_1.AddCluster();
+			{
+				dash_packet_1.AddCluster();
+				{
+					// 2nd DIO module not installed...
+					//int module = 6;
+					dash_packet_1.AddU8(0xAA);
+					dash_packet_1.AddU8(0xAA);
+					dash_packet_1.AddU16((short) 0xAAAA);
+					dash_packet_1.AddU16((short) 0x7777);
+					dash_packet_1.AddCluster();
+					{
+						for (int i = 1; i <= 10; i++)
+						{
+							dash_packet_1.AddU8((unsigned char) i * 255 / 10);
+						}
+					}
+					dash_packet_1.FinalizeCluster();
+				}
+				dash_packet_1.FinalizeCluster();
+			}
+			dash_packet_1.FinalizeCluster();
+		}
+		dash_packet_1.FinalizeCluster();
+
+		// The GetAll() method on a single Solenoid instance returns status of all eight solenoid outputs...
+		dash_packet_1.AddU8(m_pMainCylinder_IN_Solenoid->GetAll());
+	}
+	dash_packet_1.FinalizeCluster();
+	dash_packet_1.Finalize();
+
+
+
+	// Get a new Dashboard instance for second packet...
+	Dashboard &dash_packet_2 = DriverStation::GetInstance()->GetHighPriorityDashboardPacker();
+	dash_packet_2.AddCluster(); // wire (2 elements)
+	{
+		dash_packet_2.AddCluster(); // tracking data
+		{
+			const float pwm = m_pSpeedController_FR->GetPWM();
+			// GVV: Hijack the camera tracking dashboard for our own nefarious purposes (to plot out PID loop stuff)...
+			dash_packet_2.AddDouble(pwm); // Joystick X
+			dash_packet_2.AddDouble(135.0); // angle
+			dash_packet_2.AddDouble(3.0); // angular rate
+			dash_packet_2.AddDouble(5.0); // other X
+		}
+		dash_packet_2.FinalizeCluster();
+		dash_packet_2.AddCluster(); // target Info (2 elements)
+		{
+			dash_packet_2.AddCluster(); // targets
+			{
+				dash_packet_2.AddDouble(100.0); // target score
+				dash_packet_2.AddCluster(); // Circle Description (5 elements)
+				{
+					dash_packet_2.AddCluster(); // Position (2 elements)
+					{
+						dash_packet_2.AddDouble(30.0); // X
+						dash_packet_2.AddDouble(50.0); // Y
+					}
+					dash_packet_2.FinalizeCluster();
+				}
+				dash_packet_2.FinalizeCluster(); // Position
+				dash_packet_2.AddDouble(45.0); // Angle
+				dash_packet_2.AddDouble(21.0); // Major Radius
+				dash_packet_2.AddDouble(15.0); // Minor Radius
+				dash_packet_2.AddDouble(324.0); // Raw score
+			}
+			dash_packet_2.FinalizeCluster(); // targets
+		}
+		dash_packet_2.FinalizeCluster(); // target Info
+	}
+	dash_packet_2.FinalizeCluster(); // wire
+	dash_packet_2.Finalize();
+}
+
+
 
 START_ROBOT_CLASS(PrototypeController);
 
 
 
-
-/*  GVV: This is test code that I'm going to post to Chief Delphi to try and figure out the robot stall bug...
-#include "Timer.h"
-#include "Base.h"
-#include "Task.h"
-#include "Watchdog.h"
-#include "DriverStation.h"
-#include "NetworkCommunication/FRCComm.h"
+/*
+#include "WPILib.h"
 #include "NetworkCommunication/symModuleLink.h"
-#include "Utility.h"
-#include <moduleLib.h>
-#include <taskLib.h>
 #include <unldLib.h>
 
 static void robotTask(FUNCPTR factory, Task *task)
 {
 	SpeedController* pJag = new Jaguar(3);
-	printf("Hello world 2...\n");
 
 	while (1)
 	{
-		if (DriverStation::GetInstance()->IsDisabled())
-		{
-			while (DriverStation::GetInstance()->IsDisabled()) Wait(.01);
-		}
-		else
-		{
-			while (DriverStation::GetInstance()->IsOperatorControl())
-			{
+		while (DriverStation::GetInstance()->IsDisabled()) Wait(.025);
 				pJag->Set(0.5f);
-				Wait(0.005);				// wait for a motor update time
-			}
-		}
+		Wait(0.025);
 	}
 }
 
@@ -1622,4 +1855,3 @@ robotTask(0,0);
 }
 }
 */
-
