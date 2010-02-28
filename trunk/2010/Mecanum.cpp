@@ -739,6 +739,7 @@ protected:
 	void   SetWheelPID(const float kP, const float kI, const float kD);
 	void   SetEnableWheelSpeedControllers(const bool bEnable);
 	void   SendDashboardData();
+	void   ProcessPnumatics();
 
 public:
 	PrototypeController(void);
@@ -1151,6 +1152,11 @@ void PrototypeController::ProcessKicker()
 	}
 }
 
+void PrototypeController::ProcessPnumatics()
+{
+	m_pTowerSolenoid->Set(m_pFlightQuadrant->GetX() < 0.0f);
+	
+}
 
 void PrototypeController::ProcessDriveSystem()
 {
