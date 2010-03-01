@@ -377,7 +377,7 @@ double ParadoxEncoder::GetRate()
 
 double ParadoxEncoder::PIDGet()
 {
-	return GetRateRPS();
+	return GetRevolutions();
 }
 
 
@@ -417,14 +417,14 @@ class ParadoxSpeedController
 	SEM_ID           m_mutexSemaphore;
 	Notifier*        m_pNotifier;
 
-	PIDSource*       m_pPidInput;
+	ParadoxEncoder*  m_pEncoder;
 	SpeedController* m_pOutputSpeedController;
 
 	static void Main(void* const pController);
 	void Calculate();
 
 	public:
-	ParadoxSpeedController(float p, float i, float d, PIDSource* const pPidInput, SpeedController* const pOutputSpeedController, float dT = 0.025f);
+	ParadoxSpeedController(float p, float i, float d, ParadoxEncoder* const pEncoder, SpeedController* const pOutputSpeedController, float dT = 0.025f);
 	~ParadoxSpeedController();
 	void SetSetpoint(float setpoint);
 	void SetEnabled(const bool is_enabled);
@@ -436,14 +436,14 @@ class ParadoxSpeedController
 };
 
 
-ParadoxSpeedController::ParadoxSpeedController(float kP, float kI, float kD, PIDSource* const pPidInput, SpeedController* const pOutputSpeedController, float dT) : m_mutexSemaphore(0)
+ParadoxSpeedController::ParadoxSpeedController(float kP, float kI, float kD, ParadoxEncoder* const pEncoder, SpeedController* const pOutputSpeedController, float dT) : m_mutexSemaphore(0)
 {
 	m_mutexSemaphore = semBCreate(SEM_Q_PRIORITY, SEM_FULL);
 
 	m_pNotifier = new Notifier(ParadoxSpeedController::Main, this);
 
 	m_dT = dT;
-	m_pPidInput = pPidInput;
+	m_pEncoder = pEncoder;
 	m_pOutputSpeedController = pOutputSpeedController;
 
 	m_P = kP;
@@ -481,7 +481,7 @@ CRITICAL_REGION(m_mutexSemaphore)
 {
 	if ( m_isEnabled && DriverStation::GetInstance()->IsEnabled() )
 	{
-		const float measured_point = m_pPidInput->PIDGet();
+		const float measured_point = m_pEncoder->GetRateRPS();
 		m_error = m_setpoint - measured_point;
 		m_errorIntegral += m_error * m_dT;
 
@@ -524,10 +524,6 @@ CRITICAL_REGION(m_mutexSemaphore)
 	if ( m_isEnabled != is_enabled )
 	{
 		m_isEnabled = is_enabled;
-		if (!is_enabled)
-		{
-			m_pOutputSpeedController->Set(0.0f);
-		}
 	}
 }
 END_REGION;
@@ -734,12 +730,11 @@ protected:
 	void   ProcessAutonomous();
 	void   LoadDriveCoefficients();
 	void   SaveDriveCoefficients();
-	static ParadoxSpeedController* NewWheelSpeedController(PIDSource* const pPidInput, SpeedController* const pOutputSpeedController);
+	static ParadoxSpeedController* NewWheelSpeedController(ParadoxEncoder* const pEncoder, SpeedController* const pOutputSpeedController);
 	void   SetWheelSpeedLimits(const float wheelSpeedLimit);
 	void   SetWheelPID(const float kP, const float kI, const float kD);
 	void   SetEnableWheelSpeedControllers(const bool bEnable);
 	void   SendDashboardData();
-	void   ProcessPnumatics();
 
 public:
 	PrototypeController(void);
@@ -851,24 +846,25 @@ PrototypeController::PrototypeController(void)
 				8    Battery Voltage Sensor
 	*/
 
+	const bool s_flipFL_And_Tower = false;
 	m_pFR_DriveMotor   = new Jaguar(6);           // Front Right drive Motor
-	m_pFL_DriveMotor   = new Jaguar(4);           // Front Left drive Motor
+	m_pFL_DriveMotor   = new Jaguar(s_flipFL_And_Tower ? 3:4);           // Front Left drive Motor
 	m_pRR_DriveMotor   = new Jaguar(8);           // Rear Right drive Motor
 	m_pRL_DriveMotor   = new Jaguar(10);          // Rear Left drive Motor
-	m_pTowerJaguar     = new Jaguar(3);
+	m_pTowerJaguar     = new Jaguar(s_flipFL_And_Tower ? 4:3);
 	m_pBallMagnet      = new Jaguar(2);
 
 	m_pDigInFREncoder_A = new DigitalInput(2);
 	m_pDigInFREncoder_B = new DigitalInput(3);
-	m_pDigInFLEncoder_A = new DigitalInput(5);
-	m_pDigInFLEncoder_B = new DigitalInput(6);
+	m_pDigInFLEncoder_A = new DigitalInput(s_flipFL_And_Tower ? 4:5);
+	m_pDigInFLEncoder_B = new DigitalInput(s_flipFL_And_Tower ? 7:6);
 	m_pDigInRREncoder_A = new DigitalInput(8);
 	m_pDigInRREncoder_B = new DigitalInput(9); 
 	m_pDigInRLEncoder_A = new DigitalInput(11);
 	m_pDigInRLEncoder_B = new DigitalInput(12);
 
-	m_pDigInTowerEncoder_A = new DigitalInput(4);
-	m_pDigInTowerEncoder_B = new DigitalInput(7);
+	m_pDigInTowerEncoder_A = new DigitalInput(s_flipFL_And_Tower ? 5:4);
+	m_pDigInTowerEncoder_B = new DigitalInput(s_flipFL_And_Tower ? 6:7);
 	m_pKickerSwitch     = new DigitalInput(13);
 
 	m_pCompressor = new Compressor(1, 1);
@@ -900,6 +896,14 @@ PrototypeController::PrototypeController(void)
 	const float kTower_I = 0.0f;
 	const float kTower_D = 0.0f;
 	m_pTowerPositionController = new PIDController(kTower_P, kTower_I, kTower_D, m_pTowerEncoder, m_pTowerJaguar);
+	if (m_bUseAbsoluteTowerMotorControl)
+	{
+		m_pTowerPositionController->Enable();
+	}
+	else
+	{
+		m_pTowerPositionController->Disable();
+	}
 
     m_pCameraAzimuthServo = new Servo(5);
 	m_pCameraTiltServo    = new Servo(1);
@@ -1152,11 +1156,6 @@ void PrototypeController::ProcessKicker()
 	}
 }
 
-void PrototypeController::ProcessPnumatics()
-{
-	m_pTowerSolenoid->Set(m_pFlightQuadrant->GetX() < 0.0f);
-	
-}
 
 void PrototypeController::ProcessDriveSystem()
 {
@@ -1273,33 +1272,38 @@ void PrototypeController::ProcessTower()
 {
 	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T5 ))
 	{
+		if (!m_bUseAbsoluteTowerMotorControl)
+		{
+			m_pTowerPositionController->Enable();
+		}
 		m_bUseAbsoluteTowerMotorControl = true;
 	}
 	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T6 ))
 	{
+		if (m_bUseAbsoluteTowerMotorControl)
+		{
+			m_pTowerPositionController->Disable();  // Make SURE this isn't called every iteration since it sets the motor PWM to zero!!!
+		}
 		m_bUseAbsoluteTowerMotorControl = false;
 	}
 
 	m_pTowerEncoder->DumpEncoderData(5);
-	const float towerPower = -m_pFlightQuadrant->GetThrottle();
+	const float towerPower = m_pFlightQuadrant->GetThrottle();
 	if (m_bUseAbsoluteTowerMotorControl)
 	{
 		DS_PRINTF(0, 2, "AT" ); // Absolute tower control enabled.
-		const float kTowerEncoderMaxCount = 100.0f;
+		const float kTowerEncoderMaxCount = 50.0f;
 		const float setPoint = (towerPower + 1.0f) * 0.5f * kTowerEncoderMaxCount;
 		m_pTowerPositionController->SetSetpoint(setPoint);
-		m_pTowerPositionController->Enable();
 		DS_PRINTF(4, 0, "SP: %.2f", setPoint );
 	}
 	else
 	{
 		DS_PRINTF(0, 2, "  " ); // Absolute tower control disabled.
-		m_pTowerPositionController->Disable();
 	m_pTowerJaguar->Set(towerPower);
 	}
 
-	//const bool bPressed_Tower = m_joyButtonState.GetState(kB_TowerUP);
-    //m_pTowerSolenoid->Set(bPressed_Tower);
+	m_pTowerSolenoid->Set(m_pFlightQuadrant->GetX() < 0.0f);
 	
 
 /*
@@ -1619,9 +1623,9 @@ void PrototypeController::AllStop()
 }
 
 
-ParadoxSpeedController* PrototypeController::NewWheelSpeedController(PIDSource* const pPidInput, SpeedController* const pOutputSpeedController)
+ParadoxSpeedController* PrototypeController::NewWheelSpeedController(ParadoxEncoder* const pEncoder, SpeedController* const pOutputSpeedController)
 {
-	ParadoxSpeedController* const pSpeedController = new ParadoxSpeedController(kDefaultWheel_P, kDefaultWheel_I, kDefaultWheel_D, pPidInput, pOutputSpeedController);
+	ParadoxSpeedController* const pSpeedController = new ParadoxSpeedController(kDefaultWheel_P, kDefaultWheel_I, kDefaultWheel_D, pEncoder, pOutputSpeedController);
 	pSpeedController->SetMaxSpeed(kDefaultMaxWheelSpeed);
 	return pSpeedController;
 }
