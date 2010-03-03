@@ -56,6 +56,13 @@ static const unsigned int kUSB_Port_FlightQuadrant        = 2;
 static const unsigned int kUSB_Port_GamePad               = 3;
 static const bool         kWatchdogState                  = false;
 
+// Main loop sleep time.  So main loop update rate is approx. (1.0f/kMainLoopWaitTime) Hz...
+static const float        kMainLoopWaitTime = 0.025f;
+
+// We clamp the main loop delta time to kMax_dT.  This is avoid large "surges" in controllers that use dT in their calculations.  These surges can occur (for example)
+// when another task starves the main robot task (not often, I hope)...
+static const float        kMax_dT           = 4.0f * kMainLoopWaitTime;
+static const INT32        kMax_dT_uS        = INT32(kMax_dT * 1000000.0f);
 
 enum FlightQuadrantButtons
 {
@@ -117,7 +124,6 @@ static const unsigned int kB_Trigger                      = kJOY_Trigger;
 static const unsigned int kB_LoadDriveCoefficients        = kJOY_Button7; 
 static const unsigned int kB_CompressorOn                 = kJOY_Button11;
 static const unsigned int kB_CompressorOff                = kJOY_Button12;
-
 
 class DriverStationSpoof : public SensorBase
 {
@@ -513,6 +519,8 @@ CRITICAL_REGION(m_mutexSemaphore)
 		const float derivative = (m_error - m_previousError) / m_dT;
 		const float fManipulatedVariable = m_P * m_error + m_I * m_errorIntegral + m_D * derivative;
 		m_pwm += fManipulatedVariable;
+		if (m_pwm > 1.0f) m_pwm = 1.0f;
+		if (m_pwm < -1.0f) m_pwm = -1.0f;
 		m_previousError = m_error;
 		m_pOutputSpeedController->Set(m_pwm);
 	}
@@ -583,6 +591,20 @@ public:
 		kKickState_PostLatchEngagePause,
 	};
 	
+	enum AutonomousState
+	{
+		kAutoState_Start,
+	};
+	
+	enum Wheel
+	{
+		kFR, // front-right
+		kFL, // front-left
+		kRR, // rear-right
+		kRL, // rear-left
+		kNumWheels,
+	};
+	
 	class ControllerButtonState
 	{
 	protected:
@@ -627,10 +649,10 @@ public:
 
 protected:
 	/* Here we declare pointers to various components of the robot's control system */
-	Jaguar*               m_pFR_DriveMotor;           // Front Right drive Motor
-	Jaguar*               m_pFL_DriveMotor;           // Front Left drive Motor
-	Jaguar*               m_pRR_DriveMotor;           // Rear Right drive Motor
-	Jaguar*               m_pRL_DriveMotor;           // Rear Left drive Motor
+
+	// Jag controllers for the wheel motors...
+	Jaguar*               m_pWheelJaguar[kNumWheels];
+
 	Jaguar*               m_pTowerJaguar;
 	Jaguar*               m_pBallMagnet;
 	Servo*                m_pCameraAzimuthServo;
@@ -656,17 +678,13 @@ protected:
 	DigitalInput*         m_pDigInTowerEncoder_B;
 	DigitalInput*         m_pKickerSwitch;
 
+	// Array of wheel encoders, one for each wheel...
+	ParadoxEncoder*       m_pWheelEncoder[kNumWheels];
 
-	ParadoxEncoder*       m_pFREncoder;
-	ParadoxEncoder*       m_pFLEncoder;
-	ParadoxEncoder*       m_pRREncoder;
-	ParadoxEncoder*       m_pRLEncoder;
 	ParadoxEncoder*       m_pTowerEncoder;
 
-	ParadoxSpeedController* m_pSpeedController_FR;
-	ParadoxSpeedController* m_pSpeedController_FL;
-	ParadoxSpeedController* m_pSpeedController_RR;
-	ParadoxSpeedController* m_pSpeedController_RL;
+	// Array of speed controllers, one for each wheel...
+	ParadoxSpeedController* m_pSpeedController[kNumWheels];
 
 	PIDController*        m_pTowerPositionController;
 	
@@ -727,14 +745,21 @@ protected:
 	// true when tower motor control is absolute, false when it is relative...
 	bool                  m_bUseAbsoluteTowerMotorControl;
 	
+	// Kicker action is a finite state machine.  Here are the state machine variables...
 	KickerState           m_kickerState;
 	float                 m_timePostLatchReleasePauseCountdown;
 	float                 m_timePostFirePauseCountdown;
 	float                 m_timePostLatchEngagePauseCountdown;
 	
+	// Autonomous mode is a finite state machine.  Here are the state machine variables...
+	AutonomousState       m_autoState;
+	
 	#ifdef USE_LOG_FILE
 	FILE*				  m_pRobotLogFile; 
 	#endif
+
+public:
+	static const char*    s_wheelAbbreviations[kNumWheels];
 
 protected:
 
@@ -744,7 +769,8 @@ protected:
 	void   ProcessControllers();
 	void   ProcessAutoAndTeleopCommon();
 	void   ProcessOperated();
-	void   ProcessDriveSystem();
+	void   ProcessTeleopDriveSystem();
+	void   ProcessDriveSystem(const float drive_X, const float drive_Y, const float drive_Z);
 	void   ProcessTower();
 	void   ProcessBallMagnet();
 	void   ProcessCamera();
@@ -760,13 +786,16 @@ protected:
 	void   SetWheelPID(const float kP, const float kI, const float kD);
 	void   SetEnableWheelSpeedControllers(const bool bEnable);
 	void   SendDashboardData();
+	void   InitializeCamera();
 
 public:
 	PrototypeController(void);
 };
 
 
-void InitializeCamera()
+const char*    PrototypeController::s_wheelAbbreviations[kNumWheels] = { "FR", "FL", "RR", "RL", };
+
+void PrototypeController::InitializeCamera()
 {
 	// Create and set up a camera instance
 /*
@@ -806,6 +835,8 @@ PrototypeController::PrototypeController(void)
 	m_timePostFirePauseCountdown = 0.0f;
 	m_timePostLatchEngagePauseCountdown = 0.0f;
 	
+	m_autoState = kAutoState_Start;
+
 	InitializeCamera();
 	
 	/*
@@ -874,10 +905,10 @@ PrototypeController::PrototypeController(void)
 	*/
 
 	const bool s_flipFL_And_Tower = false;
-	m_pFR_DriveMotor   = new Jaguar(6);           // Front Right drive Motor
-	m_pFL_DriveMotor   = new Jaguar(s_flipFL_And_Tower ? 3:4);           // Front Left drive Motor
-	m_pRR_DriveMotor   = new Jaguar(8);           // Rear Right drive Motor
-	m_pRL_DriveMotor   = new Jaguar(10);          // Rear Left drive Motor
+	m_pWheelJaguar[kFR] = new Jaguar(6);           // Front Right drive Motor
+	m_pWheelJaguar[kFL] = new Jaguar(s_flipFL_And_Tower ? 3:4);           // Front Left drive Motor
+	m_pWheelJaguar[kRR] = new Jaguar(8);           // Rear Right drive Motor
+	m_pWheelJaguar[kRL] = new Jaguar(10);          // Rear Left drive Motor
 	m_pTowerJaguar     = new Jaguar(s_flipFL_And_Tower ? 4:3);
 	m_pBallMagnet      = new Jaguar(2);
 
@@ -904,10 +935,10 @@ PrototypeController::PrototypeController(void)
 	m_pTowerCylinder_OUT_Solenoid   = new Solenoid(5);
 	m_pTowerCylinder_IN_Solenoid    = new Solenoid(6);
 
-	m_pFREncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInFREncoder_A, m_pDigInFREncoder_B);
-	m_pFLEncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInFLEncoder_A, m_pDigInFLEncoder_B);
-	m_pRREncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInRREncoder_A, m_pDigInRREncoder_B);
-	m_pRLEncoder        = ParadoxEncoder::NewWheelEncoder(m_pDigInRLEncoder_A, m_pDigInRLEncoder_B);
+	m_pWheelEncoder[kFR] = ParadoxEncoder::NewWheelEncoder(m_pDigInFREncoder_A, m_pDigInFREncoder_B);
+	m_pWheelEncoder[kFL] = ParadoxEncoder::NewWheelEncoder(m_pDigInFLEncoder_A, m_pDigInFLEncoder_B);
+	m_pWheelEncoder[kRR] = ParadoxEncoder::NewWheelEncoder(m_pDigInRREncoder_A, m_pDigInRREncoder_B);
+	m_pWheelEncoder[kRL] = ParadoxEncoder::NewWheelEncoder(m_pDigInRLEncoder_A, m_pDigInRLEncoder_B);
 
 	m_pTowerEncoder     = new ParadoxEncoder(m_pDigInTowerEncoder_A, m_pDigInTowerEncoder_B, true, Encoder::k1X);
 	m_pTowerEncoder->SetMovingAverageSize(16);
@@ -915,10 +946,10 @@ PrototypeController::PrototypeController(void)
 
 
 
-	m_pSpeedController_FR = NewWheelSpeedController(m_pFREncoder, m_pFR_DriveMotor);
-	m_pSpeedController_FL = NewWheelSpeedController(m_pFLEncoder, m_pFL_DriveMotor);
-	m_pSpeedController_RR = NewWheelSpeedController(m_pRREncoder, m_pRR_DriveMotor);
-	m_pSpeedController_RL = NewWheelSpeedController(m_pRLEncoder, m_pRL_DriveMotor);
+	m_pSpeedController[kFR] = NewWheelSpeedController(m_pWheelEncoder[kFR], m_pWheelJaguar[kFR]);
+	m_pSpeedController[kFL] = NewWheelSpeedController(m_pWheelEncoder[kFL], m_pWheelJaguar[kFL]);
+	m_pSpeedController[kRR] = NewWheelSpeedController(m_pWheelEncoder[kRR], m_pWheelJaguar[kRR]);
+	m_pSpeedController[kRL] = NewWheelSpeedController(m_pWheelEncoder[kRL], m_pWheelJaguar[kRL]);
 
 	const float kTower_P = 0.25f;
 	const float kTower_I = 0.00005f;
@@ -1192,17 +1223,23 @@ void PrototypeController::ProcessKicker()
 }
 
 
-void PrototypeController::ProcessDriveSystem()
+void PrototypeController::ProcessTeleopDriveSystem()
 {
 	const float joyX = m_pJoy->GetX();
 	const float joyY = -m_pJoy->GetY();
 	const float joyZ = m_pJoy->GetZ();
 
+	ProcessDriveSystem(joyX, joyY, joyZ);
+}
+
+
+void PrototypeController::ProcessDriveSystem(const float drive_X, const float drive_Y, const float drive_Z)
+{
 	//Grouping encoders by orientation to compare later.  How does GetAveRateRPS() Work?
-	//const float Frnt_EncSpeed = fabs((m_pFREncoder->GetRateRPS() + m_pFLEncoder->GetRateRPS()) * 0.5);
-	//const float Back_EncSpeed = fabs((m_pRREncoder->GetRateRPS() + m_pRLEncoder->GetRateRPS()) * 0.5);
-	//const float Left_EncSpeed = fabs((m_pFLEncoder->GetRateRPS() + m_pRLEncoder->GetRateRPS()) * 0.5);
-	//const float Rght_EncSpeed = fabs((m_pFREncoder->GetRateRPS() + m_pRREncoder->GetRateRPS()) * 0.5);
+	//const float Frnt_EncSpeed = fabs((m_pWheelEncoder[kFR]->GetRateRPS() + m_pWheelEncoder[kFL]->GetRateRPS()) * 0.5);
+	//const float Back_EncSpeed = fabs((m_pWheelEncoder[kRR]->GetRateRPS() + m_pWheelEncoder[kRL]->GetRateRPS()) * 0.5);
+	//const float Left_EncSpeed = fabs((m_pWheelEncoder[kFL]->GetRateRPS() + m_pWheelEncoder[kRL]->GetRateRPS()) * 0.5);
+	//const float Rght_EncSpeed = fabs((m_pWheelEncoder[kFR]->GetRateRPS() + m_pWheelEncoder[kRR]->GetRateRPS()) * 0.5);
 	
 	float FR_EncCoef = 1.0f;
 	float FL_EncCoef = 1.0f;
@@ -1211,7 +1248,7 @@ void PrototypeController::ProcessDriveSystem()
 	
 	//Comparing based on a common direction; if using mecanum strafing, compare front and back instead of left and right.
 /*
-	if (fabs(joyX) > fabs(joyY) && fabs(joyX) > fabs(joyZ))
+	if (fabs(drive_X) > fabs(drive_Y) && fabs(drive_X) > fabs(drive_Z))
 	{
 		if (Frnt_EncSpeed > Back_EncSpeed)
 		{
@@ -1239,48 +1276,44 @@ void PrototypeController::ProcessDriveSystem()
 	}
 */
 	
-	//printf("joyX = %f\n", joyX);
-	//printf("joyY = %f\n", joyY); 
-	//printf("joyZ = %f\n", joyZ);
+	//printf("drive_X = %f\n", drive_X);
+	//printf("drive_Y = %f\n", drive_Y); 
+	//printf("drive_Z = %f\n", drive_Z);
 
-	#if defined(TEST_WHEEL_ENCODER)
-	const float pwm_FR = -m_pFlightQuadrant->GetY(); // Simple method of testing wheel speed setpoint...  use flight quadrant lever.
-	#else
-	const float pwm_FR = Clamp(m_coef_X_FR * joyX + m_coef_Y_FR * joyY + m_coef_Z_FR * joyZ, -1.0f, 1.0f) * FR_EncCoef * kFR_PwmModulation;
-	#endif
-	const float pwm_FL = Clamp(m_coef_X_FL * joyX + m_coef_Y_FL * joyY + m_coef_Z_FL * joyZ, -1.0f, 1.0f) * FL_EncCoef * kFL_PwmModulation;
-	const float pwm_RR = Clamp(m_coef_X_RR * joyX + m_coef_Y_RR * joyY + m_coef_Z_RR * joyZ, -1.0f, 1.0f) * RR_EncCoef * kRR_PwmModulation;
-	const float pwm_RL = Clamp(m_coef_X_RL * joyX + m_coef_Y_RL * joyY + m_coef_Z_RL * joyZ, -1.0f, 1.0f) * RL_EncCoef * kRL_PwmModulation;
+	float pwm[kNumWheels];
+	pwm[kFR] = Clamp(m_coef_X_FR * drive_X + m_coef_Y_FR * drive_Y + m_coef_Z_FR * drive_Z, -1.0f, 1.0f) * FR_EncCoef * kFR_PwmModulation;
+	pwm[kFL] = Clamp(m_coef_X_FL * drive_X + m_coef_Y_FL * drive_Y + m_coef_Z_FL * drive_Z, -1.0f, 1.0f) * FL_EncCoef * kFL_PwmModulation;
+	pwm[kRR] = Clamp(m_coef_X_RR * drive_X + m_coef_Y_RR * drive_Y + m_coef_Z_RR * drive_Z, -1.0f, 1.0f) * RR_EncCoef * kRR_PwmModulation;
+	pwm[kRL] = Clamp(m_coef_X_RL * drive_X + m_coef_Y_RL * drive_Y + m_coef_Z_RL * drive_Z, -1.0f, 1.0f) * RL_EncCoef * kRL_PwmModulation;
 
+	//#define TEST_WHEEL_ENCODER kFR // Uncomment this line and set the desired wheel enum to test that wheel encoder.
 	#if defined(TEST_WHEEL_ENCODER)
-	m_pFREncoder->DumpEncoderData(5);
+	pwm[TEST_WHEEL_ENCODER] = -m_pFlightQuadrant->GetY(); // Simple method of testing wheel speed setpoint...  use flight quadrant lever.
+	m_pWheelEncoder[TEST_WHEEL_ENCODER]->DumpEncoderData(5);
 	#endif
 	
 	if (m_bUseSpeedController)
 	{
-		const float setPoint_FR = pwm_FR * m_maxWheelRPS;
-		const float setPoint_FL = pwm_FL * m_maxWheelRPS;
-		const float setPoint_RR = pwm_RR * m_maxWheelRPS;
-		const float setPoint_RL = pwm_RL * m_maxWheelRPS;
-
 		DS_PRINTF(0, 0, "SC" ); // Speed control enabled.
 
-		#if defined(TEST_WHEEL_ENCODER)
-		DS_PRINTF(4, 0, "SP: %.2f", setPoint_FR );
-		#endif
+		float setPoint[kNumWheels];
+		for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+		{
+			setPoint[iWheel] = pwm[iWheel] * m_maxWheelRPS;
+			m_pSpeedController[iWheel]->SetSetpoint(setPoint[iWheel]);
+		}
 
-		m_pSpeedController_FR->SetSetpoint(setPoint_FR);
-		m_pSpeedController_FL->SetSetpoint(setPoint_FL);
-		m_pSpeedController_RR->SetSetpoint(setPoint_RR);
-		m_pSpeedController_RL->SetSetpoint(setPoint_RL);
+		#if defined(TEST_WHEEL_ENCODER)
+		DS_PRINTF(4, 0, "SP: %.2f", setPoint[TEST_WHEEL_ENCODER] );
+		#endif
 	}
 	else
 	{
 		DS_PRINTF(0, 0, "  " ); // Speed control disabled.
-		m_pFR_DriveMotor->Set(pwm_FR);
-		m_pFL_DriveMotor->Set(pwm_FL);
-		m_pRR_DriveMotor->Set(pwm_RR);
-		m_pRL_DriveMotor->Set(pwm_RL);
+		for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+		{
+			m_pWheelJaguar[iWheel]->Set(pwm[iWheel]);
+		}
 	}
 }
 
@@ -1359,8 +1392,10 @@ void PrototypeController::ProcessTower()
 		m_bUseAbsoluteTowerMotorControl = false;
 	}
 
+	#define TEST_TOWER_ENCODER
+	#if defined(TEST_TOWER_ENCODER)
 	m_pTowerEncoder->DumpEncoderData(5);
-
+	#endif
 	const float towerPower = m_pFlightQuadrant->GetThrottle();
 	if (m_bUseAbsoluteTowerMotorControl)
 	{
@@ -1368,7 +1403,9 @@ void PrototypeController::ProcessTower()
 		const float kTowerEncoderMaxCount = 50.0f;
 		const float setPoint = (towerPower + 1.0f) * 0.5f * kTowerEncoderMaxCount;
 		m_pTowerPositionController->SetSetpoint(setPoint);
+		#if defined(TEST_TOWER_ENCODER)
 		DS_PRINTF(4, 0, "SP: %.2f", setPoint );
+		#endif
 	}
 	else
 	{
@@ -1397,7 +1434,7 @@ void PrototypeController::ProcessTower()
 
 void PrototypeController::ProcessEndOfMainLoop()
 {
-	// Update the dashboard.  Note: it doesn't matter which Solenoid instance we pass in...
+	// Update the dashboard...
 	SendDashboardData();
 
 	// Feed the watchdog, if active...
@@ -1408,7 +1445,6 @@ void PrototypeController::ProcessEndOfMainLoop()
 
 	// This is our main loop wait.  Because many of the robot functions are processed via a state machine in the main robot thread, this should
 	// be the only Wait(...) call in the main thread (unless Watchdog is disabled -- in the Calibrate function, for example)...
-	const float kMainLoopWaitTime = 0.025f;
 	Wait(kMainLoopWaitTime);
 }
 
@@ -1418,7 +1454,14 @@ void PrototypeController::StartCompetition()
 	AllStop();
 	while (true)
 	{
-		if (!IsDisabled())
+		// Process time...
+		ProcessTime();
+
+		if (IsDisabled())
+		{
+			AllStop();
+		}
+		else
 		{
 			ProcessAutoAndTeleopCommon();
 			if (IsAutonomous())
@@ -1439,9 +1482,6 @@ void PrototypeController::StartCompetition()
 
 void PrototypeController::ProcessAutoAndTeleopCommon()
 {
-	// Process time...
-	ProcessTime();
-
 	// Process controller state...
 	ProcessControllers();
 
@@ -1449,10 +1489,10 @@ void PrototypeController::ProcessAutoAndTeleopCommon()
 	ProcessDebug();
 
 	// Update velocity...
-	m_pFREncoder->Update();
-	m_pFLEncoder->Update();
-	m_pRREncoder->Update();
-	m_pRLEncoder->Update();
+	m_pWheelEncoder[kFR]->Update();
+	m_pWheelEncoder[kFL]->Update();
+	m_pWheelEncoder[kRR]->Update();
+	m_pWheelEncoder[kRL]->Update();
 	m_pTowerEncoder->Update();
 
 	// Keep wheel encoder state in sync...
@@ -1465,35 +1505,35 @@ void PrototypeController::ProcessAutoAndTeleopCommon()
 
 void PrototypeController::ProcessAutonomous()
 {
-	// TODO: Needs to be made into a state machine...
-	   /*     AllStop();
-	        int numberofballs=1;//Getlocation();
-	        float timetodrivethreefeet;
-        if (IsDisabled() ) Wait(0.05);
+	switch (m_autoState)
+	{
+		case kAutoState_Start:
+		{
+			break;
+		}
+	}
+	
         while (IsAutonomous())
         {
+    	int numberofballs=3;
         	while (numberofballs >=0)
 	{
-	                while (timetodrivethreefeet >=0)
-	                {
-	                m_pFR_DriveMotor->Set(.1 * kFR_PwmModulation);
-	                m_pFL_DriveMotor->Set(.1 * kFL_PwmModulation);
-	                m_pRR_DriveMotor->Set(-.1 * kRR_PwmModulation);
-	                m_pRL_DriveMotor->Set(-.1 * kRL_PwmModulation);
-	                Wait (.01);
-	                timetodrivethreefeet=timetodrivethreefeet-.01;
-	                };
   //      	ProcessKicker();
+			m_pWheelJaguar[kFR]->Set(.5 * kFR_PwmModulation);
+			m_pWheelJaguar[kFL]->Set(.5 * kFL_PwmModulation);
+			m_pWheelJaguar[kRR]->Set(-.5 * kRR_PwmModulation);
+			m_pWheelJaguar[kRL]->Set(-.5 * kRL_PwmModulation);
+			Wait (2.5);
         	};	
         	Wait (15);
-	        };*/
+    }
 }
 
 
 
 void PrototypeController::ProcessOperated()
 {
-	ProcessDriveSystem();
+	ProcessTeleopDriveSystem();
 	ProcessKicker();
 	ProcessTower();
 	ProcessBallMagnet();
@@ -1529,45 +1569,69 @@ void PrototypeController::Calibrate()
 	GetWatchdog().SetEnabled(false); 			
 
 	SetEnableWheelSpeedControllers(false); // Need to disable the speed controllers since they run in separate threads.
-	m_pTowerJaguar->Set(1.0f);
-	Wait(0.5); // let motor spin up.
+
+	// Turn all wheel motors on, full forward...
+	float forwardSpeedSum[kNumWheels];
+	for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+	{
+		forwardSpeedSum[iWheel] = 0.0f;
+		m_pWheelJaguar[iWheel]->Set(1.0f);
+	}
+	
+	Wait(0.5); // let motors spin up.
+
+	// Make several samples of the wheel speed to get a nice average...
 	const unsigned int kNumSamples = 8;
 	const float kSamplePeriod = 0.25f;
 	const float kSampleSleep = kSamplePeriod / float(kNumSamples);
-	float forwardSpeedSum = 0.0f;
 	for (unsigned int i = 0; i < kNumSamples; i++)
 	{
-		forwardSpeedSum += m_pTowerEncoder->GetRateRPS();
+		for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+		{
+			forwardSpeedSum[iWheel] += m_pWheelEncoder[iWheel]->GetRateRPS();
+		}
 		Wait((double)kSampleSleep);
 	}
-	const float maxForwardSpeed = forwardSpeedSum / float(kNumSamples);
 
+	// Now calculate max forward speed for each wheel, zero reverse speed accumulator, and start motors in full reverse...
+	float maxForwardSpeed[kNumWheels];
+	float reverseSpeedSum[kNumWheels];
+	for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+	{
+		maxForwardSpeed[iWheel] = forwardSpeedSum[iWheel] / float(kNumSamples);
+		reverseSpeedSum[iWheel] = 0.0f;
+		m_pWheelJaguar[iWheel]->Set(-1.0f);
+	}
 
-
-	m_pTowerJaguar->Set(-1.0f);
-	Wait(0.5); // let motor spin up.
-	float reverseSpeedSum = 0.0f;
+	Wait(0.5); // let motors spin up.
 	for (unsigned int i = 0; i < kNumSamples; i++)
 	{
-		reverseSpeedSum += m_pTowerEncoder->GetRateRPS();
+		for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+		{
+			reverseSpeedSum[iWheel] += m_pWheelEncoder[iWheel]->GetRateRPS();
+		}
 		Wait((double)kSampleSleep);
 	}
-	const float maxReverseSpeed = reverseSpeedSum / float(kNumSamples);
 
-	_LOG("maxForwardSpeed = %f\n", maxForwardSpeed);
-	_LOG("maxReverseSpeed = %f\n", maxReverseSpeed);
-
-	SetEnableWheelSpeedControllers(m_bUseSpeedController); // restore speed controller state.
-
+	// Now calculate the MINIMUM wheel speed of all eight individual wheel speed samples (4 forward, 4 reverse)...
+	float maxReverseSpeed[kNumWheels];
 	m_maxWheelRPS = 9999999.0f;
-	if ( fabs(maxForwardSpeed) < m_maxWheelRPS )
+	for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
 	{
-		m_maxWheelRPS = fabs(maxForwardSpeed);
+		maxReverseSpeed[iWheel] = reverseSpeedSum[iWheel] / float(kNumSamples);
+
+		_LOG("%s maxForwardSpeed = %f\n", s_wheelAbbreviations[iWheel], maxForwardSpeed[iWheel]);
+		_LOG("%s maxReverseSpeed = %f\n", s_wheelAbbreviations[iWheel], maxReverseSpeed[iWheel]);
+
+		if ( fabs(maxForwardSpeed[iWheel]) < m_maxWheelRPS )
+	{
+			m_maxWheelRPS = fabs(maxForwardSpeed[iWheel]);
 	}
 
-	if ( fabs(maxReverseSpeed) < m_maxWheelRPS )
+		if ( fabs(maxReverseSpeed[iWheel]) < m_maxWheelRPS )
 	{
-		m_maxWheelRPS = fabs(maxReverseSpeed);
+			m_maxWheelRPS = fabs(maxReverseSpeed[iWheel]);
+		}
 	}
 
 	// We de-rate the maximum wheel speed by a constant.  This is because we do our calibration on the bench with the wheels raised off the ground.
@@ -1577,6 +1641,8 @@ void PrototypeController::Calibrate()
 
 	// Update wheel speed limits...
 	SetWheelSpeedLimits(m_maxWheelRPS);
+
+	SetEnableWheelSpeedControllers(m_bUseSpeedController); // restore speed controller state.
 
 	_LOG("m_maxWheelRPS = %f\n", m_maxWheelRPS);
 	_LOG("Calibration Complete.\n");
@@ -1592,6 +1658,10 @@ void PrototypeController::ProcessTime()
 {
 	UINT32 iCurrentTime = GetFPGATime();
 	m_iDeltaTime_uS = (iCurrentTime >= m_iTimestamp_uS) ? (iCurrentTime - m_iTimestamp_uS) : (1 + iCurrentTime + (0xFFFFFFFF - m_iTimestamp_uS));
+	if (m_iDeltaTime_uS > kMax_dT_uS)
+	{
+		m_iDeltaTime_uS = kMax_dT_uS;
+	}
 	m_dT = float(m_iDeltaTime_uS) / 1000000.0f;
 	m_iTimestamp_uS = iCurrentTime;
 }
@@ -1688,12 +1758,19 @@ void PrototypeController::ControllerButtonState::UpdateButtonState( DriverStatio
 void PrototypeController::AllStop() 
 {
 	// All Stop!
-	m_pFR_DriveMotor->Set(0.0f);
-	m_pFL_DriveMotor->Set(0.0f);
-	m_pRR_DriveMotor->Set(0.0f);
-	m_pRL_DriveMotor->Set(0.0f);
+	m_pWheelJaguar[kFR]->Set(0.0f);
+	m_pWheelJaguar[kFL]->Set(0.0f);
+	m_pWheelJaguar[kRR]->Set(0.0f);
+	m_pWheelJaguar[kRL]->Set(0.0f);
 	m_pTowerJaguar->Set(0.0f);
 	m_pBallMagnet->Set(0.0f);
+
+	m_pMainCylinder_IN_Solenoid->Set(false); 
+	m_pMainCylinder_OUT_Solenoid->Set(false); 
+	m_pTriggerCylinder_IN_Solenoid->Set(false); 
+	m_pTriggerCylinder_OUT_Solenoid->Set(false); 
+	m_pTowerCylinder_OUT_Solenoid->Set(false);
+	m_pTowerCylinder_IN_Solenoid->Set(false);
 }
 
 
@@ -1707,28 +1784,28 @@ ParadoxSpeedController* PrototypeController::NewWheelSpeedController(ParadoxEnco
 
 void PrototypeController::SetWheelSpeedLimits(const float wheelSpeedLimit)
 {
-	m_pSpeedController_FR->SetMaxSpeed(wheelSpeedLimit);
-	m_pSpeedController_FL->SetMaxSpeed(wheelSpeedLimit);
-	m_pSpeedController_RR->SetMaxSpeed(wheelSpeedLimit);
-	m_pSpeedController_RL->SetMaxSpeed(wheelSpeedLimit);
+	for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+	{
+		m_pSpeedController[iWheel]->SetMaxSpeed(wheelSpeedLimit);
+	}
 }
 
 
 void PrototypeController::SetWheelPID(const float kP, const float kI, const float kD)
 {
-	m_pSpeedController_FR->SetPID(kP, kI, kD);
-	m_pSpeedController_FL->SetPID(kP, kI, kD);
-	m_pSpeedController_RR->SetPID(kP, kI, kD);
-	m_pSpeedController_RL->SetPID(kP, kI, kD);
+	for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+	{
+		m_pSpeedController[iWheel]->SetPID(kP, kI, kD);
+	}
 }
 
 
 void PrototypeController::SetEnableWheelSpeedControllers(const bool bEnable)
 {
-	m_pSpeedController_FR->SetEnabled(bEnable);
-	m_pSpeedController_FL->SetEnabled(bEnable);
-	m_pSpeedController_RR->SetEnabled(bEnable);
-	m_pSpeedController_RL->SetEnabled(bEnable);
+	for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+	{
+		m_pSpeedController[iWheel]->SetEnabled(bEnable);
+	}
 }
 
 
@@ -1840,7 +1917,7 @@ void PrototypeController::SendDashboardData()
 	{
 		dash_packet_2.AddCluster(); // tracking data
 		{
-			const float pwm = m_pSpeedController_FR->GetPWM();
+			const float pwm = m_pSpeedController[kFR]->GetPWM();
 			// GVV: Hijack the camera tracking dashboard for our own nefarious purposes (to plot out PID loop stuff)...
 			dash_packet_2.AddDouble(pwm); // Joystick X
 			dash_packet_2.AddDouble(135.0); // angle
