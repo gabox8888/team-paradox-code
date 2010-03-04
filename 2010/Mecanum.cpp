@@ -88,6 +88,12 @@ static const int kDSC_PNU = 6;  // Tower pneumatic system active.
 static const int kDSC_MAN = 9;  // Manual tower lift motor control.
 static const int kDSC_MAG = 12; // Ball magnet on.
 static const int kDSC_CMP = 15; // Compressor on.
+static const int kDSC_MOD = 18; // Processing mode (autonomous, teleop, disabled).
+
+// Second intrument display row...
+static const int kIDR_1 = 1;
+
+static const int kDSC_CAL = 0; // Running calibration program.
 
 enum FlightQuadrantButtons
 {
@@ -1586,6 +1592,7 @@ void PrototypeController::StartCompetition()
 
 		if (IsDisabled())
 		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "OFF" );
 			AllStop();
 		}
 		else
@@ -1593,11 +1600,13 @@ void PrototypeController::StartCompetition()
 			ProcessAutoAndTeleopCommon();
 			if (IsAutonomous())
 			{
+				DS_PRINTF(kIDR_0, kDSC_MOD, "AUT" );
 				m_bProcessingAutonomous = true;
 				ProcessAutonomous();
 			}
 			else
 			{
+				DS_PRINTF(kIDR_0, kDSC_MOD, "TEL" );
 				if (m_bProcessingAutonomous) // If we are transitioning from autonomous to teleoperated...
 				{
 					CleanupAutonomous();
@@ -1726,7 +1735,12 @@ void PrototypeController::ProcessOperated()
 
 	if ( m_joyButtonState.GetLongHoldDown( kB_CalibrateButton ) )
 	{
+		DS_PRINTF(kIDR_1, kDSC_CAL, "CAL" );
 		Calibrate();
+	}
+	else
+	{
+		DS_PRINTF(kIDR_1, kDSC_CAL, "   " );
 	}
 
 	if (m_gamePadButtonState.GetDownStroke( kGAME_Button_RightSelect ))
