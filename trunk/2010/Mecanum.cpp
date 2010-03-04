@@ -1318,38 +1318,27 @@ void PrototypeController::ProcessDriveSystem(const float drive_X, const float dr
 	m_pWheelEncoder[TEST_WHEEL_ENCODER]->DumpEncoderData(5);
 	#endif
 	
-	// a deadzone for the middle 16% of any axis, with existing driving nested in the else.
-	if (fabs(m_pJoy->GetX()) < 0.08 || fabs(m_pJoy->GetY()) < 0.08 || fabs(m_pJoy->GetZ()) < 0.08)
+	if (m_bUseSpeedController)
 	{
+		DS_PRINTF(0, 0, "SC" ); // Speed control enabled.
+
+		float setPoint[kNumWheels];
 		for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
 		{
-			m_pWheelJaguar[iWheel]->Set(0);
+			setPoint[iWheel] = pwm[iWheel] * m_maxWheelRPS;
+			m_pSpeedController[iWheel]->SetSetpoint(setPoint[iWheel]);
 		}
+
+		#if defined(TEST_WHEEL_ENCODER)
+		DS_PRINTF(4, 0, "SP: %.2f", setPoint[TEST_WHEEL_ENCODER] );
+		#endif
 	}
 	else
 	{
-		if (m_bUseSpeedController)
+		DS_PRINTF(0, 0, "  " ); // Speed control disabled.
+		for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
 		{
-			DS_PRINTF(0, 0, "SC" ); // Speed control enabled.
-
-			float setPoint[kNumWheels];
-			for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
-			{
-				setPoint[iWheel] = pwm[iWheel] * m_maxWheelRPS;
-				m_pSpeedController[iWheel]->SetSetpoint(setPoint[iWheel]);
-			}
-	
-			#if defined(TEST_WHEEL_ENCODER)
-			DS_PRINTF(4, 0, "SP: %.2f", setPoint[TEST_WHEEL_ENCODER] );
-			#endif
-		}
-		else
-		{
-			DS_PRINTF(0, 0, "  " ); // Speed control disabled.
-			for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
-			{
-				m_pWheelJaguar[iWheel]->Set(pwm[iWheel]);
-			}
+			m_pWheelJaguar[iWheel]->Set(pwm[iWheel]);
 		}
 	}
 }
@@ -1551,18 +1540,28 @@ void PrototypeController::ProcessAutonomous()
 {
 	// TODO: Needs to be made into a state machine...
 	     //   AllStop();
-	        int numberofballs=m_pDriverStation->GetLocation();
-	        float timetodrivethreefeet=.284;
+	       // int numberofballs=m_pDriverStation->GetLocation();
 	       // if (IsDisabled() ) Wait(0.05);
+	                            m_pBallMagnet->Set(1);
 	                            m_pWheelJaguar[kFR]->Set(-.5 * kPwmModulationWheels[kFR]);
-	        	                m_pWheelJaguar[kFL]->Set(-.5 * kPwmModulationWheels[kFL]);
-	        	                m_pWheelJaguar[kRR]->Set(.5 * kPwmModulationWheels[kRR]);
+	        	                m_pWheelJaguar[kFL]->Set(.5 * kPwmModulationWheels[kFL]);
+	        	                m_pWheelJaguar[kRR]->Set(-.5 * kPwmModulationWheels[kRR]);
 	        	                m_pWheelJaguar[kRL]->Set(.5 * kPwmModulationWheels[kRL]);
-	        	                //float time = (m_pFlightQuadrant->GetThrottle() + 1.0f) * 0.5f;
-	        	                DS_PRINTF(2, 0, "time=%f", time);
+	        	                ProcessKicker();
 	        	                Wait (1.55);
+	                            m_pBallMagnet->Set(1);
+	        	                m_pWheelJaguar[kFR]->Set(.5 * kPwmModulationWheels[kFR]);
+	        	               	m_pWheelJaguar[kFL]->Set(-.5 * kPwmModulationWheels[kFL]);
+	          	                m_pWheelJaguar[kRR]->Set(.5 * kPwmModulationWheels[kRR]);
+	           	                m_pWheelJaguar[kRL]->Set(-.5 * kPwmModulationWheels[kRL]);
+	           	                Wait (1.55);
+	                            m_pBallMagnet->Set(1);
+	           	                m_pWheelJaguar[kFR]->Set(-.5 * kPwmModulationWheels[kFR]);
+	           	                m_pWheelJaguar[kFL]->Set(-.5 * kPwmModulationWheels[kFL]);
+	           	                m_pWheelJaguar[kRR]->Set(.5 * kPwmModulationWheels[kRR]);
+	           	                m_pWheelJaguar[kRL]->Set(.5 * kPwmModulationWheels[kRL]);           	    
+	           	                Wait (3.10);
 	        	                AllStop();
-	        	                Wait (15);
 }
 	        	                /*
 	        while (IsAutonomous())
