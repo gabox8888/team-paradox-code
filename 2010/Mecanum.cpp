@@ -37,10 +37,18 @@
 
 #define DS_PRINTF(lineNum, columnNum, ...) DriverStationLCD::GetInstance()->Printf((DriverStationLCD::Line)(lineNum), (columnNum)+1, __VA_ARGS__)
 
-static const float        kFR_PwmModulation     =  1.0f;
-static const float        kFL_PwmModulation     = -1.0f;
-static const float        kRR_PwmModulation     =  1.0f;
-static const float        kRL_PwmModulation     = -1.0f;
+enum Wheel
+{
+	kFR, // front-right
+	kFL, // front-left
+	kRR, // rear-right
+	kRL, // rear-left
+	kNumWheels,
+};
+// Wheels PWM Modulation.  Use to temporarily disable specific wheels:
+//                                                              FR    FL    RR    RL	
+static const float        kPwmModulationWheels[kNumWheels] = { 1.0f, 1.0f, 1.0f, 1.0f, };
+//static const float        kPwmModulationWheels[kNumWheels] = { 0.0f, 0.0f, 0.0f, 0.0f, };
 
 static const float        kPulsesPerRevolution  = 250.0f;
 static const float        kRevolutionsPerPulse  = 1.0f / kPulsesPerRevolution;
@@ -596,15 +604,6 @@ public:
 		kAutoState_Start,
 	};
 	
-	enum Wheel
-	{
-		kFR, // front-right
-		kFL, // front-left
-		kRR, // rear-right
-		kRL, // rear-left
-		kNumWheels,
-	};
-	
 	class ControllerButtonState
 	{
 	protected:
@@ -740,10 +739,16 @@ protected:
 	bool                  m_bBallMagnetActive;
 	
 	// true when the lift tower is active (responsive to controls), false otherwise...
-	bool                  m_bTowerIsActive;
+	bool                  m_bTowerLiftMotorSystemIsActive;
+
+	// true when the lift tower is active (responsive to controls), false otherwise...
+	bool                  m_bTowerPneumaticSystemIsActive;
 	
 	// true when tower motor control is absolute, false when it is relative...
 	bool                  m_bUseAbsoluteTowerMotorControl;
+	
+	// This mirrors the enable state of the tower pid controller (which is private, grrrr)...
+	bool                  m_bTowerPidControllerIsEnabled;
 	
 	// Kicker action is a finite state machine.  Here are the state machine variables...
 	KickerState           m_kickerState;
@@ -787,6 +792,7 @@ protected:
 	void   SetEnableWheelSpeedControllers(const bool bEnable);
 	void   SendDashboardData();
 	void   InitializeCamera();
+	void   SetTowerPidControllerEnableState(const bool bEnabled);
 
 public:
 	PrototypeController(void);
@@ -828,7 +834,8 @@ PrototypeController::PrototypeController(void)
 	m_bUseSpeedController = false;
 	m_bUseAbsoluteTowerMotorControl = false;
 	m_bBallMagnetActive = false;
-	m_bTowerIsActive = false;
+	m_bTowerLiftMotorSystemIsActive = false;
+	m_bTowerPneumaticSystemIsActive = false;
 	
 	m_kickerState = kKickState_ExtendingMainCylinder;
 	m_timePostLatchReleasePauseCountdown = 0.0f;
@@ -955,14 +962,9 @@ PrototypeController::PrototypeController(void)
 	const float kTower_I = 0.00005f;
 	const float kTower_D = 0.0f;
 	m_pTowerPositionController = new PIDController(kTower_P, kTower_I, kTower_D, m_pTowerEncoder, m_pTowerJaguar);
-	if (m_bUseAbsoluteTowerMotorControl)
-	{
-		m_pTowerPositionController->Enable();
-	}
-	else
-	{
 		m_pTowerPositionController->Disable();
-	}
+	m_bTowerPidControllerIsEnabled = false;
+	SetTowerPidControllerEnableState(m_bUseAbsoluteTowerMotorControl);
 	
 	m_pCameraAzimuthServo = new Servo(5);
 	m_pCameraTiltServo    = new Servo(1);
@@ -982,18 +984,18 @@ PrototypeController::PrototypeController(void)
 	m_pDriverStation = DriverStation::GetInstance();				//Intialize the Driver Station
 
 	// Initialize the hard defaults for drive system coefficients...
-	m_coef_X_FR = -1.000000;
+	m_coef_X_FR = 1.000000;
 	m_coef_Y_FR = -1.000000;
 	m_coef_Z_FR = 1.000000;
 	m_coef_X_FL = 1.000000;
-	m_coef_Y_FL = -1.000000;
-	m_coef_Z_FL = -1.000000;
-	m_coef_X_RR = 1.000000;
+	m_coef_Y_FL = 1.000000;
+	m_coef_Z_FL = 1.000000;
+	m_coef_X_RR = -1.000000;
 	m_coef_Y_RR = -1.000000;
 	m_coef_Z_RR = 1.000000;
 	m_coef_X_RL = -1.000000;
-	m_coef_Y_RL = -1.000000;
-	m_coef_Z_RL = -1.000000;
+	m_coef_Y_RL = 1.000000;
+	m_coef_Z_RL = 1.000000;
 
 	// Hard default for max wheel speed...
 	m_maxWheelRPS = kDefaultMaxWheelSpeed; // RPS
@@ -1007,6 +1009,26 @@ PrototypeController::PrototypeController(void)
 	
 	// Load mecanum drive coefficients from file...
 	LoadDriveCoefficients();
+}
+
+
+void PrototypeController::SetTowerPidControllerEnableState(const bool bEnabled)
+{
+	if (bEnabled)
+	{
+		if (!m_bTowerPidControllerIsEnabled)
+		{
+			m_pTowerPositionController->Enable();
+		}
+	}
+	else
+	{
+		if (m_bTowerPidControllerIsEnabled)
+		{
+			m_pTowerPositionController->Disable();
+		}
+	}
+	m_bTowerPidControllerIsEnabled = bEnabled;
 }
 
 
@@ -1056,10 +1078,14 @@ void PrototypeController::LoadDriveCoefficients()
 	}
 
 	#if defined(USE_ARCADE_STEERING)
-	m_coef_X_FR = 0.0f;
-	m_coef_X_FL = 0.0f;
-	m_coef_X_RR = 0.0f;
-	m_coef_X_RL = 0.0f;
+	m_coef_Z_FR = 0.0f;
+	m_coef_Z_FL = 0.0f;
+	m_coef_Z_RR = 0.0f;
+	m_coef_Z_RL = 0.0f;
+	m_coef_X_FR = 1.0f;
+	m_coef_X_FL = 1.0f;
+	m_coef_X_RR = 1.0f;
+	m_coef_X_RL = 1.0f;
 	#endif
 }
 
@@ -1281,10 +1307,10 @@ void PrototypeController::ProcessDriveSystem(const float drive_X, const float dr
 	//printf("drive_Z = %f\n", drive_Z);
 
 	float pwm[kNumWheels];
-	pwm[kFR] = Clamp(m_coef_X_FR * drive_X + m_coef_Y_FR * drive_Y + m_coef_Z_FR * drive_Z, -1.0f, 1.0f) * FR_EncCoef * kFR_PwmModulation;
-	pwm[kFL] = Clamp(m_coef_X_FL * drive_X + m_coef_Y_FL * drive_Y + m_coef_Z_FL * drive_Z, -1.0f, 1.0f) * FL_EncCoef * kFL_PwmModulation;
-	pwm[kRR] = Clamp(m_coef_X_RR * drive_X + m_coef_Y_RR * drive_Y + m_coef_Z_RR * drive_Z, -1.0f, 1.0f) * RR_EncCoef * kRR_PwmModulation;
-	pwm[kRL] = Clamp(m_coef_X_RL * drive_X + m_coef_Y_RL * drive_Y + m_coef_Z_RL * drive_Z, -1.0f, 1.0f) * RL_EncCoef * kRL_PwmModulation;
+	pwm[kFR] = Clamp(m_coef_X_FR * drive_X + m_coef_Y_FR * drive_Y + m_coef_Z_FR * drive_Z, -1.0f, 1.0f) * FR_EncCoef * kPwmModulationWheels[kFR];
+	pwm[kFL] = Clamp(m_coef_X_FL * drive_X + m_coef_Y_FL * drive_Y + m_coef_Z_FL * drive_Z, -1.0f, 1.0f) * FL_EncCoef * kPwmModulationWheels[kFL];
+	pwm[kRR] = Clamp(m_coef_X_RR * drive_X + m_coef_Y_RR * drive_Y + m_coef_Z_RR * drive_Z, -1.0f, 1.0f) * RR_EncCoef * kPwmModulationWheels[kRR];
+	pwm[kRL] = Clamp(m_coef_X_RL * drive_X + m_coef_Y_RL * drive_Y + m_coef_Z_RL * drive_Z, -1.0f, 1.0f) * RL_EncCoef * kPwmModulationWheels[kRL];
 
 	//#define TEST_WHEEL_ENCODER kFR // Uncomment this line and set the desired wheel enum to test that wheel encoder.
 	#if defined(TEST_WHEEL_ENCODER)
@@ -1356,14 +1382,25 @@ void PrototypeController::ProcessTower()
 {
 	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T5 ))
 	{ 
-		m_bTowerIsActive = true;
+		m_bTowerLiftMotorSystemIsActive = true;
 	}
 	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T6 ))
 	{ 
-		m_bTowerIsActive = false;
+		m_bTowerLiftMotorSystemIsActive = false;
 	}
 
-	if (m_bTowerIsActive)
+	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T3 ))
+	{ 
+		m_bTowerPneumaticSystemIsActive = true;
+	}
+	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T4 ))
+	{ 
+		m_bTowerPneumaticSystemIsActive = false;
+	}
+
+
+
+	if (m_bTowerPneumaticSystemIsActive)
 	{
 		const bool bTowerCylinderExtend = m_pFlightQuadrant->GetY() < 0.0f;
 		m_pTowerCylinder_OUT_Solenoid->Set(bTowerCylinderExtend);
@@ -1375,33 +1412,28 @@ void PrototypeController::ProcessTower()
 		m_pTowerCylinder_IN_Solenoid->Set(false);
 	}
 
-	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T3 ))
+
+	if (m_gamePadButtonState.GetDownStroke( kGAME_Button2 ))
 	{
-		if (!m_bUseAbsoluteTowerMotorControl)
-		{
-			m_pTowerPositionController->Enable();
-		}
-		m_bUseAbsoluteTowerMotorControl = true;
-	}
-	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T4 ))
-	{
-		if (m_bUseAbsoluteTowerMotorControl)
-		{
-			m_pTowerPositionController->Disable();  // Make SURE this isn't called every iteration since it sets the motor PWM to zero!!!
-		}
 		m_bUseAbsoluteTowerMotorControl = false;
 	}
+	else if (m_gamePadButtonState.GetDownStroke( kGAME_Button4 ))
+		{
+		m_bUseAbsoluteTowerMotorControl = true;
+	}
+
+	const bool bEnableTowerPidController = m_bUseAbsoluteTowerMotorControl && m_bTowerLiftMotorSystemIsActive;
+	SetTowerPidControllerEnableState(bEnableTowerPidController);
 
 	#define TEST_TOWER_ENCODER
 	#if defined(TEST_TOWER_ENCODER)
 	m_pTowerEncoder->DumpEncoderData(5);
 	#endif
-	const float towerPower = m_pFlightQuadrant->GetThrottle();
-	if (m_bUseAbsoluteTowerMotorControl)
+	if (bEnableTowerPidController)
 	{
 		DS_PRINTF(0, 2, "AT" ); // Absolute tower control enabled.
 		const float kTowerEncoderMaxCount = 50.0f;
-		const float setPoint = (towerPower + 1.0f) * 0.5f * kTowerEncoderMaxCount;
+		const float setPoint = (m_pFlightQuadrant->GetThrottle() + 1.0f) * 0.5f * kTowerEncoderMaxCount;
 		m_pTowerPositionController->SetSetpoint(setPoint);
 		#if defined(TEST_TOWER_ENCODER)
 		DS_PRINTF(4, 0, "SP: %.2f", setPoint );
@@ -1409,6 +1441,7 @@ void PrototypeController::ProcessTower()
 	}
 	else
 	{
+		const float towerPower = (m_bTowerLiftMotorSystemIsActive) ? m_pFlightQuadrant->GetThrottle() : 0.0f;
 		DS_PRINTF(0, 2, "  " ); // Absolute tower control disabled.
 		m_pTowerJaguar->Set(towerPower);
 	}
@@ -1519,10 +1552,10 @@ void PrototypeController::ProcessAutonomous()
         	while (numberofballs >=0)
 	{
   //      	ProcessKicker();
-			m_pWheelJaguar[kFR]->Set(.5 * kFR_PwmModulation);
-			m_pWheelJaguar[kFL]->Set(.5 * kFL_PwmModulation);
-			m_pWheelJaguar[kRR]->Set(-.5 * kRR_PwmModulation);
-			m_pWheelJaguar[kRL]->Set(-.5 * kRL_PwmModulation);
+			m_pWheelJaguar[kFR]->Set(.1 * kPwmModulationWheels[kFR]);
+			m_pWheelJaguar[kFL]->Set(-.1 * kPwmModulationWheels[kFL]);
+			m_pWheelJaguar[kRR]->Set(-.1 * kPwmModulationWheels[kRR]);
+			m_pWheelJaguar[kRL]->Set(.1 * kPwmModulationWheels[kRL]);
 			Wait (2.5);
         	};	
         	Wait (15);
