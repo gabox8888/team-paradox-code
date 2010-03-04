@@ -637,6 +637,9 @@ public:
 		kAutoState_Start,
 		kAutoState_AdvanceToBall,
 		kAutoState_WaitForKickerLoaded,
+		kAutoState_PostKickPause,
+		kAutoState_MoveOutOfTheWay,
+		kAutoState_SitStillLikeAGoodLittleRobot,
 	};
 	
 	class ControllerButtonState
@@ -827,8 +830,10 @@ protected:
 	void   ProcessDriveSystem(const float drive_X, const float drive_Y, const float drive_Z);
 	void   ProcessTower();
 	void   ProcessBallMagnet();
+	void   ProcessTeleopBallMagnet();
 	void   ProcessCamera();
-	void   ProcessKicker();
+	void   ProcessKicker(const bool bFire_Kicker);
+	void   ProcessTeleopKicker();
 	void   ProcessEndOfMainLoop();
 	void   Calibrate();
 	void   AllStop();
@@ -843,6 +848,7 @@ protected:
 	void   SendDashboardData();
 	void   InitializeCamera();
 	void   SetTowerPidControllerEnableState(const bool bEnabled);
+	inline bool IsKickerReadyToFire() const { return (m_kickerState == kKickState_WaitingForFire); }
 
 public:
 	PrototypeController(void);
@@ -1194,15 +1200,15 @@ static float Clamp(const float x, const float lo, const float hi)
 }
 
 
-void PrototypeController::ProcessKicker()
+void PrototypeController::ProcessTeleopKicker()
 {
-/*
-	m_pTriggerCylinder_OUT_Solenoid->Set(bPressed_Trigger);
-	m_pTriggerCylinder_IN_Solenoid->Set(!bPressed_Trigger);
-	m_pMainCylinder_OUT_Solenoid->Set(bPressed_Trigger);
-	m_pMainCylinder_IN_Solenoid->Set(!bPressed_Trigger);
-*/
+	const bool bFire_Kicker = m_joyButtonState.GetState( kB_Trigger );
+	ProcessKicker(bFire_Kicker);
+}
 
+
+void PrototypeController::ProcessKicker(const bool bFire_Kicker)
+{
 	if (m_pKickerSwitch->Get())
 	{
 		DS_PRINTF(3, 0, "KS");
@@ -1248,8 +1254,7 @@ void PrototypeController::ProcessKicker()
 		
 		case kKickState_WaitingForFire:
 		{
-			const bool bPressed_Trigger = m_joyButtonState.GetState( kB_Trigger );
-			if (bPressed_Trigger)
+			if (bFire_Kicker)
 			{
 				m_pTriggerCylinder_OUT_Solenoid->Set(true);
 				m_pTriggerCylinder_IN_Solenoid->Set(false);
@@ -1420,7 +1425,7 @@ void PrototypeController::ProcessDriveSystem(const float drive_X, const float dr
 }
 
 
-void PrototypeController::ProcessBallMagnet()
+void PrototypeController::ProcessTeleopBallMagnet()
 {
 	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T1 ))
 	{ 
@@ -1431,6 +1436,12 @@ void PrototypeController::ProcessBallMagnet()
 		m_bBallMagnetActive = false;
 	}
 
+	ProcessBallMagnet();
+}
+
+
+void PrototypeController::ProcessBallMagnet()
+{
 	if (m_bBallMagnetActive)
 	{
 		DS_PRINTF(kIDR_0, kDSC_MAG, "MAG" );
@@ -1600,7 +1611,6 @@ void PrototypeController::StartCompetition()
 			ProcessAutoAndTeleopCommon();
 			if (IsAutonomous())
 			{
-				DS_PRINTF(kIDR_0, kDSC_MOD, "AUT" );
 				m_bProcessingAutonomous = true;
 				ProcessAutonomous();
 			}
@@ -1648,21 +1658,25 @@ void PrototypeController::ProcessAutoAndTeleopCommon()
 
 void PrototypeController::ProcessAutonomous()
 {
+	bool bFire_Kicker = false;
 	switch (m_autoState)
 	{
 		case kAutoState_Start:
 		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "AGO" );
 			m_autoDrive_X = 0.0f;
 			m_autoDrive_Y = 0.25f;
 			m_autoDrive_Z = 0.0f;
 	        m_numberofballs = m_pDriverStation->GetLocation();
-			m_driveTimer = 0.25f;
+			m_driveTimer = 1.0f; // Gabe, I shortened this time since the robot moves much further in forward/reverse than mecanum.
 			m_autoState = kAutoState_AdvanceToBall;
 			break;
 		}
 
 		case kAutoState_AdvanceToBall:
 		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "ADV" );
+			m_bBallMagnetActive = true;
 			if (m_driveTimer <= 0)
 			{
 				m_autoDrive_X = 0.0f;
@@ -1675,6 +1689,52 @@ void PrototypeController::ProcessAutonomous()
 
 		case kAutoState_WaitForKickerLoaded:
 		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "KIK" );
+			if (IsKickerReadyToFire())
+			{
+				bFire_Kicker = true;
+				m_driveTimer = 0.5f; // actually not driving now, just pausing for a moment after the kick to ensure that the ball is clear. 
+				m_autoState = kAutoState_PostKickPause;
+			}
+			break;
+		}
+
+		case kAutoState_PostKickPause:
+		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "PKP" );
+			if (m_driveTimer <= 0)
+			{
+				m_autoDrive_X = 0.5f;
+				m_autoDrive_Y = 0.0f;
+				m_autoDrive_Z = 0.0f;
+				m_driveTimer = 3.1f;
+				m_autoState = kAutoState_MoveOutOfTheWay;
+			}
+			break;
+		}
+		
+		case kAutoState_MoveOutOfTheWay:
+		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "LAT" );
+			m_bBallMagnetActive = false;
+			if (m_driveTimer <= 0)
+			{
+				m_autoDrive_X = 0.0f;
+				m_autoDrive_Y = 0.0f;
+				m_autoDrive_Z = 0.0f;
+				m_autoState = kAutoState_SitStillLikeAGoodLittleRobot;
+			}
+			break;
+		}
+		
+		case kAutoState_SitStillLikeAGoodLittleRobot:
+		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "SIT" );
+
+			// Just sit here and wait for teleop...
+			m_autoDrive_X = 0.0f;
+			m_autoDrive_Y = 0.0f;
+			m_autoDrive_Z = 0.0f;
 			break;
 		}
 	}
@@ -1689,7 +1749,14 @@ void PrototypeController::ProcessAutonomous()
 	// We always call the drive system every iteration.  But instead of passing in joystick values, we pass in our
 	// autonomously controlled drive variables...
    	ProcessDriveSystem(m_autoDrive_X, m_autoDrive_Y, m_autoDrive_Z);
+
+	// Same for these guys...
+	ProcessBallMagnet();
+	ProcessKicker(bFire_Kicker);
+}
+
 /*
+// Original Tom/Gabe logic that I based the autonomous state machine one...
 	                            m_pBallMagnet->Set(1);
 	                            m_pWheelJaguar[kFR]->Set(-.5 * kPwmModulationWheels[kFR]);
 	        	                m_pWheelJaguar[kFL]->Set(.5 * kPwmModulationWheels[kFL]);
@@ -1711,20 +1778,20 @@ void PrototypeController::ProcessAutonomous()
 	           	                Wait (3.10);
 	        	                AllStop();
 */
-}
 
 
 void PrototypeController::CleanupAutonomous()
 {
+	m_bBallMagnetActive = false;  // turn off ball magnet for start of teleoperated mode (maybe this should be turned on instead?).
 }
 
 
 void PrototypeController::ProcessOperated()
 {
 	ProcessTeleopDriveSystem();
-	ProcessKicker();
+	ProcessTeleopKicker();
 	ProcessTower();
-	ProcessBallMagnet();
+	ProcessTeleopBallMagnet();
 	ProcessCamera();
 
 	// Check if driver requesting save of coefficients...
