@@ -1318,27 +1318,38 @@ void PrototypeController::ProcessDriveSystem(const float drive_X, const float dr
 	m_pWheelEncoder[TEST_WHEEL_ENCODER]->DumpEncoderData(5);
 	#endif
 	
-	if (m_bUseSpeedController)
+	// a deadzone for the middle 16% of any axis, with existing driving nested in the else.
+	if (fabs(m_pJoy->GetX()) < 0.08 || fabs(m_pJoy->GetY()) < 0.08 || fabs(m_pJoy->GetZ()) < 0.08)
 	{
-		DS_PRINTF(0, 0, "SC" ); // Speed control enabled.
-
-		float setPoint[kNumWheels];
 		for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
 		{
-			setPoint[iWheel] = pwm[iWheel] * m_maxWheelRPS;
-			m_pSpeedController[iWheel]->SetSetpoint(setPoint[iWheel]);
+			m_pWheelJaguar[iWheel]->Set(0);
 		}
-
-		#if defined(TEST_WHEEL_ENCODER)
-		DS_PRINTF(4, 0, "SP: %.2f", setPoint[TEST_WHEEL_ENCODER] );
-		#endif
 	}
 	else
 	{
-		DS_PRINTF(0, 0, "  " ); // Speed control disabled.
-		for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+		if (m_bUseSpeedController)
 		{
-			m_pWheelJaguar[iWheel]->Set(pwm[iWheel]);
+			DS_PRINTF(0, 0, "SC" ); // Speed control enabled.
+
+			float setPoint[kNumWheels];
+			for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+			{
+				setPoint[iWheel] = pwm[iWheel] * m_maxWheelRPS;
+				m_pSpeedController[iWheel]->SetSetpoint(setPoint[iWheel]);
+			}
+	
+			#if defined(TEST_WHEEL_ENCODER)
+			DS_PRINTF(4, 0, "SP: %.2f", setPoint[TEST_WHEEL_ENCODER] );
+			#endif
+		}
+		else
+		{
+			DS_PRINTF(0, 0, "  " ); // Speed control disabled.
+			for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
+			{
+				m_pWheelJaguar[iWheel]->Set(pwm[iWheel]);
+			}
 		}
 	}
 }
