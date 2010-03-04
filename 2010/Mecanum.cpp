@@ -53,6 +53,12 @@ static const float        kPwmModulationWheels[kNumWheels] = { 1.0f, 1.0f, 1.0f,
 static const float        kPulsesPerRevolution  = 250.0f;
 static const float        kRevolutionsPerPulse  = 1.0f / kPulsesPerRevolution;
 
+// Number of revolutions of the tower gearbox encoder required to reach the point of full tower extension...
+static const float        kTowerExtendedEncoderCount  = -14.6f;
+static const float        kTowerRetractedEncoderCount = 0.0f;
+static const float        kTowerExtendedDangerCount   = kTowerExtendedEncoderCount  - 0.25f; // allow a small amount of over-drive
+static const float        kTowerRetractedDangerCount  = kTowerRetractedEncoderCount + 0.5f;  // allow a small amount of over-drive
+
 // Oddly enough, a P-only PID controller seems to work pretty well for the wheel speed.  My theory is that it's because the encoder speed is so noisy.
 // It tends to shoot above and below the setpoint.  This has the effect of replacing the setpoint overshoot that normally comes from integral windup...
 static const float        kDefaultWheel_P       = 0.1f;
@@ -71,6 +77,17 @@ static const float        kMainLoopWaitTime = 0.025f;
 // when another task starves the main robot task (not often, I hope)...
 static const float        kMax_dT           = 4.0f * kMainLoopWaitTime;
 static const INT32        kMax_dT_uS        = INT32(kMax_dT * 1000000.0f);
+
+// First intrument display row...
+static const int kIDR_0 = 0;
+
+// Instrument display columns...
+static const int kDSC_SPC = 0;  // Drive system speed control enabled.
+static const int kDSC_LFT = 3;  // Tower lift motor system active.
+static const int kDSC_PNU = 6;  // Tower pneumatic system active.
+static const int kDSC_MAN = 9;  // Manual tower lift motor control.
+static const int kDSC_MAG = 12; // Ball magnet on.
+static const int kDSC_CMP = 15; // Compressor on.
 
 enum FlightQuadrantButtons
 {
@@ -545,8 +562,7 @@ CRITICAL_REGION(m_mutexSemaphore)
 }
 END_REGION;
 }
-// TODO: Reset and reenable tower pid controller when encoder value <=0 or >= max!
-// TODO: Hold down the tower motor "off" button for two seconds to switch to relative tower control.
+
 
 void ParadoxSpeedController::SetSetpoint(const float setpoint)
 {
@@ -763,6 +779,9 @@ protected:
 	// This mirrors the enable state of the tower pid controller (which is private, grrrr)...
 	bool                  m_bTowerPidControllerIsEnabled;
 	
+	// true if the compressor is on, false if it's off...
+	bool                  m_pCompressorEnabled;
+	
 	// Kicker action is a finite state machine.  Here are the state machine variables...
 	KickerState           m_kickerState;
 	float                 m_timePostLatchReleasePauseCountdown;
@@ -857,10 +876,11 @@ PrototypeController::PrototypeController(void)
 	m_dT = 0.0f;
 
 	m_bUseSpeedController = false;
-	m_bUseAbsoluteTowerMotorControl = false;
+	m_bUseAbsoluteTowerMotorControl = true;
 	m_bBallMagnetActive = false;
 	m_bTowerLiftMotorSystemIsActive = false;
 	m_bTowerPneumaticSystemIsActive = false;
+	m_pCompressorEnabled = true;
 	
 	m_kickerState = kKickState_ExtendingMainCylinder;
 	m_timePostLatchReleasePauseCountdown = 0.0f;
@@ -964,7 +984,10 @@ PrototypeController::PrototypeController(void)
 	m_pKickerSwitch     = new DigitalInput(13);
 
 	m_pCompressor = new Compressor(1, 1);
-	//m_pCompressor->Start();
+	if (m_pCompressorEnabled)
+	{
+		m_pCompressor->Start();
+	}
 
 	m_pMainCylinder_IN_Solenoid     = new Solenoid(3);
 	m_pMainCylinder_OUT_Solenoid    = new Solenoid(2);
@@ -993,9 +1016,9 @@ PrototypeController::PrototypeController(void)
 	const float kTower_I = 0.005f;
 	const float kTower_D = 0.0f;
 	m_pTowerPositionController = new PIDController(kTower_P, kTower_I, kTower_D, m_pTowerEncoder, m_pTowerJaguar);
+	m_pTowerPositionController->SetInputRange(kTowerExtendedEncoderCount, kTowerRetractedEncoderCount); // kTowerExtendedEncoderCount is negative, so make it the minimum.
 	m_pTowerPositionController->Disable();
 	m_bTowerPidControllerIsEnabled = false;
-	SetTowerPidControllerEnableState(m_bUseAbsoluteTowerMotorControl);
 	
 	m_pCameraAzimuthServo = new Servo(5);
 	m_pCameraTiltServo    = new Servo(1);
@@ -1056,7 +1079,8 @@ void PrototypeController::SetTowerPidControllerEnableState(const bool bEnabled)
 	{
 		if (m_bTowerPidControllerIsEnabled)
 		{
-			m_pTowerPositionController->Disable();
+			// The "Reset" function clears the intergral accumulator and previous error and then disables the controller...
+			m_pTowerPositionController->Reset();
 		}
 	}
 	m_bTowerPidControllerIsEnabled = bEnabled;
@@ -1273,10 +1297,21 @@ void PrototypeController::ProcessKicker()
 	if (m_joyButtonState.GetDownStroke( kB_CompressorOn ))
 	{
 		m_pCompressor->Start();
+		m_pCompressorEnabled = true;
 	}
 	else if (m_joyButtonState.GetDownStroke( kB_CompressorOff ))
 	{
 		m_pCompressor->Stop();
+		m_pCompressorEnabled = false;
+	}
+
+	if (m_pCompressorEnabled)
+	{
+		DS_PRINTF(kIDR_0, kDSC_CMP, "CMP" );
+	}
+	else
+	{
+		DS_PRINTF(kIDR_0, kDSC_CMP, "   " );
 	}
 }
 
@@ -1355,7 +1390,7 @@ void PrototypeController::ProcessDriveSystem(const float drive_X, const float dr
 	// to zero here...
 	if (m_bUseSpeedController)
 	{
-		DS_PRINTF(0, 0, "SC" ); // Speed control enabled.
+		DS_PRINTF(kIDR_0, kDSC_SPC, "SPC" ); // Speed control enabled.
 
 		float setPoint[kNumWheels];
 		for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
@@ -1370,7 +1405,7 @@ void PrototypeController::ProcessDriveSystem(const float drive_X, const float dr
 	}
 	else
 	{
-		DS_PRINTF(0, 0, "  " ); // Speed control disabled.
+		DS_PRINTF(kIDR_0, kDSC_SPC, "   " ); // Speed control disabled.
 		for (int iWheel = 0; iWheel < kNumWheels; iWheel++)
 		{
 			m_pWheelJaguar[iWheel]->Set(pwm[iWheel]);
@@ -1392,10 +1427,12 @@ void PrototypeController::ProcessBallMagnet()
 
 	if (m_bBallMagnetActive)
 	{
+		DS_PRINTF(kIDR_0, kDSC_MAG, "MAG" );
 		m_pBallMagnet->Set(m_pFlightQuadrant->GetX());	
 	}
 	else
 	{
+		DS_PRINTF(kIDR_0, kDSC_MAG, "   " );
 		m_pBallMagnet->Set(0.0f);
 	}
 }
@@ -1424,6 +1461,16 @@ void PrototypeController::ProcessTower()
 		m_bTowerLiftMotorSystemIsActive = false;
 	}
 
+	if (m_bTowerLiftMotorSystemIsActive)
+	{
+		DS_PRINTF(kIDR_0, kDSC_LFT, "LFT" );
+	}
+	else
+	{
+		DS_PRINTF(kIDR_0, kDSC_LFT, "   " );
+	}
+
+
 	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T3 ))
 	{ 
 		m_bTowerPneumaticSystemIsActive = true;
@@ -1433,22 +1480,22 @@ void PrototypeController::ProcessTower()
 		m_bTowerPneumaticSystemIsActive = false;
 	}
 
-
-
 	if (m_bTowerPneumaticSystemIsActive)
 	{
 		const bool bTowerCylinderExtend = m_pFlightQuadrant->GetY() < 0.0f;
 		m_pTowerCylinder_OUT_Solenoid->Set(bTowerCylinderExtend);
 		m_pTowerCylinder_IN_Solenoid->Set(!bTowerCylinderExtend);
+		DS_PRINTF(kIDR_0, kDSC_PNU, "PNU" );
 	}
 	else
 	{
 		m_pTowerCylinder_OUT_Solenoid->Set(false);
 		m_pTowerCylinder_IN_Solenoid->Set(true);
+		DS_PRINTF(kIDR_0, kDSC_PNU, "   " );
 	}
 
 
-	if (m_gamePadButtonState.GetDownStroke( kGAME_Button2 ))
+	if (m_gamePadButtonState.GetDownStroke( kGAME_Button2 ) || m_flightQuadrantButtonState.GetLongHoldDown( kFQB_T6 ))
 	{
 		m_bUseAbsoluteTowerMotorControl = false;
 	}
@@ -1457,27 +1504,39 @@ void PrototypeController::ProcessTower()
 		m_bUseAbsoluteTowerMotorControl = true;
 	}
 
-	const bool bEnableTowerPidController = m_bUseAbsoluteTowerMotorControl && m_bTowerLiftMotorSystemIsActive;
-	SetTowerPidControllerEnableState(bEnableTowerPidController);
+	// OK: IF we've moved beyond the fully extend tower position AND we're still extending OR we've moved beyond the fully retracted tower position
+	// AND we're still retracting, then set "bSafetyStop" to true to indicate that we need to do an emergency stop of the tower controller...
+	const bool bSafetyStop = ((m_pTowerEncoder->GetRevolutions() <= kTowerExtendedDangerCount)  && (m_pTowerEncoder->GetRateRPS() < 0.0f)) ||
+	                         ((m_pTowerEncoder->GetRevolutions() >= kTowerRetractedDangerCount) && (m_pTowerEncoder->GetRateRPS() > 0.0f));
+
+	// The tower pid controller runs in a background task.  This is where we control its state...
+	const bool bUseAbsTower = m_bUseAbsoluteTowerMotorControl && m_bTowerLiftMotorSystemIsActive;
+	SetTowerPidControllerEnableState(bUseAbsTower && !bSafetyStop);
 
 	#define TEST_TOWER_ENCODER
 	#if defined(TEST_TOWER_ENCODER)
 	m_pTowerEncoder->DumpEncoderData(5);
 	#endif
-	if (bEnableTowerPidController)
+	if (bUseAbsTower)
 	{
-		DS_PRINTF(0, 2, "AT" ); // Absolute tower control enabled.
-		const float kTowerEncoderMaxCount = -14.6f;
-		const float setPoint = (-m_pFlightQuadrant->GetThrottle() + 1.0f) * 0.5f * kTowerEncoderMaxCount;
+		DS_PRINTF(kIDR_0, kDSC_MAN, "   " ); // Absolute tower control enabled.
+		if (bSafetyStop)
+		{
+			m_pTowerJaguar->Set(0.0f);
+		}
+		else
+	{
+		const float setPoint = (-m_pFlightQuadrant->GetThrottle() + 1.0f) * 0.5f * (kTowerExtendedEncoderCount - kTowerRetractedEncoderCount) + kTowerRetractedEncoderCount;
 		m_pTowerPositionController->SetSetpoint(setPoint);
 		#if defined(TEST_TOWER_ENCODER)
 		DS_PRINTF(4, 0, "SP: %.2f", setPoint );
 		#endif
 	}
+	}
 	else
 	{
 		const float towerPower = (m_bTowerLiftMotorSystemIsActive) ? m_pFlightQuadrant->GetThrottle() : 0.0f;
-		DS_PRINTF(0, 2, "  " ); // Absolute tower control disabled.
+		DS_PRINTF(kIDR_0, kDSC_MAN, "MAN" ); // Absolute tower control disabled.
 		m_pTowerJaguar->Set(towerPower);
 	}
 
