@@ -911,25 +911,25 @@ PrototypeController::PrototypeController(void)
 				8    Battery Voltage Sensor
 	*/
 
-	const bool s_flipFL_And_Tower = false;
+	const bool s_flipWheel_And_Tower = true;
 	m_pWheelJaguar[kFR] = new Jaguar(6);           // Front Right drive Motor
-	m_pWheelJaguar[kFL] = new Jaguar(s_flipFL_And_Tower ? 3:4);           // Front Left drive Motor
+	m_pWheelJaguar[kFL] = new Jaguar(4);           // Front Left drive Motor
 	m_pWheelJaguar[kRR] = new Jaguar(8);           // Rear Right drive Motor
 	m_pWheelJaguar[kRL] = new Jaguar(10);          // Rear Left drive Motor
-	m_pTowerJaguar     = new Jaguar(s_flipFL_And_Tower ? 4:3);
+	m_pTowerJaguar     = new Jaguar(3);
 	m_pBallMagnet      = new Jaguar(2);
 
 	m_pDigInFREncoder_A = new DigitalInput(2);
 	m_pDigInFREncoder_B = new DigitalInput(3);
-	m_pDigInFLEncoder_A = new DigitalInput(s_flipFL_And_Tower ? 4:5);
-	m_pDigInFLEncoder_B = new DigitalInput(s_flipFL_And_Tower ? 7:6);
+	m_pDigInFLEncoder_A = new DigitalInput(5);
+	m_pDigInFLEncoder_B = new DigitalInput(6);
 	m_pDigInRREncoder_A = new DigitalInput(8);
 	m_pDigInRREncoder_B = new DigitalInput(9); 
-	m_pDigInRLEncoder_A = new DigitalInput(11);
-	m_pDigInRLEncoder_B = new DigitalInput(12);
+	m_pDigInRLEncoder_A = new DigitalInput(s_flipWheel_And_Tower ? 4:11);
+	m_pDigInRLEncoder_B = new DigitalInput(s_flipWheel_And_Tower ? 7:12);
 
-	m_pDigInTowerEncoder_A = new DigitalInput(s_flipFL_And_Tower ? 5:4);
-	m_pDigInTowerEncoder_B = new DigitalInput(s_flipFL_And_Tower ? 6:7);
+	m_pDigInTowerEncoder_A = new DigitalInput(s_flipWheel_And_Tower ? 11:4);
+	m_pDigInTowerEncoder_B = new DigitalInput(s_flipWheel_And_Tower ? 12:7);
 	m_pKickerSwitch     = new DigitalInput(13);
 
 	m_pCompressor = new Compressor(1, 1);
@@ -959,7 +959,7 @@ PrototypeController::PrototypeController(void)
 	m_pSpeedController[kRL] = NewWheelSpeedController(m_pWheelEncoder[kRL], m_pWheelJaguar[kRL]);
 
 	const float kTower_P = 0.25f;
-	const float kTower_I = 0.00005f;
+	const float kTower_I = 0.005f;
 	const float kTower_D = 0.0f;
 	m_pTowerPositionController = new PIDController(kTower_P, kTower_I, kTower_D, m_pTowerEncoder, m_pTowerJaguar);
 		m_pTowerPositionController->Disable();
@@ -1409,7 +1409,7 @@ void PrototypeController::ProcessTower()
 	else
 	{
 		m_pTowerCylinder_OUT_Solenoid->Set(false);
-		m_pTowerCylinder_IN_Solenoid->Set(false);
+		m_pTowerCylinder_IN_Solenoid->Set(true);
 	}
 
 
@@ -1432,8 +1432,8 @@ void PrototypeController::ProcessTower()
 	if (bEnableTowerPidController)
 	{
 		DS_PRINTF(0, 2, "AT" ); // Absolute tower control enabled.
-		const float kTowerEncoderMaxCount = 50.0f;
-		const float setPoint = (m_pFlightQuadrant->GetThrottle() + 1.0f) * 0.5f * kTowerEncoderMaxCount;
+		const float kTowerEncoderMaxCount = -14.6f;
+		const float setPoint = (-m_pFlightQuadrant->GetThrottle() + 1.0f) * 0.5f * kTowerEncoderMaxCount;
 		m_pTowerPositionController->SetSetpoint(setPoint);
 		#if defined(TEST_TOWER_ENCODER)
 		DS_PRINTF(4, 0, "SP: %.2f", setPoint );
@@ -1538,30 +1538,41 @@ void PrototypeController::ProcessAutoAndTeleopCommon()
 
 void PrototypeController::ProcessAutonomous()
 {
-	switch (m_autoState)
-	{
-		case kAutoState_Start:
-		{
-			break;
-		}
-	}
-	
-        while (IsAutonomous())
-        {
-    	int numberofballs=3;
-        	while (numberofballs >=0)
-	{
-  //      	ProcessKicker();
-			m_pWheelJaguar[kFR]->Set(.1 * kPwmModulationWheels[kFR]);
-			m_pWheelJaguar[kFL]->Set(-.1 * kPwmModulationWheels[kFL]);
-			m_pWheelJaguar[kRR]->Set(-.1 * kPwmModulationWheels[kRR]);
-			m_pWheelJaguar[kRL]->Set(.1 * kPwmModulationWheels[kRL]);
-			Wait (2.5);
-        	};	
-        	Wait (15);
-    }
+	// TODO: Needs to be made into a state machine...
+	     //   AllStop();
+	        int numberofballs=m_pDriverStation->GetLocation();
+	        float timetodrivethreefeet=.284;
+	       // if (IsDisabled() ) Wait(0.05);
+	                            m_pWheelJaguar[kFR]->Set(-.5 * kPwmModulationWheels[kFR]);
+	        	                m_pWheelJaguar[kFL]->Set(-.5 * kPwmModulationWheels[kFL]);
+	        	                m_pWheelJaguar[kRR]->Set(.5 * kPwmModulationWheels[kRR]);
+	        	                m_pWheelJaguar[kRL]->Set(.5 * kPwmModulationWheels[kRL]);
+	        	                //float time = (m_pFlightQuadrant->GetThrottle() + 1.0f) * 0.5f;
+	        	                DS_PRINTF(2, 0, "time=%f", time);
+	        	                Wait (1.55);
+	        	                AllStop();
+	        	                Wait (15);
 }
-
+	        	                /*
+	        while (IsAutonomous())
+	        {
+	                while (numberofballs >=0)
+	                {
+	                while (timetodrivethreefeet >=0)
+	                {
+//	                	ProcessDriveSystem(joyX, joyY, joyZ);
+	                m_pWheelJaguar[kFR]->Set(-.5 * kPwmModulationWheels[kFR]);
+	                m_pWheelJaguar[kFL]->Set(-.5 * kPwmModulationWheels[kFL]);
+	                m_pWheelJaguar[kRR]->Set(.5 * kPwmModulationWheels[kRR]);
+	                m_pWheelJaguar[kRL]->Set(.5 * kPwmModulationWheels[kRL]);
+	                Wait (.01);
+	                timetodrivethreefeet=timetodrivethreefeet-.01;
+	                };
+	  //            ProcessKicker();
+	                };      
+	                Wait (15);
+}
+*/
 
 
 void PrototypeController::ProcessOperated()
