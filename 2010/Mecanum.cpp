@@ -827,7 +827,9 @@ protected:
 	void   ProcessOperated();
 	void   ProcessTeleopDriveSystem();
 	void   ProcessDriveSystem(const float drive_X, const float drive_Y, const float drive_Z);
-	void   ProcessTower();
+	void   ProcessTower(const bool bTowerCylinderExtend, const float towerMotorJoy);
+	void   ProcessTeleopTower();
+
 	void   ProcessCamera();
 	void   ProcessKicker(const bool bFire_Kicker);
 	void   ProcessTeleopKicker();
@@ -909,7 +911,7 @@ PrototypeController::PrototypeController(void)
 	Channel assignments, sorted by channel:
 		On the Digital sidecar:
 			DIGITAL I/O:
-				1    Compressor pressure sensor switch.
+				1    BAD?
 				2    Front-right wheel encoder "A"
 				3    Front-right wheel encoder "B"
 				4    Tower motor encoder "A"
@@ -922,7 +924,7 @@ PrototypeController::PrototypeController(void)
 				11   Rear-left wheel encoder "A"
 				12   Rear-left wheel encoder "B" 
 				13   Kicker latch switch.
-				14   UNUSED
+				14   Compressor pressure sensor switch.
 				
 			PWM OUT:
 				1    Camera Tilt Servo (DON'T USE FOR JAG WITHOUT REMOVING JUMPER)
@@ -990,7 +992,7 @@ PrototypeController::PrototypeController(void)
 	m_pDigInTowerEncoder_B = new DigitalInput(s_flipWheel_And_Tower ? 12:7);
 	m_pKickerSwitch     = new DigitalInput(13);
 
-	m_pCompressor = new Compressor(1, 1);
+	m_pCompressor = new Compressor(14, 1);
 	if (m_pCompressorEnabled)
 	{
 		m_pCompressor->Start();
@@ -1045,16 +1047,16 @@ PrototypeController::PrototypeController(void)
 	m_pDriverStation = DriverStation::GetInstance();				//Intialize the Driver Station
 
 	// Initialize the hard defaults for drive system coefficients...
-	m_coef_X_FR = 1.000000;
+	m_coef_X_FR = -1.000000;
 	m_coef_Y_FR = -1.000000;
 	m_coef_Z_FR = 1.000000;
-	m_coef_X_FL = 1.000000;
+	m_coef_X_FL = -1.000000;
 	m_coef_Y_FL = 1.000000;
 	m_coef_Z_FL = 1.000000;
-	m_coef_X_RR = -1.000000;
+	m_coef_X_RR = 1.000000;
 	m_coef_Y_RR = -1.000000;
 	m_coef_Z_RR = 1.000000;
-	m_coef_X_RL = -1.000000;
+	m_coef_X_RL = 1.000000;
 	m_coef_Y_RL = 1.000000;
 	m_coef_Z_RL = 1.000000;
 
@@ -1431,7 +1433,7 @@ void PrototypeController::ProcessCamera()
 }
 
 
-void PrototypeController::ProcessTower()
+void PrototypeController::ProcessTeleopTower()
 {
 	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T5 ))
 	{ 
@@ -1442,16 +1444,6 @@ void PrototypeController::ProcessTower()
 		m_bTowerLiftMotorSystemIsActive = false;
 	}
 
-	if (m_bTowerLiftMotorSystemIsActive)
-	{
-		DS_PRINTF(kIDR_0, kDSC_LFT, "LFT" );
-	}
-	else
-	{
-		DS_PRINTF(kIDR_0, kDSC_LFT, "   " );
-	}
-
-
 	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T3 ))
 	{ 
 		m_bTowerPneumaticSystemIsActive = true;
@@ -1461,9 +1453,35 @@ void PrototypeController::ProcessTower()
 		m_bTowerPneumaticSystemIsActive = false;
 	}
 
+	if (m_gamePadButtonState.GetDownStroke( kGAME_Button2 ) || m_flightQuadrantButtonState.GetLongHoldDown( kFQB_T6 ))
+	{
+		m_bUseAbsoluteTowerMotorControl = false;
+	}
+	else if (m_gamePadButtonState.GetDownStroke( kGAME_Button4 ))
+	{
+		m_bUseAbsoluteTowerMotorControl = true;
+	}
+
+	const bool bTowerCylinderExtend = m_pFlightQuadrant->GetY() < 0.0f;
+	const float towerMotorJoy = m_pFlightQuadrant->GetThrottle();
+
+	ProcessTower(bTowerCylinderExtend, towerMotorJoy);
+	}
+
+
+void PrototypeController::ProcessTower(const bool bTowerCylinderExtend, const float towerMotorJoy)
+{
+	if (m_bTowerLiftMotorSystemIsActive)
+	{ 
+		DS_PRINTF(kIDR_0, kDSC_LFT, "LFT" );
+	}
+	else
+	{ 
+		DS_PRINTF(kIDR_0, kDSC_LFT, "   " );
+	}
+
 	if (m_bTowerPneumaticSystemIsActive)
 	{
-		const bool bTowerCylinderExtend = m_pFlightQuadrant->GetY() < 0.0f;
 		m_pTowerCylinder_OUT_Solenoid->Set(bTowerCylinderExtend);
 		m_pTowerCylinder_IN_Solenoid->Set(!bTowerCylinderExtend);
 		DS_PRINTF(kIDR_0, kDSC_PNU, "PNU" );
@@ -1475,15 +1493,6 @@ void PrototypeController::ProcessTower()
 		DS_PRINTF(kIDR_0, kDSC_PNU, "   " );
 	}
 
-
-	if (m_gamePadButtonState.GetDownStroke( kGAME_Button2 ) || m_flightQuadrantButtonState.GetLongHoldDown( kFQB_T6 ))
-	{
-		m_bUseAbsoluteTowerMotorControl = false;
-	}
-	else if (m_gamePadButtonState.GetDownStroke( kGAME_Button4 ))
-	{
-		m_bUseAbsoluteTowerMotorControl = true;
-	}
 
 	// OK: IF we've moved beyond the fully extend tower position AND we're still extending OR we've moved beyond the fully retracted tower position
 	// AND we're still retracting, then set "bSafetyStop" to true to indicate that we need to do an emergency stop of the tower controller...
@@ -1507,7 +1516,7 @@ void PrototypeController::ProcessTower()
 		}
 		else
 		{
-			const float setPoint = (-m_pFlightQuadrant->GetThrottle() + 1.0f) * 0.5f * (kTowerExtendedEncoderCount - kTowerRetractedEncoderCount) + kTowerRetractedEncoderCount;
+			const float setPoint = (-towerMotorJoy + 1.0f) * 0.5f * (kTowerExtendedEncoderCount - kTowerRetractedEncoderCount) + kTowerRetractedEncoderCount;
 			m_pTowerPositionController->SetSetpoint(setPoint);
 			#if defined(TEST_TOWER_ENCODER)
 			DS_PRINTF(4, 0, "SP: %.2f", setPoint );
@@ -1516,7 +1525,7 @@ void PrototypeController::ProcessTower()
 	}
 	else
 	{
-		const float towerPower = (m_bTowerLiftMotorSystemIsActive) ? m_pFlightQuadrant->GetThrottle() : 0.0f;
+		const float towerPower = (m_bTowerLiftMotorSystemIsActive) ? towerMotorJoy : 0.0f;
 		DS_PRINTF(kIDR_0, kDSC_MAN, "MAN" ); // Absolute tower control disabled.
 		m_pTowerJaguar->Set(towerPower);
 	}
@@ -1670,7 +1679,7 @@ void PrototypeController::ProcessAutonomous()
 				m_autoDrive_X = 0.5f;
 				m_autoDrive_Y = 0.0f;
 				m_autoDrive_Z = 0.0f;
-				m_driveTimer = 1.55f;
+				m_driveTimer = 3.1f;
 				m_autoState = kAutoState_MoveOutOfTheWay;
 			}
 			break;
@@ -1765,6 +1774,10 @@ void PrototypeController::ProcessAutonomous()
 
 	// Same for these guys...
 	ProcessKicker(bFire_Kicker);
+
+	m_bTowerLiftMotorSystemIsActive = false;
+	m_bTowerPneumaticSystemIsActive = false;
+	ProcessTower(false, 0.0f);
 }
 
 /*
@@ -1801,7 +1814,7 @@ void PrototypeController::ProcessOperated()
 {
 	ProcessTeleopDriveSystem();
 	ProcessTeleopKicker();
-	ProcessTower();
+	ProcessTeleopTower();
 	ProcessCamera();
 
 	// Check if driver requesting save of coefficients...
@@ -1822,7 +1835,7 @@ void PrototypeController::ProcessOperated()
 
 	if (m_gamePadButtonState.GetDownStroke( kGAME_Button_RightSelect ))
 	{
-		m_bUseSpeedController = true;
+		//m_bUseSpeedController = true;
 	}
 	else if (m_gamePadButtonState.GetDownStroke( kGAME_Button_LeftSelect ))
 	{
