@@ -636,9 +636,13 @@ public:
 	{
 		kAutoState_Start,
 		kAutoState_AdvanceToBall,
+		kAutoState_AdvanceTo2Ball,
 		kAutoState_WaitForKickerLoaded,
+		kAutoState_WaitForKicker2Loaded,
 		kAutoState_PostKickPause,
-		kAutoState_MoveOutOfTheWay,
+		kAutoState_PostKick2Pause,
+		kAutoState_MoveOutOfTheWay,		
+		kAutoState_MoveOutOfThe2Way,
 		kAutoState_SitStillLikeAGoodLittleRobot,
 	};
 	
@@ -691,7 +695,6 @@ protected:
 	Jaguar*               m_pWheelJaguar[kNumWheels];
 
 	Jaguar*               m_pTowerJaguar;
-	Jaguar*               m_pBallMagnet;
 	Servo*                m_pCameraAzimuthServo;
 	Servo*                m_pCameraTiltServo;
 	Solenoid*             m_pMainCylinder_IN_Solenoid; 
@@ -771,11 +774,7 @@ protected:
 	ControllerButtonState m_gamePadButtonState;
 
 	// true when speed controllers are enabled, false uses direct PWM...
-	bool                  m_bUseSpeedController;
-
-	// true when the ball magnet is turned on, false otherwise...
-	bool                  m_bBallMagnetActive;
-	
+	bool                  m_bUseSpeedController;	
 	// true when the lift tower is active (responsive to controls), false otherwise...
 	bool                  m_bTowerLiftMotorSystemIsActive;
 
@@ -829,8 +828,6 @@ protected:
 	void   ProcessTeleopDriveSystem();
 	void   ProcessDriveSystem(const float drive_X, const float drive_Y, const float drive_Z);
 	void   ProcessTower();
-	void   ProcessBallMagnet();
-	void   ProcessTeleopBallMagnet();
 	void   ProcessCamera();
 	void   ProcessKicker(const bool bFire_Kicker);
 	void   ProcessTeleopKicker();
@@ -889,7 +886,6 @@ PrototypeController::PrototypeController(void)
 
 	m_bUseSpeedController = false;
 	m_bUseAbsoluteTowerMotorControl = true;
-	m_bBallMagnetActive = false;
 	m_bTowerLiftMotorSystemIsActive = false;
 	m_bTowerPneumaticSystemIsActive = false;
 	m_pCompressorEnabled = true;
@@ -980,7 +976,6 @@ PrototypeController::PrototypeController(void)
 	m_pWheelJaguar[kRR] = new Jaguar(8);           // Rear Right drive Motor
 	m_pWheelJaguar[kRL] = new Jaguar(10);          // Rear Left drive Motor
 	m_pTowerJaguar     = new Jaguar(3);
-	m_pBallMagnet      = new Jaguar(2);
 
 	m_pDigInFREncoder_A = new DigitalInput(2);
 	m_pDigInFREncoder_B = new DigitalInput(3);
@@ -1424,37 +1419,6 @@ void PrototypeController::ProcessDriveSystem(const float drive_X, const float dr
 	}
 }
 
-
-void PrototypeController::ProcessTeleopBallMagnet()
-{
-	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T1 ))
-	{ 
-		m_bBallMagnetActive = true;
-	}
-	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T2 ))
-	{ 
-		m_bBallMagnetActive = false;
-	}
-
-	ProcessBallMagnet();
-}
-
-
-void PrototypeController::ProcessBallMagnet()
-{
-	if (m_bBallMagnetActive)
-	{
-		DS_PRINTF(kIDR_0, kDSC_MAG, "MAG" );
-		m_pBallMagnet->Set(m_pFlightQuadrant->GetX());	
-	}
-	else
-	{
-		DS_PRINTF(kIDR_0, kDSC_MAG, "   " );
-		m_pBallMagnet->Set(0.0f);
-	}
-}
-
-
 void PrototypeController::ProcessCamera()
 {
 	float azimuthJoy=m_pGamePad->GetX();
@@ -1542,13 +1506,13 @@ void PrototypeController::ProcessTower()
 			m_pTowerJaguar->Set(0.0f);
 		}
 		else
-	{
-		const float setPoint = (-m_pFlightQuadrant->GetThrottle() + 1.0f) * 0.5f * (kTowerExtendedEncoderCount - kTowerRetractedEncoderCount) + kTowerRetractedEncoderCount;
-		m_pTowerPositionController->SetSetpoint(setPoint);
-		#if defined(TEST_TOWER_ENCODER)
-		DS_PRINTF(4, 0, "SP: %.2f", setPoint );
-		#endif
-	}
+		{
+			const float setPoint = (-m_pFlightQuadrant->GetThrottle() + 1.0f) * 0.5f * (kTowerExtendedEncoderCount - kTowerRetractedEncoderCount) + kTowerRetractedEncoderCount;
+			m_pTowerPositionController->SetSetpoint(setPoint);
+			#if defined(TEST_TOWER_ENCODER)
+			DS_PRINTF(4, 0, "SP: %.2f", setPoint );
+			#endif
+		}
 	}
 	else
 	{
@@ -1665,10 +1629,10 @@ void PrototypeController::ProcessAutonomous()
 		{
 			DS_PRINTF(kIDR_0, kDSC_MOD, "AGO" );
 			m_autoDrive_X = 0.0f;
-			m_autoDrive_Y = 0.25f;
+			m_autoDrive_Y = 0.35f;
 			m_autoDrive_Z = 0.0f;
 	        m_numberofballs = m_pDriverStation->GetLocation();
-			m_driveTimer = 1.0f; // Gabe, I shortened this time since the robot moves much further in forward/reverse than mecanum.
+			m_driveTimer = 1.45f; // Gabe, I shortened this time since the robot moves much further in forward/reverse than mecanum.
 			m_autoState = kAutoState_AdvanceToBall;
 			break;
 		}
@@ -1676,7 +1640,6 @@ void PrototypeController::ProcessAutonomous()
 		case kAutoState_AdvanceToBall:
 		{
 			DS_PRINTF(kIDR_0, kDSC_MOD, "ADV" );
-			m_bBallMagnetActive = true;
 			if (m_driveTimer <= 0)
 			{
 				m_autoDrive_X = 0.0f;
@@ -1707,7 +1670,7 @@ void PrototypeController::ProcessAutonomous()
 				m_autoDrive_X = 0.5f;
 				m_autoDrive_Y = 0.0f;
 				m_autoDrive_Z = 0.0f;
-				m_driveTimer = 3.1f;
+				m_driveTimer = 1.55f;
 				m_autoState = kAutoState_MoveOutOfTheWay;
 			}
 			break;
@@ -1716,7 +1679,57 @@ void PrototypeController::ProcessAutonomous()
 		case kAutoState_MoveOutOfTheWay:
 		{
 			DS_PRINTF(kIDR_0, kDSC_MOD, "LAT" );
-			m_bBallMagnetActive = false;
+			if (m_driveTimer <= 0)
+			{
+				m_autoDrive_X = 0.0f;
+				m_autoDrive_Y = 0.0f;
+				m_autoDrive_Z = 0.0f;
+				m_autoState   = kAutoState_AdvanceTo2Ball;
+			}
+			break;
+		}
+		case kAutoState_AdvanceTo2Ball:
+		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "ADV" );
+			if (m_driveTimer <= 0)
+			{
+				m_autoDrive_X = 0.0f;
+				m_autoDrive_Y = 0.0f;
+				m_autoDrive_Z = 0.0f;
+				m_autoState = kAutoState_WaitForKicker2Loaded;
+			}
+			break;
+		}
+
+		case kAutoState_WaitForKicker2Loaded:
+		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "KIK" );
+			if (IsKickerReadyToFire())
+			{
+				bFire_Kicker = true;
+				m_driveTimer = 0.5f; // actually not driving now, just pausing for a moment after the kick to ensure that the ball is clear. 
+				m_autoState = kAutoState_PostKick2Pause;
+			}
+			break;
+		}
+
+		case kAutoState_PostKick2Pause:
+		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "PKP" );
+			if (m_driveTimer <= 0)
+			{
+				m_autoDrive_X = 0.5f;
+				m_autoDrive_Y = 0.0f;
+				m_autoDrive_Z = 0.0f;
+				m_driveTimer = 1.55f;
+				m_autoState = kAutoState_MoveOutOfThe2Way;
+			}
+			break;
+		}
+				
+		case kAutoState_MoveOutOfThe2Way:
+		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "LAT" );
 			if (m_driveTimer <= 0)
 			{
 				m_autoDrive_X = 0.0f;
@@ -1751,7 +1764,6 @@ void PrototypeController::ProcessAutonomous()
    	ProcessDriveSystem(m_autoDrive_X, m_autoDrive_Y, m_autoDrive_Z);
 
 	// Same for these guys...
-	ProcessBallMagnet();
 	ProcessKicker(bFire_Kicker);
 }
 
@@ -1782,7 +1794,6 @@ void PrototypeController::ProcessAutonomous()
 
 void PrototypeController::CleanupAutonomous()
 {
-	m_bBallMagnetActive = false;  // turn off ball magnet for start of teleoperated mode (maybe this should be turned on instead?).
 }
 
 
@@ -1791,7 +1802,6 @@ void PrototypeController::ProcessOperated()
 	ProcessTeleopDriveSystem();
 	ProcessTeleopKicker();
 	ProcessTower();
-	ProcessTeleopBallMagnet();
 	ProcessCamera();
 
 	// Check if driver requesting save of coefficients...
@@ -2023,8 +2033,7 @@ void PrototypeController::AllStop()
 	m_pWheelJaguar[kRR]->Set(0.0f);
 	m_pWheelJaguar[kRL]->Set(0.0f);
 	m_pTowerJaguar->Set(0.0f);
-	m_pBallMagnet->Set(0.0f);
-
+	
 	m_pMainCylinder_IN_Solenoid->Set(false); 
 	m_pMainCylinder_OUT_Solenoid->Set(false); 
 	m_pTriggerCylinder_IN_Solenoid->Set(false); 
