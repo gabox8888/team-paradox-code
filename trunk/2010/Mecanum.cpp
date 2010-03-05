@@ -625,6 +625,7 @@ class PrototypeController : public RobotBase
 public:
 	enum KickerState
 	{
+		kKickState_WaitForActive,
 		kKickState_ExtendingMainCylinder,
 		kKickState_PostLatchPause,
 		kKickState_WaitingForFire,
@@ -636,13 +637,10 @@ public:
 	{
 		kAutoState_Start,
 		kAutoState_AdvanceToBall,
-		kAutoState_AdvanceTo2Ball,
 		kAutoState_WaitForKickerLoaded,
-		kAutoState_WaitForKicker2Loaded,
 		kAutoState_PostKickPause,
-		kAutoState_PostKick2Pause,
+		kAutoState_BackUp,
 		kAutoState_MoveOutOfTheWay,		
-		kAutoState_MoveOutOfThe2Way,
 		kAutoState_SitStillLikeAGoodLittleRobot,
 	};
 	
@@ -774,7 +772,7 @@ protected:
 	ControllerButtonState m_gamePadButtonState;
 
 	// true when speed controllers are enabled, false uses direct PWM...
-	bool                  m_bUseSpeedController;	
+	bool                  m_bUseSpeedController;
 	// true when the lift tower is active (responsive to controls), false otherwise...
 	bool                  m_bTowerLiftMotorSystemIsActive;
 
@@ -792,9 +790,11 @@ protected:
 	
 	// Kicker action is a finite state machine.  Here are the state machine variables...
 	KickerState           m_kickerState;
+	bool                  m_bKickerSystemIsActive;
 	float                 m_timePostLatchReleasePauseCountdown;
 	float                 m_timePostFirePauseCountdown;
 	float                 m_timePostLatchEngagePauseCountdown;
+	float                 m_kickerSwitchWaitTimeout;
 	
 	// Autonomous mode is a finite state machine.  Here are the state machine variables...
 	AutonomousState       m_autoState;
@@ -892,10 +892,12 @@ PrototypeController::PrototypeController(void)
 	m_bTowerPneumaticSystemIsActive = false;
 	m_pCompressorEnabled = true;
 	
-	m_kickerState = kKickState_ExtendingMainCylinder;
+	m_kickerState = kKickState_WaitForActive;
+	m_bKickerSystemIsActive = true;
 	m_timePostLatchReleasePauseCountdown = 0.0f;
 	m_timePostFirePauseCountdown = 0.0f;
 	m_timePostLatchEngagePauseCountdown = 0.0f;
+	m_kickerSwitchWaitTimeout = 0.0;
 	
 	m_autoState = kAutoState_Start;
 	m_bProcessingAutonomous = false;
@@ -1210,17 +1212,34 @@ void PrototypeController::ProcessKicker(const bool bFire_Kicker)
 	{
 		DS_PRINTF(3, 0, "KS");
 	}
+	else
+	{
+		DS_PRINTF(3, 0, "  ");
+	}
 	
 	switch (m_kickerState)
 	{
 		default:
+		case kKickState_WaitForActive:
+		{
+			DS_PRINTF(3, 2, "NOT ACTIVE        ");
+			if (m_bKickerSystemIsActive)
+			{
+				m_kickerSwitchWaitTimeout = 10.0f;
+				m_kickerState = kKickState_ExtendingMainCylinder;
+			}
+			break;
+		}
+		
 		case kKickState_ExtendingMainCylinder:
 		{
 			m_pTriggerCylinder_OUT_Solenoid->Set(false);
 			m_pTriggerCylinder_IN_Solenoid->Set(true);
 			m_pMainCylinder_OUT_Solenoid->Set(true);
 			m_pMainCylinder_IN_Solenoid->Set(false);
-			const bool bKickerSwitch_ON = (m_pKickerSwitch->Get()==1);
+			m_kickerSwitchWaitTimeout -= m_dT;
+			
+			const bool bKickerSwitch_ON = (m_pKickerSwitch->Get()==1) || (m_kickerSwitchWaitTimeout <= 0.0f);
 			if (bKickerSwitch_ON)
 			{
 				const float kPostLatchPauseTime = 0.5f;
@@ -1292,7 +1311,7 @@ void PrototypeController::ProcessKicker(const bool bFire_Kicker)
 			{
 				m_timePostLatchEngagePauseCountdown = 0.0f;
 
-				m_kickerState = kKickState_ExtendingMainCylinder;
+				m_kickerState = kKickState_WaitForActive;
 			}
 			
 			DS_PRINTF(3, 2, "POST-LATCH PAUSE  ");
@@ -1466,17 +1485,17 @@ void PrototypeController::ProcessTeleopTower()
 	const float towerMotorJoy = m_pFlightQuadrant->GetThrottle();
 
 	ProcessTower(bTowerCylinderExtend, towerMotorJoy);
-	}
+}
 
 
 void PrototypeController::ProcessTower(const bool bTowerCylinderExtend, const float towerMotorJoy)
 {
 	if (m_bTowerLiftMotorSystemIsActive)
-	{ 
+	{
 		DS_PRINTF(kIDR_0, kDSC_LFT, "LFT" );
 	}
 	else
-	{ 
+	{
 		DS_PRINTF(kIDR_0, kDSC_LFT, "   " );
 	}
 
@@ -1509,7 +1528,7 @@ void PrototypeController::ProcessTower(const bool bTowerCylinderExtend, const fl
 	#endif
 	if (bUseAbsTower)
 	{
-		DS_PRINTF(kIDR_0, kDSC_MAN, "   " ); // Absolute tower control enabled.
+		DS_PRINTF(kIDR_0, kDSC_MAN, "ABS" ); // Absolute tower control enabled.
 		if (bSafetyStop)
 		{
 			m_pTowerJaguar->Set(0.0f);
@@ -1553,6 +1572,9 @@ void PrototypeController::ProcessEndOfMainLoop()
 {
 	// Update the dashboard...
 	SendDashboardData();
+
+	// send text to driver station "user messages" window...
+	DriverStationLCD::GetInstance()->UpdateLCD();
 
 	// Feed the watchdog, if active...
 	if (kWatchdogState)
@@ -1623,9 +1645,6 @@ void PrototypeController::ProcessAutoAndTeleopCommon()
 
 	// Keep wheel encoder state in sync...
 	SetEnableWheelSpeedControllers(m_bUseSpeedController);
-	
-	// send text to driver station "user messages" window...
-	DriverStationLCD::GetInstance()->UpdateLCD();
 }
 
 
@@ -1640,7 +1659,8 @@ void PrototypeController::ProcessAutonomous()
 			m_autoDrive_X = 0.0f;
 			m_autoDrive_Y = 0.35f;
 			m_autoDrive_Z = 0.0f;
-	        m_numberofballs = m_pDriverStation->GetLocation();
+			// Gabe: let's test one ball first, then try for more
+	        m_numberofballs = 1; // m_pDriverStation->GetLocation();
 			m_driveTimer = 1.45f; // Gabe, I shortened this time since the robot moves much further in forward/reverse than mecanum.
 			m_autoState = kAutoState_AdvanceToBall;
 			break;
@@ -1666,6 +1686,7 @@ void PrototypeController::ProcessAutonomous()
 			{
 				bFire_Kicker = true;
 				m_driveTimer = 0.5f; // actually not driving now, just pausing for a moment after the kick to ensure that the ball is clear. 
+				m_numberofballs -= 1; // just kicked a ball (we hope) so decrement ball count.
 				m_autoState = kAutoState_PostKickPause;
 			}
 			break;
@@ -1674,6 +1695,20 @@ void PrototypeController::ProcessAutonomous()
 		case kAutoState_PostKickPause:
 		{
 			DS_PRINTF(kIDR_0, kDSC_MOD, "PKP" );
+			if (m_driveTimer <= 0)
+			{
+				m_autoDrive_X = 0.0f;
+				m_autoDrive_Y = -0.35f;
+				m_autoDrive_Z = 0.0f;
+				m_driveTimer = 1.45f;
+				m_autoState = kAutoState_BackUp;
+			}
+			break;
+		}
+		
+		case kAutoState_BackUp:
+		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "BAK" );
 			if (m_driveTimer <= 0)
 			{
 				m_autoDrive_X = 0.5f;
@@ -1690,65 +1725,25 @@ void PrototypeController::ProcessAutonomous()
 			DS_PRINTF(kIDR_0, kDSC_MOD, "LAT" );
 			if (m_driveTimer <= 0)
 			{
-				m_autoDrive_X = 0.0f;
-				m_autoDrive_Y = 0.0f;
-				m_autoDrive_Z = 0.0f;
-				m_autoState   = kAutoState_AdvanceTo2Ball;
-			}
-			break;
-		}
-		case kAutoState_AdvanceTo2Ball:
-		{
-			DS_PRINTF(kIDR_0, kDSC_MOD, "ADV" );
-			if (m_driveTimer <= 0)
-			{
-				m_autoDrive_X = 0.0f;
-				m_autoDrive_Y = 0.0f;
-				m_autoDrive_Z = 0.0f;
-				m_autoState = kAutoState_WaitForKicker2Loaded;
-			}
-			break;
-		}
-
-		case kAutoState_WaitForKicker2Loaded:
-		{
-			DS_PRINTF(kIDR_0, kDSC_MOD, "KIK" );
-			if (IsKickerReadyToFire())
-			{
-				bFire_Kicker = true;
-				m_driveTimer = 0.5f; // actually not driving now, just pausing for a moment after the kick to ensure that the ball is clear. 
-				m_autoState = kAutoState_PostKick2Pause;
-			}
-			break;
-		}
-
-		case kAutoState_PostKick2Pause:
-		{
-			DS_PRINTF(kIDR_0, kDSC_MOD, "PKP" );
-			if (m_driveTimer <= 0)
-			{
-				m_autoDrive_X = 0.5f;
-				m_autoDrive_Y = 0.0f;
-				m_autoDrive_Z = 0.0f;
-				m_driveTimer = 1.55f;
-				m_autoState = kAutoState_MoveOutOfThe2Way;
+				if (m_numberofballs > 0)
+				{
+					m_autoDrive_X = 0.0f;
+					m_autoDrive_Y = 0.35f;
+					m_autoDrive_Z = 0.0f;
+					m_driveTimer = 1.45f; // Gabe, I shortened this time since the robot moves much further in forward/reverse than mecanum.
+					m_autoState = kAutoState_AdvanceToBall;
+				}
+				else
+				{
+					m_autoDrive_X = 0.0f;
+					m_autoDrive_Y = 0.0f;
+					m_autoDrive_Z = 0.0f;
+					m_autoState = kAutoState_SitStillLikeAGoodLittleRobot;
+				}
 			}
 			break;
 		}
 				
-		case kAutoState_MoveOutOfThe2Way:
-		{
-			DS_PRINTF(kIDR_0, kDSC_MOD, "LAT" );
-			if (m_driveTimer <= 0)
-			{
-				m_autoDrive_X = 0.0f;
-				m_autoDrive_Y = 0.0f;
-				m_autoDrive_Z = 0.0f;
-				m_autoState = kAutoState_SitStillLikeAGoodLittleRobot;
-			}
-			break;
-		}
-		
 		case kAutoState_SitStillLikeAGoodLittleRobot:
 		{
 			DS_PRINTF(kIDR_0, kDSC_MOD, "SIT" );
@@ -2046,7 +2041,7 @@ void PrototypeController::AllStop()
 	m_pWheelJaguar[kRR]->Set(0.0f);
 	m_pWheelJaguar[kRL]->Set(0.0f);
 	m_pTowerJaguar->Set(0.0f);
-	
+
 	m_pMainCylinder_IN_Solenoid->Set(false); 
 	m_pMainCylinder_OUT_Solenoid->Set(false); 
 	m_pTriggerCylinder_IN_Solenoid->Set(false); 
