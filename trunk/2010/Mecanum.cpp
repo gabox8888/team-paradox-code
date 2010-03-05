@@ -807,6 +807,11 @@ protected:
 	float                 m_autoDrive_X;
 	float                 m_autoDrive_Y;
 	float                 m_autoDrive_Z;
+
+	float                 m_autoTarget_X;
+	float                 m_autoTarget_Y;
+	float                 m_autoTarget_Z;
+
 	int                   m_numberofballs;
 	float                 m_driveTimer;
 	
@@ -848,6 +853,7 @@ protected:
 	void   InitializeCamera();
 	void   SetTowerPidControllerEnableState(const bool bEnabled);
 	inline bool IsKickerReadyToFire() const { return (m_kickerState == kKickState_WaitingForFire); }
+	void   MoveSmoothly(float &v, const float target, const float dT);
 
 public:
 	PrototypeController(void);
@@ -904,6 +910,9 @@ PrototypeController::PrototypeController(void)
 	m_autoDrive_X = 0.0f;
 	m_autoDrive_Y = 0.0f;
 	m_autoDrive_Z = 0.0f;
+	m_autoTarget_X = 0.0f;
+	m_autoTarget_Y = 0.0f;
+	m_autoTarget_Z = 0.0f;
 	m_numberofballs = 0;
 	m_driveTimer = 0.0f;
 
@@ -1024,7 +1033,7 @@ PrototypeController::PrototypeController(void)
 	m_pSpeedController[kRL] = NewWheelSpeedController(m_pWheelEncoder[kRL], m_pWheelJaguar[kRL]);
 
 	const float kTower_P = 0.25f;
-	const float kTower_I = 0.0025f;
+	const float kTower_I = 0.005f;
 	const float kTower_D = 0.0f;
 	m_pTowerPositionController = new PIDController(kTower_P, kTower_I, kTower_D, m_pTowerEncoder, m_pTowerJaguar);
 	m_pTowerPositionController->SetInputRange(kTowerExtendedEncoderCount, kTowerRetractedEncoderCount); // kTowerExtendedEncoderCount is negative, so make it the minimum.
@@ -1655,20 +1664,37 @@ void PrototypeController::ProcessAutoAndTeleopCommon()
 }
 
 
+static const float kMaxSmoothMotorPWMStep = 1.0f;
+void PrototypeController::MoveSmoothly(float &v, const float target, const float dT)
+{
+	const float delta = target - v;
+	float absDelta = fabs(delta);
+	const float stepMax = dT * kMaxSmoothMotorPWMStep;
+	if (absDelta > stepMax)
+	{
+		absDelta = stepMax;
+	}
+	const float smoothDelta = (delta >= 0.0f) ? absDelta : -absDelta;
+	v += smoothDelta;
+}
+
+
 void PrototypeController::ProcessAutonomous()
 {
 	bool bFire_Kicker = false;
+	const float kForwardBackwardTime = 2.45f;
+	const float kForwardBackwardPower = 0.35f;
 	switch (m_autoState)
 	{
 		case kAutoState_Start:
 		{
 			DS_PRINTF(kIDR_0, kDSC_MOD, "AGO" );
-			m_autoDrive_X = 0.0f;
-			m_autoDrive_Y = 0.35f;
-			m_autoDrive_Z = 0.0f;
+			m_autoTarget_X = 0.0f;
+			m_autoTarget_Y = kForwardBackwardPower;
+			m_autoTarget_Z = 0.0f;
 			// Gabe: let's test one ball first, then try for more
 	        m_numberofballs = 1; // m_pDriverStation->GetLocation();
-			m_driveTimer = 1.45f; // Gabe, I shortened this time since the robot moves much further in forward/reverse than mecanum.
+			m_driveTimer = kForwardBackwardTime; // DRIVE_TIME Gabe, I shortened this time since the robot moves much further in forward/reverse than mecanum.
 			m_autoState = kAutoState_AdvanceToBall;
 			break;
 		}
@@ -1678,9 +1704,9 @@ void PrototypeController::ProcessAutonomous()
 			DS_PRINTF(kIDR_0, kDSC_MOD, "ADV" );
 			if (m_driveTimer <= 0)
 			{
-				m_autoDrive_X = 0.0f;
-				m_autoDrive_Y = 0.0f;
-				m_autoDrive_Z = 0.0f;
+				m_autoTarget_X = 0.0f;
+				m_autoTarget_Y = 0.0f;
+				m_autoTarget_Z = 0.0f;
 				m_autoState = kAutoState_WaitForKickerLoaded;
 			}
 			break;
@@ -1692,7 +1718,7 @@ void PrototypeController::ProcessAutonomous()
 			if (IsKickerReadyToFire())
 			{
 				bFire_Kicker = true;
-				m_driveTimer = 0.5f; // actually not driving now, just pausing for a moment after the kick to ensure that the ball is clear. 
+				m_driveTimer = 0.5f; // DRIVE_TIME actually not driving now, just pausing for a moment after the kick to ensure that the ball is clear. 
 				m_numberofballs -= 1; // just kicked a ball (we hope) so decrement ball count.
 				m_autoState = kAutoState_PostKickPause;
 			}
@@ -1704,10 +1730,10 @@ void PrototypeController::ProcessAutonomous()
 			DS_PRINTF(kIDR_0, kDSC_MOD, "PKP" );
 			if (m_driveTimer <= 0)
 			{
-				m_autoDrive_X = 0.0f;
-				m_autoDrive_Y = -0.35f;
-				m_autoDrive_Z = 0.0f;
-				m_driveTimer = 1.45f;
+				m_autoTarget_X = 0.0f;
+				m_autoTarget_Y = -kForwardBackwardPower;
+				m_autoTarget_Z = 0.0f;
+				m_driveTimer = kForwardBackwardTime; // DRIVE_TIME
 				m_autoState = kAutoState_BackUp;
 			}
 			break;
@@ -1718,10 +1744,10 @@ void PrototypeController::ProcessAutonomous()
 			DS_PRINTF(kIDR_0, kDSC_MOD, "BAK" );
 			if (m_driveTimer <= 0)
 			{
-				m_autoDrive_X = 0.5f;
-				m_autoDrive_Y = 0.0f;
-				m_autoDrive_Z = 0.0f;
-				m_driveTimer = 3.1f;
+				m_autoTarget_X = 0.5f;
+				m_autoTarget_Y = 0.0f;
+				m_autoTarget_Z = 0.0f;
+				m_driveTimer = 4.1f; // DRIVE_TIME
 				m_autoState = kAutoState_MoveOutOfTheWay;
 			}
 			break;
@@ -1734,17 +1760,17 @@ void PrototypeController::ProcessAutonomous()
 			{
 				if (m_numberofballs > 0)
 				{
-					m_autoDrive_X = 0.0f;
-					m_autoDrive_Y = 0.35f;
-					m_autoDrive_Z = 0.0f;
-					m_driveTimer = 1.45f; // Gabe, I shortened this time since the robot moves much further in forward/reverse than mecanum.
+					m_autoTarget_X = 0.0f;
+					m_autoTarget_Y = kForwardBackwardPower;
+					m_autoTarget_Z = 0.0f;
+					m_driveTimer = kForwardBackwardTime; // DRIVE_TIME Gabe, I shortened this time since the robot moves much further in forward/reverse than mecanum.
 					m_autoState = kAutoState_AdvanceToBall;
 				}
 				else
 				{
-					m_autoDrive_X = 0.0f;
-					m_autoDrive_Y = 0.0f;
-					m_autoDrive_Z = 0.0f;
+					m_autoTarget_X = 0.0f;
+					m_autoTarget_Y = 0.0f;
+					m_autoTarget_Z = 0.0f;
 					m_autoState = kAutoState_SitStillLikeAGoodLittleRobot;
 				}
 			}
@@ -1756,9 +1782,9 @@ void PrototypeController::ProcessAutonomous()
 			DS_PRINTF(kIDR_0, kDSC_MOD, "SIT" );
 
 			// Just sit here and wait for teleop...
-			m_autoDrive_X = 0.0f;
-			m_autoDrive_Y = 0.0f;
-			m_autoDrive_Z = 0.0f;
+			m_autoTarget_X = 0.0f;
+			m_autoTarget_Y = 0.0f;
+			m_autoTarget_Z = 0.0f;
 			break;
 		}
 	}
@@ -1769,6 +1795,10 @@ void PrototypeController::ProcessAutonomous()
 	{
 		m_driveTimer = 0.0f;
 	}
+
+	MoveSmoothly(m_autoDrive_X, m_autoTarget_X, m_dT);
+	MoveSmoothly(m_autoDrive_Y, m_autoTarget_Y, m_dT);
+	MoveSmoothly(m_autoDrive_Z, m_autoTarget_Z, m_dT);
 	
 	// We always call the drive system every iteration.  But instead of passing in joystick values, we pass in our
 	// autonomously controlled drive variables...
