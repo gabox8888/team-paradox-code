@@ -56,8 +56,8 @@ static const float        kRevolutionsPerPulse  = 1.0f / kPulsesPerRevolution;
 // Number of revolutions of the tower gearbox encoder required to reach the point of full tower extension...
 static const float        kTowerExtendedEncoderCount  = -14.6f;
 static const float        kTowerRetractedEncoderCount = 0.0f;
-static const float        kTowerExtendedDangerCount   = kTowerExtendedEncoderCount  - 0.25f; // allow a small amount of over-drive
-static const float        kTowerRetractedDangerCount  = kTowerRetractedEncoderCount + 0.5f;  // allow a small amount of over-drive
+static const float        kTowerExtendedDangerCount   = kTowerExtendedEncoderCount  - 0.125f; // allow a small amount of over-drive
+static const float        kTowerRetractedDangerCount  = kTowerRetractedEncoderCount + 0.125f;  // allow a small amount of over-drive
 
 // Oddly enough, a P-only PID controller seems to work pretty well for the wheel speed.  My theory is that it's because the encoder speed is so noisy.
 // It tends to shoot above and below the setpoint.  This has the effect of replacing the setpoint overshoot that normally comes from integral windup...
@@ -1024,7 +1024,7 @@ PrototypeController::PrototypeController(void)
 	m_pSpeedController[kRL] = NewWheelSpeedController(m_pWheelEncoder[kRL], m_pWheelJaguar[kRL]);
 
 	const float kTower_P = 0.25f;
-	const float kTower_I = 0.005f;
+	const float kTower_I = 0.0025f;
 	const float kTower_D = 0.0f;
 	m_pTowerPositionController = new PIDController(kTower_P, kTower_I, kTower_D, m_pTowerEncoder, m_pTowerJaguar);
 	m_pTowerPositionController->SetInputRange(kTowerExtendedEncoderCount, kTowerRetractedEncoderCount); // kTowerExtendedEncoderCount is negative, so make it the minimum.
@@ -1522,13 +1522,21 @@ void PrototypeController::ProcessTower(const bool bTowerCylinderExtend, const fl
 	const bool bUseAbsTower = m_bUseAbsoluteTowerMotorControl && m_bTowerLiftMotorSystemIsActive;
 	SetTowerPidControllerEnableState(bUseAbsTower && !bSafetyStop);
 
+	if (m_bUseAbsoluteTowerMotorControl)
+	{
+		DS_PRINTF(kIDR_0, kDSC_MAN, "ABS" ); // Absolute tower control.
+	}
+	else
+	{
+		DS_PRINTF(kIDR_0, kDSC_MAN, "MAN" ); // Relative tower control.
+	}
+
 	#define TEST_TOWER_ENCODER
 	#if defined(TEST_TOWER_ENCODER)
 	m_pTowerEncoder->DumpEncoderData(5);
 	#endif
 	if (bUseAbsTower)
 	{
-		DS_PRINTF(kIDR_0, kDSC_MAN, "ABS" ); // Absolute tower control enabled.
 		if (bSafetyStop)
 		{
 			m_pTowerJaguar->Set(0.0f);
@@ -1545,7 +1553,6 @@ void PrototypeController::ProcessTower(const bool bTowerCylinderExtend, const fl
 	else
 	{
 		const float towerPower = (m_bTowerLiftMotorSystemIsActive) ? towerMotorJoy : 0.0f;
-		DS_PRINTF(kIDR_0, kDSC_MAN, "MAN" ); // Absolute tower control disabled.
 		m_pTowerJaguar->Set(towerPower);
 	}
 
