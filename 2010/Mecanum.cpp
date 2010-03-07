@@ -640,7 +640,7 @@ public:
 		kAutoState_WaitForKickerLoaded,
 		kAutoState_PostKickPause,
 		kAutoState_BackUp,
-		kAutoState_MoveOutOfTheWay,		
+		//kAutoState_MoveOutOfTheWay,		
 		kAutoState_SitStillLikeAGoodLittleRobot,
 	};
 	
@@ -692,7 +692,7 @@ protected:
 	// Jag controllers for the wheel motors...
 	Jaguar*               m_pWheelJaguar[kNumWheels];
 
-	Jaguar*               m_pTowerJaguar;
+	Victor*               m_pTowerJaguar;
 	Servo*                m_pCameraAzimuthServo;
 	Servo*                m_pCameraTiltServo;
 	Solenoid*             m_pMainCylinder_IN_Solenoid; 
@@ -795,6 +795,7 @@ protected:
 	float                 m_timePostFirePauseCountdown;
 	float                 m_timePostLatchEngagePauseCountdown;
 	float                 m_kickerSwitchWaitTimeout;
+	float                 m_timeKickerSwitchEngaged;
 	
 	// Autonomous mode is a finite state machine.  Here are the state machine variables...
 	AutonomousState       m_autoState;
@@ -903,7 +904,8 @@ PrototypeController::PrototypeController(void)
 	m_timePostLatchReleasePauseCountdown = 0.0f;
 	m_timePostFirePauseCountdown = 0.0f;
 	m_timePostLatchEngagePauseCountdown = 0.0f;
-	m_kickerSwitchWaitTimeout = 0.0;
+	m_kickerSwitchWaitTimeout = 0.0f;
+	m_timeKickerSwitchEngaged = 0.0f;
 	
 	m_autoState = kAutoState_Start;
 	m_bProcessingAutonomous = false;
@@ -988,7 +990,7 @@ PrototypeController::PrototypeController(void)
 	m_pWheelJaguar[kFL] = new Jaguar(4);           // Front Left drive Motor
 	m_pWheelJaguar[kRR] = new Jaguar(8);           // Rear Right drive Motor
 	m_pWheelJaguar[kRL] = new Jaguar(10);          // Rear Left drive Motor
-	m_pTowerJaguar     = new Jaguar(3);
+	m_pTowerJaguar     = new Victor(3);
 
 	m_pDigInFREncoder_A = new DigitalInput(2);
 	m_pDigInFREncoder_B = new DigitalInput(3);
@@ -1058,16 +1060,16 @@ PrototypeController::PrototypeController(void)
 	m_pDriverStation = DriverStation::GetInstance();				//Intialize the Driver Station
 
 	// Initialize the hard defaults for drive system coefficients...
-	m_coef_X_FR = -1.000000;
+	m_coef_X_FR = 1.000000;
 	m_coef_Y_FR = -1.000000;
 	m_coef_Z_FR = 1.000000;
-	m_coef_X_FL = -1.000000;
+	m_coef_X_FL = 1.000000;
 	m_coef_Y_FL = 1.000000;
 	m_coef_Z_FL = 1.000000;
-	m_coef_X_RR = 1.000000;
+	m_coef_X_RR = -1.000000;
 	m_coef_Y_RR = -1.000000;
 	m_coef_Z_RR = 1.000000;
-	m_coef_X_RL = 1.000000;
+	m_coef_X_RL = -1.000000;
 	m_coef_Y_RL = 1.000000;
 	m_coef_Z_RL = 1.000000;
 
@@ -1109,6 +1111,7 @@ void PrototypeController::SetTowerPidControllerEnableState(const bool bEnabled)
 
 void PrototypeController::LoadDriveCoefficients()
 {
+/*
 	FILE* fp_steeringConfig	= fopen("MecanumDriveCoefficients.ini", "rb");
 	if (fp_steeringConfig)
 	{
@@ -1163,6 +1166,7 @@ void PrototypeController::LoadDriveCoefficients()
 	m_coef_X_RR = 1.0f;
 	m_coef_X_RL = 1.0f;
 	#endif
+*/
 }
 
 
@@ -1226,6 +1230,7 @@ void PrototypeController::ProcessKicker(const bool bFire_Kicker)
 		DS_PRINTF(3, 0, "  ");
 	}
 	
+	const float kSwitchMustBeEngagedForTime = 0.125f;
 	switch (m_kickerState)
 	{
 		default:
@@ -1234,8 +1239,9 @@ void PrototypeController::ProcessKicker(const bool bFire_Kicker)
 			DS_PRINTF(3, 2, "NOT ACTIVE        ");
 			if (m_bKickerSystemIsActive)
 			{
-				m_kickerSwitchWaitTimeout = 10.0f;
+				m_kickerSwitchWaitTimeout = 10000.0f;
 				m_kickerState = kKickState_ExtendingMainCylinder;
+				m_timeKickerSwitchEngaged = kSwitchMustBeEngagedForTime;
 			}
 			break;
 		}
@@ -1251,10 +1257,19 @@ void PrototypeController::ProcessKicker(const bool bFire_Kicker)
 			const bool bKickerSwitch_ON = (m_pKickerSwitch->Get()==1) || (m_kickerSwitchWaitTimeout <= 0.0f);
 			if (bKickerSwitch_ON)
 			{
-				const float kPostLatchPauseTime = 0.5f;
-				m_timePostLatchReleasePauseCountdown = kPostLatchPauseTime;
-				m_kickerState = kKickState_PostLatchPause;
+				m_timeKickerSwitchEngaged -= m_dT;
+				if (m_timeKickerSwitchEngaged <= 0.0f)
+				{
+					const float kPostLatchPauseTime = 0.75f;
+					m_timePostLatchReleasePauseCountdown = kPostLatchPauseTime;
+					m_kickerState = kKickState_PostLatchPause;
+				}
 			}
+			else
+			{
+				m_timeKickerSwitchEngaged = kSwitchMustBeEngagedForTime;
+			}
+			
 			DS_PRINTF(3, 2, "EXTEND            ");
 			break;
 		}
@@ -1481,6 +1496,12 @@ void PrototypeController::ProcessTeleopTower()
 		m_bTowerPneumaticSystemIsActive = false;
 	}
 
+	if (m_flightQuadrantButtonState.GetLongHoldDown( kFQB_T6 ))
+	{
+		m_bUseAbsoluteTowerMotorControl = false;
+	}
+
+/*
 	if (m_gamePadButtonState.GetDownStroke( kGAME_Button2 ) || m_flightQuadrantButtonState.GetLongHoldDown( kFQB_T6 ))
 	{
 		m_bUseAbsoluteTowerMotorControl = false;
@@ -1489,6 +1510,7 @@ void PrototypeController::ProcessTeleopTower()
 	{
 		m_bUseAbsoluteTowerMotorControl = true;
 	}
+*/
 
 	const bool bTowerCylinderExtend = m_pFlightQuadrant->GetY() < 0.0f;
 	const float towerMotorJoy = m_pFlightQuadrant->GetThrottle();
@@ -1744,15 +1766,15 @@ void PrototypeController::ProcessAutonomous()
 			DS_PRINTF(kIDR_0, kDSC_MOD, "BAK" );
 			if (m_driveTimer <= 0)
 			{
-				m_autoTarget_X = 0.5f;
+				m_autoTarget_X = 0.0f;
 				m_autoTarget_Y = 0.0f;
 				m_autoTarget_Z = 0.0f;
-				m_driveTimer = 4.1f; // DRIVE_TIME
-				m_autoState = kAutoState_MoveOutOfTheWay;
+				m_autoState = kAutoState_SitStillLikeAGoodLittleRobot;
 			}
 			break;
 		}
 		
+/*
 		case kAutoState_MoveOutOfTheWay:
 		{
 			DS_PRINTF(kIDR_0, kDSC_MOD, "LAT" );
@@ -1776,6 +1798,7 @@ void PrototypeController::ProcessAutonomous()
 			}
 			break;
 		}
+*/
 				
 		case kAutoState_SitStillLikeAGoodLittleRobot:
 		{
