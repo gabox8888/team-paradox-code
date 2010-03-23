@@ -78,6 +78,8 @@ static const float        kMainLoopWaitTime = 0.025f;
 static const float        kMax_dT           = 4.0f * kMainLoopWaitTime;
 static const INT32        kMax_dT_uS        = INT32(kMax_dT * 1000000.0f);
 
+static const float        kRadiansToDegrees = 180.0f / 3.14159265f;
+
 // First intrument display row...
 static const int kIDR_0 = 0;
 
@@ -303,9 +305,9 @@ class ParadoxEncoder : public Encoder, public PIDSource
 ParadoxEncoder* ParadoxEncoder::NewWheelEncoder(DigitalSource* const aSource, DigitalSource* const bSource)
 {
 	const Encoder::EncodingType iEncodingType = Encoder::k1X; // REMEMBER!  There is a limit of eight counters (1x, 2x) and four 4x encoders (FPGA limit)!!
-	const unsigned int kMovingAverageSize = 16;
+	//const unsigned int kMovingAverageSize = 16;
 	ParadoxEncoder* const pEncoder = new ParadoxEncoder(aSource, bSource, true, iEncodingType);        //Optical Encoder on tom proto drive
-	pEncoder->SetMovingAverageSize(kMovingAverageSize);
+	//pEncoder->SetMovingAverageSize(kMovingAverageSize);
 	pEncoder->Start();
 	return pEncoder;
 }
@@ -620,6 +622,79 @@ END_REGION;
 }
 
 
+
+
+class Razor9DOF
+{
+protected:
+	SerialPort*           m_pSerialPort;
+	int                   m_iTimeout;
+
+public:
+	float                 m_roll;
+	float                 m_pitch;
+	float                 m_yaw;
+
+public:
+	void Initialize();
+	void Read9DOF();
+};
+
+
+void Razor9DOF::Initialize()
+{
+	m_pSerialPort = new SerialPort(57600, 8, SerialPort::kParity_None, SerialPort::kStopBits_One);
+	m_pSerialPort->SetReadBufferSize(256);
+	m_pSerialPort->SetTimeout(1.0f);
+	m_iTimeout = 0;
+	m_roll = 0.0f;
+	m_pitch = 0.0f;
+	m_yaw = 0.0f;
+}
+
+
+void Razor9DOF::Read9DOF()
+{
+	const int k9DOFPacketSize = 28;
+	while (m_pSerialPort->GetBytesReceived() >= k9DOFPacketSize)
+	{
+		const int kWorkBufSize = 128;
+		char workBuf[kWorkBufSize];
+		const int nBytesRead = m_pSerialPort->Read(workBuf, kWorkBufSize - 1);
+		workBuf[nBytesRead] = '\0';
+		if (nBytesRead == k9DOFPacketSize)
+		{
+			float roll, pitch, yaw;
+			const int nItemsRead = sscanf(workBuf, "GVV:%f,%f,%f", &roll, &pitch, &yaw);
+			if (nItemsRead == 3)
+			{
+				m_roll = roll;
+				m_pitch = pitch;
+				m_yaw = yaw;
+				m_iTimeout = 0;
+			}
+		}
+		else
+		{
+			// something bad happened...
+			//m_iTimeout = 9999; // force timeout
+			break;
+		}
+	}
+
+	m_iTimeout += 1;
+	const int kNumTimeout = 40; // 40 * 50ms = 2secs
+	if (m_iTimeout > kNumTimeout)
+	{
+		printf("TIMEOUT reading Razor 9DOF serial data.\n");
+		m_pSerialPort->Reset(); // try resetting the serial port.
+		m_iTimeout = 0;
+	}
+}
+
+
+
+
 class PrototypeController : public RobotBase
 {
 public:
@@ -731,6 +806,8 @@ protected:
 	Joystick*             m_pGamePad;        // Game Controller
 	
 	DriverStation*        m_pDriverStation;           //Driver Station
+	
+	Razor9DOF*            m_pRazor9DOF;
 	
 	// Mecanum drive coefficients...
 	float                 m_coef_X_FR;
@@ -1024,7 +1101,7 @@ PrototypeController::PrototypeController(void)
 	m_pWheelEncoder[kRL] = ParadoxEncoder::NewWheelEncoder(m_pDigInRLEncoder_A, m_pDigInRLEncoder_B);
 
 	m_pTowerEncoder     = new ParadoxEncoder(m_pDigInTowerEncoder_A, m_pDigInTowerEncoder_B, true, Encoder::k1X);
-	m_pTowerEncoder->SetMovingAverageSize(16);
+	//m_pTowerEncoder->SetMovingAverageSize(16);
 	m_pTowerEncoder->Start();
 
 
@@ -1058,6 +1135,10 @@ PrototypeController::PrototypeController(void)
 	_LOG("**********************************************************************************************\n");
 	
 	m_pDriverStation = DriverStation::GetInstance();				//Intialize the Driver Station
+
+	m_pRazor9DOF = new Razor9DOF();
+	assert(m_pRazor9DOF);
+	m_pRazor9DOF->Initialize();
 
 	// Initialize the hard defaults for drive system coefficients...
 	m_coef_X_FR = 1.000000;
@@ -1514,7 +1595,6 @@ void PrototypeController::ProcessTeleopTower()
 
 	const bool bTowerCylinderExtend = m_pFlightQuadrant->GetY() < 0.0f;
 	const float towerMotorJoy = m_pFlightQuadrant->GetThrottle();
-
 	ProcessTower(bTowerCylinderExtend, towerMotorJoy);
 }
 
@@ -1619,6 +1699,10 @@ void PrototypeController::ProcessEndOfMainLoop()
 	{
 		GetWatchdog().Feed();
 	}
+
+	m_pRazor9DOF->Read9DOF();
+	//printf("RPY: % 05.2f,% 05.2f,% 05.2f\n", m_pRazor9DOF->m_roll*kRadiansToDegrees, m_pRazor9DOF->m_pitch*kRadiansToDegrees, m_pRazor9DOF->m_yaw*kRadiansToDegrees);
+DS_PRINTF(2, 0, "%.2f     ", m_pRazor9DOF->m_yaw*kRadiansToDegrees);
 
 	// This is our main loop wait.  Because many of the robot functions are processed via a state machine in the main robot thread, this should
 	// be the only Wait(...) call in the main thread (unless Watchdog is disabled -- in the Calibrate function, for example)...
@@ -2257,7 +2341,7 @@ void PrototypeController::SendDashboardData()
 			const float pwm = m_pSpeedController[kFR]->GetPWM();
 			// GVV: Hijack the camera tracking dashboard for our own nefarious purposes (to plot out PID loop stuff)...
 			dash_packet_2.AddDouble(pwm); // Joystick X
-			dash_packet_2.AddDouble(135.0); // angle
+			dash_packet_2.AddDouble(m_pRazor9DOF->m_yaw*kRadiansToDegrees); // angle
 			dash_packet_2.AddDouble(3.0); // angular rate
 			dash_packet_2.AddDouble(5.0); // other X
 		}
