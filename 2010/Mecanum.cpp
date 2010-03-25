@@ -1302,128 +1302,18 @@ void PrototypeController::ProcessTeleopKicker()
 
 void PrototypeController::ProcessKicker(const bool bFire_Kicker)
 {
-	if (m_pKickerSwitch->Get())
-	{
-		DS_PRINTF(3, 0, "KS");
-	}
-	else
-	{
-		DS_PRINTF(3, 0, "  ");
-	}
 	
-	const float kSwitchMustBeEngagedForTime = 0.125f;
-	switch (m_kickerState)
-	{
-		default:
-		case kKickState_WaitForActive:
-		{
-			DS_PRINTF(3, 2, "NOT ACTIVE        ");
-			if (m_bKickerSystemIsActive)
-			{
-				m_kickerSwitchWaitTimeout = 10000.0f;
-				m_kickerState = kKickState_ExtendingMainCylinder;
-				m_timeKickerSwitchEngaged = kSwitchMustBeEngagedForTime;
-			}
-			break;
-		}
-		
-		case kKickState_ExtendingMainCylinder:
-		{
-			m_pTriggerCylinder_OUT_Solenoid->Set(false);
-			m_pTriggerCylinder_IN_Solenoid->Set(true);
-			m_pMainCylinder_OUT_Solenoid->Set(true);
-			m_pMainCylinder_IN_Solenoid->Set(false);
-			m_kickerSwitchWaitTimeout -= m_dT;
-			
-			const bool bKickerSwitch_ON = (m_pKickerSwitch->Get()==1) || (m_kickerSwitchWaitTimeout <= 0.0f);
-			if (bKickerSwitch_ON)
-			{
-				m_timeKickerSwitchEngaged -= m_dT;
-				if (m_timeKickerSwitchEngaged <= 0.0f)
-				{
-					const float kPostLatchPauseTime = 0.75f;
-					m_timePostLatchReleasePauseCountdown = kPostLatchPauseTime;
-					m_kickerState = kKickState_PostLatchPause;
-				}
-			}
-			else
-			{
-				m_timeKickerSwitchEngaged = kSwitchMustBeEngagedForTime;
-			}
-			
-			DS_PRINTF(3, 2, "EXTEND            ");
-			break;
-		}
-		
-		case kKickState_PostLatchPause:
-		{
-			m_timePostLatchReleasePauseCountdown -= m_dT;
-			if (m_timePostLatchReleasePauseCountdown <= 0.0f)
-			{
-				m_timePostLatchReleasePauseCountdown = 0.0f;
-
-				m_pMainCylinder_OUT_Solenoid->Set(false);
-				m_pMainCylinder_IN_Solenoid->Set(true);
-
-				m_kickerState = kKickState_WaitingForFire;
-			}
-
-			DS_PRINTF(3, 2, "POST-UNLATCH PAUSE");
-			
-			break;
-		}
-		
-		case kKickState_WaitingForFire:
-		{
-			if (bFire_Kicker)
-			{
-				m_pTriggerCylinder_OUT_Solenoid->Set(true);
-				m_pTriggerCylinder_IN_Solenoid->Set(false);
-				const float kPostFirePauseTime = 0.5f;
-				m_timePostFirePauseCountdown = kPostFirePauseTime;
-				m_kickerState = kKickState_PostFirePause;
-			}
-			
-			DS_PRINTF(3, 2, "WAITING FOR FIRE  ");
-
-			break;
-		}
-
-		case kKickState_PostFirePause:
-		{
-			m_timePostFirePauseCountdown -= m_dT;
-			if (m_timePostFirePauseCountdown <= 0.0f)
-			{
-				m_timePostFirePauseCountdown = 0.0f;
-
-				m_pTriggerCylinder_OUT_Solenoid->Set(false);
-				m_pTriggerCylinder_IN_Solenoid->Set(true);
-
-				const float kPostLatchEngagePauseTime = 0.5f;
-				m_timePostLatchEngagePauseCountdown = kPostLatchEngagePauseTime;
-
-				m_kickerState = kKickState_PostLatchEngagePause;
-			}
-			
-			DS_PRINTF(3, 2, "POST-FIRE PAUSE   ");
-
-			break;
-		}
-		case kKickState_PostLatchEngagePause:
-		{
-			m_timePostLatchEngagePauseCountdown -= m_dT;
-			if (m_timePostLatchEngagePauseCountdown <= 0.0f)
-			{
-				m_timePostLatchEngagePauseCountdown = 0.0f;
-
-				m_kickerState = kKickState_WaitForActive;
-			}
-			
-			DS_PRINTF(3, 2, "POST-LATCH PAUSE  ");
-
-			break;
-		}
-	};
+	const bool bPressed_Trigger = m_joyButtonState.GetState( kB_Trigger );
+	    if (bPressed_Trigger)
+	    {
+	    	m_pTriggerCylinder_IN_Solenoid->Set(1);
+	    	m_pTriggerCylinder_OUT_Solenoid->Set(0);
+	    }
+	    else
+	    {
+	    	m_pTriggerCylinder_IN_Solenoid->Set(0);
+	    	m_pTriggerCylinder_OUT_Solenoid->Set(1);	 
+	    }
 
 
 	if (m_joyButtonState.GetDownStroke( kB_CompressorOn ))
