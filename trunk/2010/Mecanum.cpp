@@ -774,6 +774,8 @@ protected:
 	Solenoid*             m_pMainCylinder_OUT_Solenoid; 
 	Solenoid*             m_pTriggerCylinder_IN_Solenoid; 
 	Solenoid*             m_pTriggerCylinder_OUT_Solenoid; 
+	Solenoid*             m_pTriggerCylinder2_IN_Solenoid; 
+	Solenoid*             m_pTriggerCylinder2_OUT_Solenoid; 
 	Solenoid*             m_pTowerCylinder_OUT_Solenoid;
 	Solenoid*             m_pTowerCylinder_IN_Solenoid;
 	
@@ -1094,6 +1096,8 @@ PrototypeController::PrototypeController(void)
 	m_pTriggerCylinder_OUT_Solenoid = new Solenoid(4);
 	m_pTowerCylinder_OUT_Solenoid   = new Solenoid(5);
 	m_pTowerCylinder_IN_Solenoid    = new Solenoid(6);
+	m_pTriggerCylinder2_IN_Solenoid = new Solenoid(7);
+	m_pTriggerCylinder2_OUT_Solenoid = new Solenoid(8);
 
 	m_pWheelEncoder[kFR] = ParadoxEncoder::NewWheelEncoder(m_pDigInFREncoder_A, m_pDigInFREncoder_B);
 	m_pWheelEncoder[kFL] = ParadoxEncoder::NewWheelEncoder(m_pDigInFLEncoder_A, m_pDigInFLEncoder_B);
@@ -1306,13 +1310,17 @@ void PrototypeController::ProcessKicker(const bool bFire_Kicker)
 	const bool bPressed_Trigger = m_joyButtonState.GetState( kB_Trigger );
 	    if (bPressed_Trigger)
 	    {
-	    	m_pTriggerCylinder_IN_Solenoid->Set(1);
-	    	m_pTriggerCylinder_OUT_Solenoid->Set(0);
+	    	m_pTriggerCylinder_IN_Solenoid->Set(0);
+	    	m_pTriggerCylinder2_IN_Solenoid->Set(0);
+	    	m_pTriggerCylinder_OUT_Solenoid->Set(1);
+	    	m_pTriggerCylinder2_OUT_Solenoid->Set(1);
 	    }
 	    else
 	    {
-	    	m_pTriggerCylinder_IN_Solenoid->Set(0);
-	    	m_pTriggerCylinder_OUT_Solenoid->Set(1);	 
+	    	m_pTriggerCylinder_IN_Solenoid->Set(1);
+	    	m_pTriggerCylinder2_IN_Solenoid->Set(1);
+	    	m_pTriggerCylinder_OUT_Solenoid->Set(0);	
+	    	m_pTriggerCylinder2_OUT_Solenoid->Set(0);
 	    }
 
 
