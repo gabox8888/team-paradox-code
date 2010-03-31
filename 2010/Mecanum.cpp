@@ -973,7 +973,7 @@ PrototypeController::PrototypeController(void)
 	m_dT = 0.0f;
 
 	m_bUseSpeedController = false;
-	m_bUseAbsoluteTowerMotorControl = true;
+	m_bUseAbsoluteTowerMotorControl = false;
 	m_bTowerLiftMotorSystemIsActive = false;
 	m_bTowerPneumaticSystemIsActive = false;
 	m_pCompressorEnabled = true;
