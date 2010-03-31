@@ -24,6 +24,7 @@
 
 
 #define printf(...)
+//#define USE_RAZOR_IMU
 
 #define USE_LOG_FILE
 
@@ -624,6 +625,7 @@ END_REGION;
 
 
 
+#if defined(USE_RAZOR_IMU)
 class Razor9DOF
 {
 protected:
@@ -691,6 +693,7 @@ void Razor9DOF::Read9DOF()
 		m_iTimeout = 0;
 	}
 }
+#endif // #if defined(USE_RAZOR_IMU)
 
 
 
@@ -809,7 +812,9 @@ protected:
 	
 	DriverStation*        m_pDriverStation;           //Driver Station
 	
+	#if defined(USE_RAZOR_IMU)
 	Razor9DOF*            m_pRazor9DOF;
+	#endif
 	
 	// Mecanum drive coefficients...
 	float                 m_coef_X_FR;
@@ -1140,10 +1145,12 @@ PrototypeController::PrototypeController(void)
 	
 	m_pDriverStation = DriverStation::GetInstance();				//Intialize the Driver Station
 
+	#if defined(USE_RAZOR_IMU)
 	m_pRazor9DOF = new Razor9DOF();
 	assert(m_pRazor9DOF);
 	m_pRazor9DOF->Initialize();
-
+	#endif
+	
 	// Initialize the hard defaults for drive system coefficients...
 	m_coef_X_FR = 1.000000;
 	m_coef_Y_FR = -1.000000;
@@ -1598,10 +1605,12 @@ void PrototypeController::ProcessEndOfMainLoop()
 		GetWatchdog().Feed();
 	}
 
+	#if defined(USE_RAZOR_IMU)
 	m_pRazor9DOF->Read9DOF();
 	//printf("RPY: % 05.2f,% 05.2f,% 05.2f\n", m_pRazor9DOF->m_roll*kRadiansToDegrees, m_pRazor9DOF->m_pitch*kRadiansToDegrees, m_pRazor9DOF->m_yaw*kRadiansToDegrees);
-DS_PRINTF(2, 0, "%.2f     ", m_pRazor9DOF->m_yaw*kRadiansToDegrees);
-
+	DS_PRINTF(2, 0, "%.2f     ", m_pRazor9DOF->m_yaw*kRadiansToDegrees);
+	#endif
+	
 	// This is our main loop wait.  Because many of the robot functions are processed via a state machine in the main robot thread, this should
 	// be the only Wait(...) call in the main thread (unless Watchdog is disabled -- in the Calibrate function, for example)...
 	Wait(kMainLoopWaitTime);
@@ -2239,7 +2248,11 @@ void PrototypeController::SendDashboardData()
 			const float pwm = m_pSpeedController[kFR]->GetPWM();
 			// GVV: Hijack the camera tracking dashboard for our own nefarious purposes (to plot out PID loop stuff)...
 			dash_packet_2.AddDouble(pwm); // Joystick X
+			#if defined(USE_RAZOR_IMU)
 			dash_packet_2.AddDouble(m_pRazor9DOF->m_yaw*kRadiansToDegrees); // angle
+			#else
+			dash_packet_2.AddDouble(0.0f); // angle
+			#endif
 			dash_packet_2.AddDouble(3.0); // angular rate
 			dash_packet_2.AddDouble(5.0); // other X
 		}
