@@ -55,7 +55,7 @@ static const float        kPulsesPerRevolution  = 250.0f;
 static const float        kRevolutionsPerPulse  = 1.0f / kPulsesPerRevolution;
 
 // Number of revolutions of the tower gearbox encoder required to reach the point of full tower extension...
-static const float        kTowerExtendedEncoderCount  = -14.6f;
+static const float        kTowerExtendedEncoderCount  = -13.2f;
 static const float        kTowerRetractedEncoderCount = 0.0f;
 static const float        kTowerExtendedDangerCount   = kTowerExtendedEncoderCount  - 0.125f; // allow a small amount of over-drive
 static const float        kTowerRetractedDangerCount  = kTowerRetractedEncoderCount + 0.125f;  // allow a small amount of over-drive
@@ -112,6 +112,21 @@ enum FlightQuadrantButtons
 	kFQB_LeverSwitch_RIGHT,
 };
 
+enum Extreme3DProButtons
+{
+	kLogJOY_Trigger,            // 0
+	kLogJOY_ThumbLowTrigger,    // 1
+	kLogJOY_ThumbBottomLeft,    // 2
+	kLogJOY_ThumbBottomRight,   // 3
+	kLogJOY_ThumbTopLeft,       // 4
+	kLogJOY_ThumbTopRight,      // 5
+	kLogJOY_Button7,            // 6
+	kLogJOY_Button8,            // 7
+	kLogJOY_Button9,            // 8
+	kLogJOY_Button10,           // 9
+	kLogJOY_Button11,           // 10
+	kLogJOY_Button12,           // 11
+};
 
 enum ThrustMasterButtons
 {
@@ -714,9 +729,12 @@ public:
 	enum AutonomousState
 	{
 		kAutoState_Start,
-		kAutoState_AdvanceToBall,
-		kAutoState_WaitForKickerLoaded,
-		kAutoState_PostKickPause,
+		kAutoState_AdvanceTo1stBall,
+		kAutoState_Kick1stBall,
+		kAutoState_AdvanceTo2ndBall,
+		kAutoState_Kick2ndBall,
+		kAutoState_AdvanceTo3rdBall,
+		kAutoState_Kick3rdBall,
 		kAutoState_BackUp,
 		//kAutoState_MoveOutOfTheWay,		
 		kAutoState_SitStillLikeAGoodLittleRobot,
@@ -770,7 +788,7 @@ protected:
 	// Jag controllers for the wheel motors...
 	Jaguar*               m_pWheelJaguar[kNumWheels];
 
-	Victor*               m_pTowerJaguar;
+	Jaguar*               m_pTowerJaguar;
 	Servo*                m_pCameraAzimuthServo;
 	Servo*                m_pCameraTiltServo;
 	Solenoid*             m_pMainCylinder_IN_Solenoid; 
@@ -872,14 +890,7 @@ protected:
 	// true if the compressor is on, false if it's off...
 	bool                  m_pCompressorEnabled;
 	
-	// Kicker action is a finite state machine.  Here are the state machine variables...
-	KickerState           m_kickerState;
-	bool                  m_bKickerSystemIsActive;
-	float                 m_timePostLatchReleasePauseCountdown;
-	float                 m_timePostFirePauseCountdown;
-	float                 m_timePostLatchEngagePauseCountdown;
-	float                 m_kickerSwitchWaitTimeout;
-	float                 m_timeKickerSwitchEngaged;
+	bool				  m_bTowerCylinderExtend;
 	
 	// Autonomous mode is a finite state machine.  Here are the state machine variables...
 	AutonomousState       m_autoState;
@@ -937,7 +948,6 @@ protected:
 	void   SendDashboardData();
 	void   InitializeCamera();
 	void   SetTowerPidControllerEnableState(const bool bEnabled);
-	inline bool IsKickerReadyToFire() const { return (m_kickerState == kKickState_WaitingForFire); }
 	void   MoveSmoothly(float &v, const float target, const float dT);
 
 public:
@@ -950,12 +960,11 @@ const char*    PrototypeController::s_wheelAbbreviations[kNumWheels] = { "FR", "
 void PrototypeController::InitializeCamera()
 {
 	// Create and set up a camera instance
-/*
 	AxisCamera &camera = AxisCamera::GetInstance();
-	camera.WriteResolution(AxisCamera::kResolution_320x240);
+	camera.WriteRotation(AxisCamera::kRotation_180);
+	camera.WriteResolution(AxisCamera::kResolution_160x120); //kResolution_320x240
 	camera.WriteCompression(20);
 	camera.WriteBrightness(0);
-*/
 }
 
 
@@ -982,14 +991,7 @@ PrototypeController::PrototypeController(void)
 	m_bTowerLiftMotorSystemIsActive = false;
 	m_bTowerPneumaticSystemIsActive = false;
 	m_pCompressorEnabled = true;
-	
-	m_kickerState = kKickState_WaitForActive;
-	m_bKickerSystemIsActive = true;
-	m_timePostLatchReleasePauseCountdown = 0.0f;
-	m_timePostFirePauseCountdown = 0.0f;
-	m_timePostLatchEngagePauseCountdown = 0.0f;
-	m_kickerSwitchWaitTimeout = 0.0f;
-	m_timeKickerSwitchEngaged = 0.0f;
+	m_bTowerCylinderExtend=false;
 	
 	m_autoState = kAutoState_Start;
 	m_bProcessingAutonomous = false;
@@ -1074,7 +1076,7 @@ PrototypeController::PrototypeController(void)
 	m_pWheelJaguar[kFL] = new Jaguar(4);           // Front Left drive Motor
 	m_pWheelJaguar[kRR] = new Jaguar(8);           // Rear Right drive Motor
 	m_pWheelJaguar[kRL] = new Jaguar(10);          // Rear Left drive Motor
-	m_pTowerJaguar     = new Victor(3);
+	m_pTowerJaguar     = new Jaguar(3);
 
 	m_pDigInFREncoder_A = new DigitalInput(2);
 	m_pDigInFREncoder_B = new DigitalInput(3);
@@ -1120,8 +1122,8 @@ PrototypeController::PrototypeController(void)
 	m_pSpeedController[kRR] = NewWheelSpeedController(m_pWheelEncoder[kRR], m_pWheelJaguar[kRR]);
 	m_pSpeedController[kRL] = NewWheelSpeedController(m_pWheelEncoder[kRL], m_pWheelJaguar[kRL]);
 
-	const float kTower_P = 0.25f;
-	const float kTower_I = 0.005f;
+	const float kTower_P = 0.35f;
+	const float kTower_I = 0.02f;
 	const float kTower_D = 0.0f;
 	m_pTowerPositionController = new PIDController(kTower_P, kTower_I, kTower_D, m_pTowerEncoder, m_pTowerJaguar);
 	m_pTowerPositionController->SetInputRange(kTowerExtendedEncoderCount, kTowerRetractedEncoderCount); // kTowerExtendedEncoderCount is negative, so make it the minimum.
@@ -1164,7 +1166,7 @@ PrototypeController::PrototypeController(void)
 	m_coef_X_RL = -1.000000;
 	m_coef_Y_RL = 1.000000;
 	m_coef_Z_RL = 1.000000;
-
+	
 	// Hard default for max wheel speed...
 	m_maxWheelRPS = kDefaultMaxWheelSpeed; // RPS
 	SetWheelSpeedLimits(m_maxWheelRPS);
@@ -1313,22 +1315,20 @@ void PrototypeController::ProcessTeleopKicker()
 
 void PrototypeController::ProcessKicker(const bool bFire_Kicker)
 {
-	
-	const bool bPressed_Trigger = m_joyButtonState.GetState( kB_Trigger );
-	    if (bPressed_Trigger)
-	    {
-	    	m_pTriggerCylinder_IN_Solenoid->Set(0);
-	    	m_pTriggerCylinder2_IN_Solenoid->Set(0);
-	    	m_pTriggerCylinder_OUT_Solenoid->Set(1);
-	    	m_pTriggerCylinder2_OUT_Solenoid->Set(1);
-	    }
-	    else
-	    {
-	    	m_pTriggerCylinder_IN_Solenoid->Set(1);
-	    	m_pTriggerCylinder2_IN_Solenoid->Set(1);
-	    	m_pTriggerCylinder_OUT_Solenoid->Set(0);	
-	    	m_pTriggerCylinder2_OUT_Solenoid->Set(0);
-	    }
+    if (bFire_Kicker)
+    {
+    	m_pTriggerCylinder_IN_Solenoid->Set(0);
+    	m_pTriggerCylinder2_IN_Solenoid->Set(0);
+    	m_pTriggerCylinder_OUT_Solenoid->Set(1);
+    	m_pTriggerCylinder2_OUT_Solenoid->Set(1);
+    }
+    else
+    {
+    	m_pTriggerCylinder_IN_Solenoid->Set(1);
+    	m_pTriggerCylinder2_IN_Solenoid->Set(1);
+    	m_pTriggerCylinder_OUT_Solenoid->Set(0);	
+    	m_pTriggerCylinder2_OUT_Solenoid->Set(0);
+    }
 
 
 	if (m_joyButtonState.GetDownStroke( kB_CompressorOn ))
@@ -1450,7 +1450,7 @@ void PrototypeController::ProcessDriveSystem(const float drive_X, const float dr
 	}
 }
 
-void PrototypeController::ProcessCamera()
+/*void PrototypeController::ProcessCamera()
 {
 	float azimuthJoy=m_pGamePad->GetX();
 	float tiltJoy=m_pGamePad->GetY();
@@ -1459,30 +1459,30 @@ void PrototypeController::ProcessCamera()
 	//DS_PRINTF(5, 0, "AZ = %.2f; TI = %f", azimuth, tilt);
 	m_pCameraAzimuthServo->Set(azimuth); 
 	m_pCameraTiltServo->Set(tilt);
-}
+}*/
 
 
 void PrototypeController::ProcessTeleopTower()
 {
-	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T5 ))
+	if (m_flightQuadrantButtonState.GetDownStroke( kLogJOY_Button8 ))
 	{ 
 		m_bTowerLiftMotorSystemIsActive = true;
 	}
-	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T6 ))
+	else if (m_flightQuadrantButtonState.GetDownStroke( kLogJOY_Button10 ))
 	{ 
 		m_bTowerLiftMotorSystemIsActive = false;
 	}
 
-	if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T3 ))
+	if (m_flightQuadrantButtonState.GetDownStroke( kLogJOY_Button7 ))
 	{ 
 		m_bTowerPneumaticSystemIsActive = true;
 	}
-	else if (m_flightQuadrantButtonState.GetDownStroke( kFQB_T4 ))
+	else if (m_flightQuadrantButtonState.GetDownStroke( kLogJOY_Button9 ))
 	{ 
 		m_bTowerPneumaticSystemIsActive = false;
 	}
 
-	if (m_flightQuadrantButtonState.GetLongHoldDown( kFQB_T6 ))
+	if (m_flightQuadrantButtonState.GetLongHoldDown( kLogJOY_Button10 ))
 	{
 		m_bUseAbsoluteTowerMotorControl = false;
 	}
@@ -1498,9 +1498,17 @@ void PrototypeController::ProcessTeleopTower()
 	}
 */
 
-	const bool bTowerCylinderExtend = m_pFlightQuadrant->GetY() < 0.0f;
-	const float towerMotorJoy = m_pFlightQuadrant->GetThrottle();
-	ProcessTower(bTowerCylinderExtend, towerMotorJoy);
+	//const bool bTowerCylinderExtend = m_pFlightQuadrant->GetY() < 0.0f;
+	if (m_flightQuadrantButtonState.GetDownStroke( kLogJOY_ThumbTopLeft ))
+	{ 
+		m_bTowerCylinderExtend = true;
+	}
+	else if (m_flightQuadrantButtonState.GetDownStroke( kLogJOY_ThumbBottomLeft ))
+	{ 
+		m_bTowerCylinderExtend = false;
+	}
+	const float towerMotorJoy = m_pFlightQuadrant->GetY();
+	ProcessTower(m_bTowerCylinderExtend, towerMotorJoy);
 }
 
 
@@ -1547,9 +1555,11 @@ void PrototypeController::ProcessTower(const bool bTowerCylinderExtend, const fl
 		DS_PRINTF(kIDR_0, kDSC_MAN, "MAN" ); // Relative tower control.
 	}
 
+	const float setPoint = (-towerMotorJoy + 1.0f) * 0.5f * (kTowerExtendedEncoderCount - kTowerRetractedEncoderCount) + kTowerRetractedEncoderCount;
 	#define TEST_TOWER_ENCODER
 	#if defined(TEST_TOWER_ENCODER)
 	m_pTowerEncoder->DumpEncoderData(5);
+	DS_PRINTF(4, 0, "SP: %.2f", setPoint );
 	#endif
 	if (bUseAbsTower)
 	{
@@ -1559,11 +1569,7 @@ void PrototypeController::ProcessTower(const bool bTowerCylinderExtend, const fl
 		}
 		else
 		{
-			const float setPoint = (-towerMotorJoy + 1.0f) * 0.5f * (kTowerExtendedEncoderCount - kTowerRetractedEncoderCount) + kTowerRetractedEncoderCount;
 			m_pTowerPositionController->SetSetpoint(setPoint);
-			#if defined(TEST_TOWER_ENCODER)
-			DS_PRINTF(4, 0, "SP: %.2f", setPoint );
-			#endif
 		}
 	}
 	else
@@ -1706,13 +1712,13 @@ void PrototypeController::ProcessAutonomous()
 			m_autoTarget_Y = kForwardBackwardPower;
 			m_autoTarget_Z = 0.0f;
 			// Gabe: let's test one ball first, then try for more
-	        m_numberofballs = 1; // m_pDriverStation->GetLocation();
+	        m_numberofballs = 3; // m_pDriverStation->GetLocation();
 			m_driveTimer = kForwardBackwardTime; // DRIVE_TIME Gabe, I shortened this time since the robot moves much further in forward/reverse than mecanum.
-			m_autoState = kAutoState_AdvanceToBall;
+			m_autoState = kAutoState_AdvanceTo1stBall;
 			break;
 		}
 
-		case kAutoState_AdvanceToBall:
+		case kAutoState_AdvanceTo1stBall:
 		{
 			DS_PRINTF(kIDR_0, kDSC_MOD, "ADV" );
 			if (m_driveTimer <= 0)
@@ -1720,33 +1726,83 @@ void PrototypeController::ProcessAutonomous()
 				m_autoTarget_X = 0.0f;
 				m_autoTarget_Y = 0.0f;
 				m_autoTarget_Z = 0.0f;
-				m_autoState = kAutoState_WaitForKickerLoaded;
+				m_driveTimer = 0.8f; // DRIVE_TIME actually not driving now, just pausing for a moment to wait for the kick action to complete. 
+				m_autoState = kAutoState_Kick1stBall;
 			}
 			break;
 		}
 
-		case kAutoState_WaitForKickerLoaded:
+		case kAutoState_Kick1stBall:
 		{
 			DS_PRINTF(kIDR_0, kDSC_MOD, "KIK" );
-			if (IsKickerReadyToFire())
+			bFire_Kicker = true;
+			if (m_driveTimer <= 0)
 			{
-				bFire_Kicker = true;
-				m_driveTimer = 0.5f; // DRIVE_TIME actually not driving now, just pausing for a moment after the kick to ensure that the ball is clear. 
+				m_autoTarget_X = 0.0f;
+				m_autoTarget_Y = kForwardBackwardPower;
+				m_autoTarget_Z = 0.0f;
+				m_driveTimer = 1.0f; // DRIVE_TIME
 				m_numberofballs -= 1; // just kicked a ball (we hope) so decrement ball count.
-				m_autoState = kAutoState_PostKickPause;
+				m_autoState = kAutoState_AdvanceTo2ndBall;
+			}
+			break;
+		}
+		
+		case kAutoState_AdvanceTo2ndBall:
+		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "ADV" );
+			if (m_driveTimer <= 0)
+			{
+				m_autoTarget_X = 0.0f;
+				m_autoTarget_Y = 0.0f;
+				m_autoTarget_Z = 0.0f;
+				m_driveTimer = 1.5f; // DRIVE_TIME actually not driving now, just pausing for a moment to wait for the kick action to complete. 
+				m_autoState = kAutoState_Kick2ndBall;
 			}
 			break;
 		}
 
-		case kAutoState_PostKickPause:
+		case kAutoState_Kick2ndBall:
 		{
-			DS_PRINTF(kIDR_0, kDSC_MOD, "PKP" );
+			DS_PRINTF(kIDR_0, kDSC_MOD, "KIK" );
+			bFire_Kicker = true;
+			if (m_driveTimer <= 0)
+			{
+				m_autoTarget_X = 0.0f;
+				m_autoTarget_Y = kForwardBackwardPower;
+				m_autoTarget_Z = 0.0f;
+				m_driveTimer = 1.0f; // DRIVE_TIME
+				m_numberofballs -= 1; // just kicked a ball (we hope) so decrement ball count.
+				m_autoState = kAutoState_AdvanceTo3rdBall;
+			}
+			break;
+		}
+		
+		case kAutoState_AdvanceTo3rdBall:
+		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "ADV" );
+			if (m_driveTimer <= 0)
+			{
+				m_autoTarget_X = 0.0f;
+				m_autoTarget_Y = 0.0f;
+				m_autoTarget_Z = 0.0f;
+				m_driveTimer = 1.0f; // DRIVE_TIME actually not driving now, just pausing for a moment to wait for the kick action to complete. 
+				m_autoState = kAutoState_Kick3rdBall;
+			}
+			break;
+		}
+
+		case kAutoState_Kick3rdBall:
+		{
+			DS_PRINTF(kIDR_0, kDSC_MOD, "KIK" );
+			bFire_Kicker = true;
 			if (m_driveTimer <= 0)
 			{
 				m_autoTarget_X = 0.0f;
 				m_autoTarget_Y = -kForwardBackwardPower;
 				m_autoTarget_Z = 0.0f;
 				m_driveTimer = kForwardBackwardTime; // DRIVE_TIME
+				m_numberofballs -= 1; // just kicked a ball (we hope) so decrement ball count.
 				m_autoState = kAutoState_BackUp;
 			}
 			break;
@@ -1861,7 +1917,7 @@ void PrototypeController::ProcessOperated()
 	ProcessTeleopDriveSystem();
 	ProcessTeleopKicker();
 	ProcessTeleopTower();
-	ProcessCamera();
+	//ProcessCamera();
 
 	// Check if driver requesting save of coefficients...
 	if ( m_joyButtonState.GetLongHoldDown( kB_LoadDriveCoefficients ) )
