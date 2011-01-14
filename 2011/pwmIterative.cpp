@@ -2,32 +2,44 @@
 
 class ParadoxIterative : public IterativeRobot
 {
-	RobotDrive myRobot;
-	Joystick stickL;
-	Joystick stickR;
+	Jaguar jagL;
+	Jaguar jagR;
+	Joystick gpad;
 
 public:
 	ParadoxIterative(void):
-		myRobot(1, 2),
-		stickL(1),
-		stickR(2)
+		jagL(1),
+		jagR(2),
+		gpad(1)
 	{
-		myRobot.SetExpiration(0.1);
+		jagL.SetExpiration(0.1);
+		jagR.SetExpiration(0.1);
+	}
+	
+	void DisabledInit(void)
+	{
+		jagL.Set(0.0);
+		jagR.Set(0.0);
+		jagL.SetSafetyEnabled(false);
+		jagR.SetSafetyEnabled(false);
 	}
 	
 	void AutonomousContinuous(void)
 	{
-		myRobot.TankDrive(0.0, 0.0);
+		jagL.Set(0.0);
+		jagR.Set(0.0);
 	}
-
+	
 	void TeleopInit(void)
 	{
-		myRobot.SetSafetyEnabled(true);
+		jagL.SetSafetyEnabled(true);
+		jagR.SetSafetyEnabled(true);
 	}
 	
 	void TeleopContinuous(void)
 	{
-		myRobot.TankDrive(stickL.GetY(), stickR.GetY());
+		jagL.Set(-1*(gpad.GetTwist()));
+		jagR.Set(gpad.GetY());
 	}
 };
 
