@@ -9,6 +9,7 @@
  */ 
 class RobotDemo : public SimpleRobot
 {
+		Accelerometer *acc;
         DigitalInput *left;
         DigitalInput *middle;
         DigitalInput *right;
@@ -16,12 +17,12 @@ class RobotDemo : public SimpleRobot
         //Arm         *Arm;
         RobotDrive *myRobot; // robot drive system
         Joystick *stickL; // only joystick
-        Joystick *stickR; // only joystick
 
 
 public:
         RobotDemo() 
         {
+        		acc 	= new Accelerometer(1);
                 left    = new DigitalInput(1);
                 middle  = new DigitalInput(2);
                 right   = new DigitalInput(3);
@@ -41,64 +42,97 @@ public:
         {
         		myRobot->SetSafetyEnabled(false);
                 Timer *timer = new Timer();
+                float x;
+                int c;
+                int g;
+                //float distance;
+                //float velocity = acc->GetAcceleration();
                 timer->Start();
                 timer->Reset();
-                bool toggleValue = toggle->Get()?1:0;
+                
+                //distance=velcity*timer;//141
 
-                while (1)
+                while (timer->Get() < 5.5)
                 {
                 	bool leftValue = left->Get()?1:0 ;      // read the line tracking sensors
                 	bool middleValue = middle->Get()?1:0 ;
                 	bool rightValue = right->Get()?1:0 ;
-                	int  total = (leftValue * 4 + middleValue * 2 + rightValue);
+                	int  total = leftValue * 4 + middleValue * 2 + rightValue;
                 	float turn;
                 	float speed;
+                	
+                	if(timer->Get()== 4.2)
+                	{
+                		bool toggleValue = toggle->Get()?1:0;
+                		if (toggleValue==1)
+                		{
+                		   speed = -0.3;
+                		   turn = -1.0;
+                		   myRobot->Drive(-0.5,0.0);
+                		   Wait(0.8);
+                		   myRobot->Drive(-0.5,1.0);
+                		   Wait (0.8);
+                	}
+                	else
+                	{
+                			speed = -0.3;
+                		    turn = 1.0;
+                		    myRobot->Drive(-0.5,0.0);
+                		    Wait(0.8);
+                	}
+                	}
                
                 	switch (total)
                 	{
                 	   		case 7:
-                	   				turn = 0;
-                	   				speed = 0;
+                	   				g++;
+                	   				if (c>6) speed = 0;
+                	   				{turn = x+0.02;
+                	   				speed = 0.3;}
                 	   				break;
                 	   		case 6:
-                	   				speed = -0.125;
-                    	   			turn = -0.6;
+                	   				speed = -0.3;
+                    	   			turn = -1.0;
                     	   			break;
                 	   		case 5:
-                	   				speed = -0.125;
+                	   				speed = -0.3;
                 	   		        turn = 0.0;
+                	   		        c=0;
                 	   		        break;
                 	   		case 4:
-                	   				speed = -0.125;
-                    	   			turn = 0.5;
+                	   				speed = -0.3;
+                    	   			turn = 1.0;
                     	   			break; 
                 	   		case 3:
-                	   				speed = -0.125;
-                    	   			turn = 0.6;
+                	   				speed = -0.3;
+                    	   			turn = 1.0;
                     	   			break;
                 	   		case 2:
+                	   			bool toggleValue = toggle->Get()?1:0;
                 	   			if (toggleValue==1)
                 	   			{
-                	   				myRobot->Drive(0.0,0.0);
-                	   				Wait(0.15);
-                	   				speed = -0.12;
-                	   				turn = -0.5;
+                	   				speed = -0.3;
+                	   				turn = -1.0;
+                	   				myRobot->Drive(0.5,0.0);
+                	   				Wait(0.3);
                 	   			}
-                	   			if (toggleValue==0)
+                	   			else
                 	   			{
-                	   				myRobot->Drive(0.0,0.0);
-                	   				Wait(0.15);
-                	   				speed = -0.12;
-                	   				turn = 0.5;
+                	   				speed = -0.3;
+                	   				turn = 1.0;
+                	   				myRobot->Drive(0.5,0.0);
+                	   				Wait(0.3);
                 	   			}
                 	   				break;
                 	   		case 1:
-                	   				speed = -0.12;
-                	   				turn = 0.5;
+                	   				speed = -0.3;
+                	   				turn = 1.0;
                 	   				break;
                 	   		default:
-                	   				speed = -0.12;
+                	   				c++;
+                	   				speed = -0.3;
                 	   				turn = 0.0;
+                	   				if (c>4) speed = 0;
                 	   				break;
                 	   		//case 7:
                 	   				//turn = 0;
@@ -106,8 +140,11 @@ public:
                         
                 	}
                 myRobot->Drive(speed,turn);
-                Wait (0.25);
+             //   Wait (0.01);
+             //   if (turn == 1.0 || turn == -1.0) Wait(0.55);
+                x=turn;
                 }
+                myRobot->Drive(0.0,0.0);
          }
 
         /**o
@@ -115,15 +152,11 @@ public:
          */
         void OperatorControl(void)
         {
-                myRobot->SetSafetyEnabled(true);
+                myRobot->SetSafetyEnabled(false);
                 while (IsOperatorControl())
                 {
                         
-                        float coefL = -1.0;
-                        float coefR = -1.0;
-                        if (stickL->GetTrigger()) coefL = -1.0;
-                        if (stickR->GetTrigger()) coefR = -1.0;
-                        myRobot->TankDrive(coefL*(stickL->GetTwist()),coefR*(stickL->GetY())); // drive with arcade style (use right stick)
+                        myRobot->TankDrive(stickL->GetTwist(),stickL->GetY()); // drive with arcade style (use right stick)
                         Wait(0.005);                            // wait for a motor update time
                         
                 }
