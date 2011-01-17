@@ -1,155 +1,135 @@
 #include "WPILib.h"
 //#include "Arm.h"
+//#include "LineTracking.h"
 
-/**
- * This is a demo program showing the use of the RobotBase class.
- * The SimpleRobot class is the base of a robot application that will automatically call your
- * Autonomous and OperatorControl methods at the right time as controlled by the switches on
- * the driver station or the field controls.
- */ 
 class RobotDemo : public SimpleRobot
 {
-		Accelerometer *acc;
-        DigitalInput *left;
-        DigitalInput *middle;
-        DigitalInput *right;
-        DigitalInput *toggle;
+		Gyro		 *gyro;
+		DigitalInput *left;
+		DigitalInput *middle;
+		DigitalInput *right;
+		DigitalInput  *toggle;
+		//LineTracking *myTracker;
         //Arm         *Arm;
-        RobotDrive *myRobot; // robot drive system
-        Joystick *stickL; // only joystick
+        RobotDrive 	*myRobot; // robot drive system
+        Joystick 	*stickL; // only joystick
+        
+        float GyDrift;
+        float GyCorrected;
+        	
 
 
 public:
         RobotDemo() 
         {
-        		acc 	= new Accelerometer(1);
-                left    = new DigitalInput(1);
-                middle  = new DigitalInput(2);
-                right   = new DigitalInput(3);
-                toggle  = new DigitalInput(8);
-                myRobot = new RobotDrive(1, 2); // these must be initialized in the same order
-                stickL  = new Joystick(1);             // as they are declared above.
-                //stickR (2)
+        		gyro		= new Gyro 		   (1);
+        		left 		= new DigitalInput (1);
+        		middle 		= new DigitalInput (2);
+        		right 		= new DigitalInput (3);
+        		toggle		= new DigitalInput (8);
+        		//myTracker	= new LineTracking(1,2,3); 
+                myRobot 	= new RobotDrive(1, 2); // these must be initialized in the same order
+                stickL  	= new Joystick(1);             // as they are declared above.
+               
         }
-        //{
-                //myRobot.SetExpiration(0.1);
-        //}
-
-        /**
-         * Drive left & right motors for 2 seconds then stop
-         */
         void Autonomous(void)
         {
-        		myRobot->SetSafetyEnabled(false);
-                Timer *timer = new Timer();
-                float x;
-                int c;
-                int g;
-                //float distance;
-                //float velocity = acc->GetAcceleration();
-                timer->Start();
-                timer->Reset();
-                
-                //distance=velcity*timer;//141
-
-                while (timer->Get() < 5.5)
+        	Timer *timer = new Timer();
+        	timer->Start();
+        	timer->Reset();
+        	gyro->Reset();
+        	GyDrift = 0.0;
+        	Wait(1.0);
+        	GyDrift = gyro->GetAngle();
+        	GyCorrected -= GyDrift;
+        	gyro->Reset();
+        	float x;
+        			
+        	while(timer->Get() < 10.0)
+        	{
+        			int c;
+        			int g;
+        			bool leftValue = left->Get()?1:0 ;      // read the line tracking sensors
+        			bool middleValue = middle->Get()?1:0 ;
+        			bool rightValue = right->Get()?1:0 ;
+        			int  total = leftValue * 4 + middleValue * 2 + rightValue;
+        			float turn;
+        			float speed;
+        			float GyDrift;
+        			float GyCorrected;
+        			GyCorrected = gyro->GetAngle() - (0.01 * GyDrift);
+        			
+        			if (timer->Get() == 3.2)
+        			{
+        				bool toggleValue = toggle->Get()?1:0;
+        				if (toggleValue == 1) 
+        				{
+        					while (GyCorrected != -18)
+        					{
+        						myRobot->Drive(-0.5,-0.3);
+        						Wait (0.5);
+        					}
+        				}
+        				else
+        				{
+        					while (GyCorrected != 18)
+        					{
+        						myRobot->Drive(-0.5,0.3);
+        						Wait (0.5);
+        					}
+        				}
+        			}
+        			
+        			switch (total)
+        			{
+        			case 7:
+        				g++;
+        				if (g>10) speed = 0;
+        				{
+        					turn = x+0.02;
+        					speed = 0.3;
+        				}
+        				break;
+        			case 6:
+        				speed = -0.3;
+        				turn = -1.0;
+        				break;
+        			case 5:
+        				speed = -0.3;
+        				turn = 0.0;
+        				c=0;
+        				break;
+        			case 4:
+        				speed = -0.3;
+        				turn = 1.0;
+        				break; 
+        			case 3:
+        				speed = -0.3;
+        				turn = 1.0;
+        				break;
+        			case 1:
+        				speed = -0.3;
+        				turn = 1.0;
+        				break;
+        			default:
+        				c++;
+        				speed = -0.3;
+        				turn = 0.0;
+        				if (c>4) speed = 0;
+        				break;		                        
+        			}
+        			x=turn;
+        			myRobot->Drive(speed,turn);
+        	}
+        	myRobot->Drive(0.0,0.0);
+                while (GyCorrected=!0.0)
                 {
-                	bool leftValue = left->Get()?1:0 ;      // read the line tracking sensors
-                	bool middleValue = middle->Get()?1:0 ;
-                	bool rightValue = right->Get()?1:0 ;
-                	int  total = leftValue * 4 + middleValue * 2 + rightValue;
-                	float turn;
-                	float speed;
+                	if (GyCorrected > 0) myRobot->Drive(0.0,0.3);
+                	if (GyCorrected < 0) myRobot->Drive(0.0,-0.3);
+                	GyCorrected = gyro->GetAngle() - (.01* GyDrift);
                 	
-                	if(timer->Get()== 4.2)
-                	{
-                		bool toggleValue = toggle->Get()?1:0;
-                		if (toggleValue==1)
-                		{
-                		   speed = -0.3;
-                		   turn = -1.0;
-                		   myRobot->Drive(-0.5,0.0);
-                		   Wait(0.8);
-                		   myRobot->Drive(-0.5,1.0);
-                		   Wait (0.8);
-                	}
-                	else
-                	{
-                			speed = -0.3;
-                		    turn = 1.0;
-                		    myRobot->Drive(-0.5,0.0);
-                		    Wait(0.8);
-                	}
-                	}
-               
-                	switch (total)
-                	{
-                	   		case 7:
-                	   				g++;
-                	   				if (c>6) speed = 0;
-                	   				{turn = x+0.02;
-                	   				speed = 0.3;}
-                	   				break;
-                	   		case 6:
-                	   				speed = -0.3;
-                    	   			turn = -1.0;
-                    	   			break;
-                	   		case 5:
-                	   				speed = -0.3;
-                	   		        turn = 0.0;
-                	   		        c=0;
-                	   		        break;
-                	   		case 4:
-                	   				speed = -0.3;
-                    	   			turn = 1.0;
-                    	   			break; 
-                	   		case 3:
-                	   				speed = -0.3;
-                    	   			turn = 1.0;
-                    	   			break;
-                	   		case 2:
-                	   			bool toggleValue = toggle->Get()?1:0;
-                	   			if (toggleValue==1)
-                	   			{
-                	   				speed = -0.3;
-                	   				turn = -1.0;
-                	   				myRobot->Drive(0.5,0.0);
-                	   				Wait(0.3);
-                	   			}
-                	   			else
-                	   			{
-                	   				speed = -0.3;
-                	   				turn = 1.0;
-                	   				myRobot->Drive(0.5,0.0);
-                	   				Wait(0.3);
-                	   			}
-                	   				break;
-                	   		case 1:
-                	   				speed = -0.3;
-                	   				turn = 1.0;
-                	   				break;
-                	   		default:
-                	   				c++;
-                	   				speed = -0.3;
-                	   				turn = 0.0;
-                	   				if (c>4) speed = 0;
-                	   				break;
-                	   		//case 7:
-                	   				//turn = 0;
-                	   				//break;
-                        
-                	}
-                myRobot->Drive(speed,turn);
-             //   Wait (0.01);
-             //   if (turn == 1.0 || turn == -1.0) Wait(0.55);
-                x=turn;
-                }
-                myRobot->Drive(0.0,0.0);
-         }
-
-        /**o
-         * Runs the motors with arcade steering. 
-         */
+         		}
+        }
         void OperatorControl(void)
         {
                 myRobot->SetSafetyEnabled(false);
@@ -163,5 +143,4 @@ public:
         }
 };
 
-START_ROBOT_CLASS(RobotDemo)
-;
+START_ROBOT_CLASS(RobotDemo);
