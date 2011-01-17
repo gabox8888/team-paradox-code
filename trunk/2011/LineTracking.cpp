@@ -9,7 +9,7 @@ LineTracking::LineTracking(UINT32 Lsensor, UINT32 Msensor, UINT32 Rsensor)
 	right 	= new DigitalInput (DigitalInput::CheckDigitalModule(Rsensor),DigitalInput::CheckDigitalChannel(Rsensor));
 }
 
-float LineTracking::GetSpeed(void) //http://www.watchsmallvilleonline.com/episode-19-blank/
+float LineTracking::GetSpeed() //http://www.watchsmallvilleonline.com/episode-19-blank/
 {
 	float x;
 	int c;
@@ -62,7 +62,7 @@ float LineTracking::GetSpeed(void) //http://www.watchsmallvilleonline.com/episod
 	return speed;
 }
 
-float LineTracking::GetTurn(void)
+float LineTracking::GetTurn()
 {
 	float x;
 	int c;
