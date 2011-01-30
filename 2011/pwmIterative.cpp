@@ -2,31 +2,23 @@
 
 class ParadoxIterative : public IterativeRobot
 {
-	Jaguar jagL;
-	Jaguar jagR;
-	Joystick gpad;
+	RobotDrive drive;
+	Joystick stick;
 	Gyro gyro;
-	DigitalInput lightL;
-	DigitalInput lightC;
-	DigitalInput lightR;
-	DigitalInput LorR;
+	Encoder encoder;
+	DriverStationLCD *ds;
 	
 public:
 	ParadoxIterative(void):
-		jagL(1),
-		jagR(2),
-		gpad(1),
+		//drive(1,2,3,5),
+		drive(7,10,9,8),
+		stick(1),
 		gyro(1),
-		lightL(1),
-		lightC(2),
-		lightR(3),
-		LorR(8)
+		encoder(5,4)
 	{
+		ds = DriverStationLCD::GetInstance();
 		SetPeriod(0.01);
-		jagL.SetExpiration(0.1);
-		jagR.SetExpiration(0.1);
-		jagL.SetSafetyEnabled(false);
-		jagR.SetSafetyEnabled(false);
+		drive.SetSafetyEnabled(false);
 	}
 	
 	float GyDrift;
@@ -34,69 +26,10 @@ public:
 	
 	void DisabledInit(void)
 	{
-		jagL.Set(0.0);
-		jagR.Set(0.0);
+		drive.Drive(0.0,0.0);
 	}
-	
-	void AutonomousContinuous(void)
-	{
-		int Lsees = (lightL.Get()) ? 0 : 100;
-		int Csees = (lightL.Get()) ? 0 : 010;
-		int Rsees = (lightL.Get()) ? 0 : 001;
-		int lineState = Lsees + Csees + Rsees;
-		
-		switch (lineState)
-		{
-			case 010:
-				jagL.Set(0.4);
-				jagR.Set(0.4);
-				break;
-			case 110:
-				jagL.Set(0.0);
-				jagR.Set(0.4);
-				break;
-			case 100:
-				jagL.Set(-0.4);
-				jagR.Set(0.4);
-				break;
-			case 011:
-				jagL.Set(0.4);
-				jagR.Set(0.0);
-				break;
-			case 001:
-				jagL.Set(0.4);
-				jagR.Set(-0.4);
-				break;
-			case 101:
-				gyro.Reset();
-				GyCorrected = 0.0 - GyDrift;
-				if(LorR.Get()==1)
-				{
-					while(GyCorrected < 18.0)
-					{
-						jagL.Set(0.4);
-						jagR.Set(0.0);
-					}
-				}
-				else
-				{
-					while(GyCorrected > -18.0)
-					{
-						jagL.Set(0.0);
-						jagR.Set(0.4);
-					}
-				}
-				jagL.Set(0.4);
-				jagR.Set(0.4);
-				Wait(0.5);
-			default:
-				jagL.Set(-0.2);
-				jagR.Set(-0.2);
-				break;
-		}
-	}
-	
-	void AutonomousInit(void)
+/*	
+	void TeleopInit(void)
 	{
 		gyro.Reset();
 		GyDrift = 0.0;
@@ -106,16 +39,30 @@ public:
 		gyro.Reset();
 	}
 	
-	void AutonomousPeriodic(void)
+	void TeleopPeriodic(void)
 	{
 		GyCorrected = gyro.GetAngle() - (GetPeriod() * GyDrift);
+	}
+*/	
+	
+	void TeleopInit(void)
+	{
+		encoder.Start();
 	}
 	
 	void TeleopContinuous(void)
 	{
-		jagL.Set(0.01*(GyCorrected));
-		//jagL.Set(gpad.GetY());
-		//jagR.Set(-1*gpad.GetTwist());
+		/*float right;
+		float left;
+		if(stick.GetRawButton(8)) right=1;
+		if(stick.GetRawButton(7)) left=1;
+		if(stick.GetRawButton(6)) right=-1;
+		if(stick.GetRawButton(5)) left=-1;
+		drive.TankDrive(left,right);*/
+		//drive.TankDrive(stick.GetTwist(),stick.GetY());
+		ds->Printf(DriverStationLCD::kUser_Line1, 1, "Encoder: %08d", encoder.GetRaw());
+		ds->UpdateLCD();
+		Wait(0.05);
 	}
 };
 
