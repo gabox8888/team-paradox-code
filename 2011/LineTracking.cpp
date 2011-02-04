@@ -4,9 +4,9 @@
 
 LineTracking::LineTracking(UINT32 Lsensor, UINT32 Msensor, UINT32 Rsensor)
 {
-	left 	= new DigitalInput (DigitalInput::CheckDigitalModule(Lsensor),DigitalInput::CheckDigitalChannel(Lsensor));
-	middle 	= new DigitalInput (DigitalInput::CheckDigitalModule(Msensor),DigitalInput::CheckDigitalChannel(Msensor));
-	right 	= new DigitalInput (DigitalInput::CheckDigitalModule(Rsensor),DigitalInput::CheckDigitalChannel(Rsensor));
+	left 	= new DigitalInput (DigitalInput::CheckDigitalChannel(Lsensor));
+	middle 	= new DigitalInput (DigitalInput::CheckDigitalChannel(Msensor));
+	right 	= new DigitalInput (DigitalInput::CheckDigitalChannel(Rsensor));
 }
 
 float LineTracking::GetSpeed() //http://www.watchsmallvilleonline.com/episode-19-blank/
