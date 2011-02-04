@@ -7,8 +7,9 @@ class Arm
 {
 public:
 	Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvictor, UINT32 enco_a, UINT32 enco_b, UINT32 solen_close, UINT32 solen_open, UINT32 limit);
-	virtual ~Arm();
+	~Arm();
 	
+	void Set(float);
 	void SetPosition(UINT32 level);
 	void Hand(bool wantopen);
 	

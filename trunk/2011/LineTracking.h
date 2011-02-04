@@ -11,7 +11,7 @@ class LineTracking
 {
 public:
 	LineTracking(UINT32 Lsensor, UINT32 Msensor, UINT32 Rsensor);
-	virtual ~LineTracking();
+	~LineTracking();
 
 	float GetSpeed();
 	float GetTurn();

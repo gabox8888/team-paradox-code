@@ -13,6 +13,24 @@ Arm::Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvi
 	limitswitch	= new DigitalInput(limit);
 }
 
+void Arm::Set(float arm)
+{
+	if (arm==1)
+	{
+		green->Set(1);
+		blue ->Set(1);
+		red->Set(1);
+		black->Set(1);
+	}
+	if (arm==-1)
+	{
+		green->Set(-1);
+		blue ->Set(-1);
+		red->Set(-1);
+		black->Set(-1);
+	}
+}
+
 void Arm::SetPosition(UINT32 level)
 {
 	int setpoint;
