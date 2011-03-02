@@ -1,73 +1,113 @@
 #include "WPILib.h"
 #include "Arm.h"
 
-Arm::Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvictor, UINT32 enco_a, UINT32 enco_b, UINT32 solen_close, UINT32 solen_open, UINT32 limit)
+const float kTower_P = 2.0f;
+const float kTower_I = 0.0f;
+const float kTower_D = 0.0f;
+
+Arm::Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvictor, UINT32 pot, UINT32 solen_close, UINT32 solen_open, UINT32 limit)
 {
 	green		= new Victor(greenvictor);
 	blue		= new Victor(bluevictor);
 	red			= new Victor(redvictor);
 	black		= new Victor(blackvictor);
-	encoder		= new Encoder(enco_a, enco_b);
+	POT			= new ParadoxAnalogChannel(pot);
 	close		= new Solenoid(solen_close);
 	open		= new Solenoid(solen_open);
 	limitswitch	= new DigitalInput(limit);
+
+	m_pPidController = new PIDController(0.0f, 0.0f, 0.0f, POT, this);
+	m_pPidController->Enable();
+	m_pPidController->SetInputRange(kArmPOT_Min, kArmPOT_Max); // kTowerExtendedEncoderCount is negative, so make it the minimum.
 }
 
-void Arm::Set(float arm)
+void Arm::PIDWrite(float output)
 {
-	if (arm==1)
+	if (limitswitch->Get() == 0)
 	{
-		green->Set(1);
-		blue ->Set(1);
-		red->Set(1);
-		black->Set(1);
+		if (output > 0.0f)
+		{
+			output = 0.0f;
+		}
 	}
-	if (arm==-1)
-	{
-		green->Set(-1);
-		blue ->Set(-1);
-		red->Set(-1);
-		black->Set(-1);
-	}
+	green->PIDWrite(output);
+	blue->PIDWrite(output);
+	red->PIDWrite(output);
+	black->PIDWrite(output);
 }
 
-void Arm::SetPosition(UINT32 level)
+ void Arm::Set(float arm)
 {
-	int setpoint;
-	if (level==1) setpoint = 100;
-	if (level==2) setpoint = 120;
-	if (level==3) setpoint = 200;
-	if (level==4) setpoint = 220;
-	if (level==5) setpoint = 300;
-	if (level==6) setpoint = 330;
-	if (level==0) setpoint = 0;
-	
-	if (encoder->GetRaw() > setpoint)
+	if (limitswitch->Get() == 1)
 	{
-		green->Set(-0.3);
-		blue->Set(-0.3);
-		red->Set(0.3);
-		black->Set(0.3);
-	}
-	else if (encoder->GetRaw() < setpoint)
-	{
-		green->Set(0.3);
-		blue->Set(0.3);
-		red->Set(-0.3);
-		black->Set(-0.3);
+		green->Set(arm);
+		blue ->Set(arm);
+		red->Set(arm);
+		black->Set(arm);
 	}
 	else
+	{
+		if (arm < 0)
+		{
+			green->Set(arm);
+			blue ->Set(arm);
+			red->Set(arm);
+			black->Set(arm);
+		}
+		else
+		{
+			green->Set(0.0);
+			blue ->Set(0.0);
+			red->Set(0.0);
+			black->Set(0.0);
+		}
+	}
+}
+
+
+void Arm::SetPosition(float pot_pos, float sens)
+{
+	if (sens < 0.001f)
+	{
+		m_pPidController->Reset();
+		m_pPidController->Enable();
+	}
+	m_pPidController->SetPID((kTower_P * sens),(kTower_I * sens),(kTower_D * sens));
+	m_pPidController->SetSetpoint(pot_pos);
+/*
+	float mindead = pot_pos - 0.05;
+	float maxdead = pot_pos + 0.05;
+	if (POT->GetVoltage() > maxdead)
+	{
+		green->Set(-0.5*sensitivity);
+		blue->Set(-0.5*sensitivity);
+		red->Set(-0.5*sensitivity);
+		black->Set(-0.5*sensitivity);
+	}
+	if ((POT->GetVoltage() < mindead) && (limitswitch->Get() == 1.0))
+	{
+		green->Set(0.5*sensitivity);
+		blue->Set(0.5*sensitivity);
+		red->Set(0.5*sensitivity);
+		black->Set(0.5*sensitivity);
+	}
+	if ((POT->GetVoltage() > mindead) && (POT->GetVoltage() < maxdead))
 	{
 		green->Set(0.0);
 		blue->Set(0.0);
 		red->Set(0.0);
 		black->Set(0.0);
 	}
-	if (limitswitch->Get() == 1) encoder->Reset();
+*/
 }
 
 void Arm::Hand(bool wantopen)
 {
 	close->Set(!wantopen);
 	open->Set(wantopen);
+}
+
+UINT32 Arm::GetLimitSwitch()
+{
+	return limitswitch->Get();
 }

@@ -3,22 +3,46 @@
 
 #include "WPILib.h"
 
-class Arm
+static const float kArmPOT_Min = 2.52f;
+static const float kArmPOT_Max = 3.8f;
+
+class ParadoxAnalogChannel : public AnalogChannel
 {
 public:
-	Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvictor, UINT32 enco_a, UINT32 enco_b, UINT32 solen_close, UINT32 solen_open, UINT32 limit);
-	~Arm();
+	explicit ParadoxAnalogChannel(UINT32 channel) : AnalogChannel(channel) { }
+
+	virtual double PIDGet()
+	{
+		return GetVoltage();
+	}
+};
+
+
+class Arm : public PIDOutput
+{
+public:
+	Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvictor, UINT32 pot, UINT32 solen_close, UINT32 solen_open, UINT32 limit);
+	virtual ~Arm() {}
 	
 	void Set(float);
-	void SetPosition(UINT32 level);
+	void SetPosition(float pot_pos, float sensitivity);
 	void Hand(bool wantopen);
+	void PIDWrite(float output);
+	ParadoxAnalogChannel* GetPot() const { return POT; }
+	
+	UINT32 GetLimitSwitch();
+	
+public:
+	PIDController* m_pPidController;
 	
 protected:
+
+
 	Victor *green;
 	Victor *blue;
 	Victor *red;
 	Victor *black;
-	Encoder *encoder;
+	ParadoxAnalogChannel *POT;
 	Solenoid *close;
 	Solenoid *open;
 	DigitalInput *limitswitch;
