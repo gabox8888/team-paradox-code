@@ -29,6 +29,7 @@ class RobotDemo : public IterativeRobot
         UINT32 AutoState;
         UINT32 handstate;
         bool handisclosed;
+        int ch0;
 
 public:
         RobotDemo() 
@@ -51,6 +52,7 @@ public:
                 ds			= DriverStationLCD::GetInstance();
                 timer		= new Timer();
         		
+                ch0=0;
                 AutoState=1;
                 sonar->SetAutomaticMode(1);
                 myRobot->SetSafetyEnabled(false);
@@ -151,7 +153,9 @@ public:
        			x=turn;
        			myRobot->Drive(speed,turn);
         	}
-        	AutoState=6;
+        	ch0++;
+        	if (ch0==1)AutoState=6;
+        	if (ch0==2)AutoState=3;
     		}
     		if (AutoState=6)
     		{
@@ -161,9 +165,15 @@ public:
     		}
     		if (AutoState=7)
     		{
-    			myRobot->Drive(1.0,0.0);
-    			Wait (5);
+    			myRobot->Drive(1.0,1.0);
+    			if (timer->Get() > 5)
+    			{
+        			timer->Reset();
+        			ParadoxArm->Hand(1);
+        			AutoState=5;
     		}
+    		
+}
         	/*else
         	{
         		if (distance > distance2) myRobot->Drive(0.5,1.0);
@@ -241,6 +251,62 @@ public:
             if (stickL->GetRawButton(2))MiniIn->Set(0);
             if (stickL->GetRawButton(6))MiniOut->Set(0);
             if (stickL->GetRawButton(6))MiniIn->Set(1);
+            if (stickL->GetRawButton(3))
+            {
+            	distance = sonar->GetRangeInches();
+            	if (distance > 52.0)
+            	{	
+            		float x;
+            		int c;
+            		int g;
+            		bool leftValue = LSensor->Get()?1:0 ;      // read the line tracking sensors
+            		bool middleValue = MSensor->Get()?1:0 ;
+            		bool rightValue = RSensor->Get()?1:0 ;
+            		int  total = leftValue * 4 + middleValue * 2 + rightValue;
+            		float turn;
+            		float speed;
+            		switch (total)
+            		{
+            			case 7:
+            			g++;
+            			if (g>10) speed = 0;
+            			{
+            				turn = x+0.02;
+            				speed = 0.7;
+            			}
+            				break;
+            			case 6:
+            				speed = -0.7;
+            				turn = -0.5;
+            				break;
+            			case 5:
+            				speed = -0.7;
+            				turn = 0.0;
+            				c=0;
+            				break;
+            			case 4:
+            				speed = -0.7;
+            				turn = 0.5;
+            				break; 
+            			case 3:
+            				speed = -0.7;
+            				turn = 0.5;
+            				break;
+            			case 1:
+            				speed = -0.7;
+            				turn = 0.5;
+            				break;
+            			default:
+            				c++;
+            				speed = -0.7;
+            				turn = 0.0;
+            				if (c>4) speed = 0;
+            				break;		                        
+            		}
+            		x=turn;
+            		myRobot->Drive(stickL->GetY(),turn);
+            	}
+            }
         }
         
         void DisabledInit(void)
