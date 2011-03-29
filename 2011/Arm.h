@@ -3,8 +3,8 @@
 
 #include "WPILib.h"
 
-static const float kArmPOT_Min = 2.52f;
-static const float kArmPOT_Max = 3.8f;
+static const float kArmPOT_Min = 2.71f;
+static const float kArmPOT_Max = 4.01f;
 
 class ParadoxAnalogChannel : public AnalogChannel
 {
@@ -21,14 +21,17 @@ public:
 class Arm : public PIDOutput
 {
 public:
-	Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvictor, UINT32 pot, UINT32 solen_close, UINT32 solen_open, UINT32 limit);
+	Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvictor, UINT32 encoA, UINT32 encoB, UINT32 huvictor, UINT32 hdvictor, UINT32 wristvictor, UINT32 limit, UINT32 limit2);
 	virtual ~Arm() {}
 	
 	void Set(float);
 	void SetPosition(float pot_pos, float sensitivity);
-	void Hand(bool wantopen);
+	void Hand(float on);
+	void Turn(float turn);
 	void PIDWrite(float output);
-	ParadoxAnalogChannel* GetPot() const { return POT; }
+	void Wrist (float hwrist);
+	//ParadoxAnalogChannel* GetPot() const { return POT; }
+	void PIDOn(bool wanton);
 	
 	UINT32 GetLimitSwitch();
 	
@@ -42,10 +45,12 @@ protected:
 	Victor *blue;
 	Victor *red;
 	Victor *black;
-	ParadoxAnalogChannel *POT;
-	Solenoid *close;
-	Solenoid *open;
+	Encoder *ENCO;
+	Victor *handup;
+	Victor *handdw;
+	Victor *wrist;
 	DigitalInput *limitswitch;
+	DigitalInput *bumpswitch;
 	
 private:
 	DISALLOW_COPY_AND_ASSIGN(Arm);

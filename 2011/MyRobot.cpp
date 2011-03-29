@@ -6,8 +6,6 @@ static float s_absArmPot;
 
 class RobotDemo : public IterativeRobot
 {
-		Solenoid	  *shifting;
-		Solenoid	 *shifting2;
 		Solenoid	   *MiniOut;
 		Solenoid	    *MiniIn;
 		Ultrasonic       *sonar;
@@ -20,191 +18,91 @@ class RobotDemo : public IterativeRobot
         Victor			 *Right; 
         RobotDrive	   *myRobot;
         Joystick 		*stickL;
+        Joystick 		*stickR;
         DriverStationLCD 	*ds;
-        Timer 			 *timer; 
+        Gyro			  *gyro;
         
         float distance;
-        bool HighGear;
-        float pot_setpoint; //back position
-        UINT32 AutoState;
-        UINT32 handstate;
-        bool handisclosed;
-        int ch0;
+        float autotime;
+        int hand;
+        float driftperperiod;
+        float gycorrected;
 
 public:
         RobotDemo() 
         {
-        		shifting	= new Solenoid	   (8);
-        		shifting2	= new Solenoid	   (7);
+        		printf("RobotDemo Enter\n");
         		MiniOut		= new Solenoid	   (1);
-        		MiniIn		= new Solenoid	   (2);
+        		MiniIn		= new Solenoid	   (3);
         		sonar		= new Ultrasonic (10,11);        		
         		spike		= new Compressor  (14,1);
         		LSensor		= new DigitalInput(1);
         		MSensor		= new DigitalInput(2);
         		RSensor		= new DigitalInput(3);
-        		ParadoxArm  = new Arm(9,10,5,4,2,5,6,8);
+        		ParadoxArm  = new Arm(9,10,7,4,12,13,5,6,3,8,9);
         		Left		= new Victor(1);
         		Right		= new Victor(2);
-               // myRobot		= new RobotDrive(Left,Right);
-                myRobot		= new RobotDrive(1,2,3,4);
+                myRobot		= new RobotDrive(Left,Right);
+                //myRobot		= new RobotDrive(1,2);
         		stickL  	= new Joystick(1);
+        		stickR  	= new Joystick(2);
                 ds			= DriverStationLCD::GetInstance();
-                timer		= new Timer();
-        		
-                ch0=0;
-                AutoState=1;
+                gyro		= new Gyro(1);
+                
+        		hand = 0;
+                spike->Start();
+                MiniOut->Set(0);
+                MiniIn->Set(1); 
                 sonar->SetAutomaticMode(1);
                 myRobot->SetSafetyEnabled(false);
-                SetPeriod(0.05);
+                SetPeriod(0.1);
+        		printf("RobotDemo Exit\n");
         }
         
-        float Absol(float num)
+        void AutonomousInit(void)
         {
-        	if (num < 0.0) return -1.0*num;
-        	else return num;
+        	spike->Start();
+        	autotime = 0.0;
+        	ParadoxArm->PIDOn(0);
+        	ParadoxArm->Hand(1);
+        	gyro->Reset();
+        	driftperperiod = 0;
+        	gycorrected = 0;
         }
         
-        void AutonomousContinuous(void)
+        void AutonomousPeriodic(void)
         {
-        	timer->Start();
-        	if (AutoState==1)
+        	//**FALLBACK JUST-PREPARE-ARM-GODDAMNIT! CODE
+        	//if (autotime < 2.0) ParadoxArm->Hand(1);
+        	//else ParadoxArm->Hand(0);
+        	//ParadoxArm->Set(0.4);
+        	
+        	if (autotime == 1.0)
         	{
-        		myRobot->Drive(-1.0,0.0);
-        		if (timer->Get() > 0.7)
-        		{
-        			timer->Reset();
-        			AutoState=2;
-        		}
+        		driftperperiod = gyro->GetAngle() * GetPeriod();
+        		gyro->Reset();
         	}
-        	if (AutoState==2)
-        	{
-        		ParadoxArm->SetPosition(2.35,0.3);
-        		AutoState=3;
-        	}
-        	if (AutoState==3)
-        	{
-        		myRobot->Drive(1.0,0.0);
-        		if (timer->Get() > 0.7)
-        		{
-        			timer->Reset();
-        			ParadoxArm->Hand(1);
-        			AutoState=4;
-        		}
-        	}
-        	if (AutoState==4)
-        	{
-        		ParadoxArm->SetPosition(2.09,0.3);
-        		AutoState=5;
-        	}
-    		if (AutoState==5)
-    		{
-        	distance = sonar->GetRangeInches();
-        	if (distance > 52.0)
-        	{	
-        		float x;
-        		int c;
-        		int g;
-        		bool leftValue = LSensor->Get()?1:0 ;      // read the line tracking sensors
-        		bool middleValue = MSensor->Get()?1:0 ;
-        		bool rightValue = RSensor->Get()?1:0 ;
-        		int  total = leftValue * 4 + middleValue * 2 + rightValue;
-        		float turn;
-       			float speed;
-       			switch (total)
-       			{
-       			case 7:
-       				g++;
-       				if (g>10) speed = 0;
-       				{
-       					turn = x+0.02;
-       					speed = 0.7;
-        			}
-        			break;
-        		case 6:
-        			speed = -0.7;
-       				turn = -0.5;
-       				break;
-       			case 5:
-       				speed = -0.7;
-       				turn = 0.0;
-       				c=0;
-      				break;
-      			case 4:
-        			speed = -0.7;
-        			turn = 0.5;
-        			break; 
-        		case 3:
-        			speed = -0.7;
-       				turn = 0.5;
-       				break;
-       			case 1:
-       				speed = -0.7
-       				;
-       				turn = 0.5;
-       				break;
-       			default:
-       				c++;
-       				speed = -0.7;
-        			turn = 0.0;
-        			if (c>4) speed = 0;
-        			break;		                        
-       			}
-       			x=turn;
-       			myRobot->Drive(speed,turn);
-        	}
-        	ch0++;
-        	if (ch0==1)AutoState=6;
-        	if (ch0==2)AutoState=3;
-    		}
-    		if (AutoState=6)
-    		{
-    			ParadoxArm->SetPosition(2.00,0.3);
-    			ParadoxArm->Hand(0);
-    			AutoState=7;
-    		}
-    		if (AutoState=7)
-    		{
-    			myRobot->Drive(1.0,1.0);
-    			if (timer->Get() > 5)
-    			{
-        			timer->Reset();
-        			ParadoxArm->Hand(1);
-        			AutoState=5;
-    		}
-    		
-}
-        	/*else
-        	{
-        		if (distance > distance2) myRobot->Drive(0.5,1.0);
-        		if (distance < distance2) myRobot->Drive(0.5,1.0);
-        		if (distance == distance2) myRobot->Drive(0.0,0.0);
-        	}*/
+        	gycorrected = gyro->GetAngle() - (driftperperiod * autotime);
+        	
+        	ds->Clear();
+        	ds->Printf(DriverStationLCD::kUser_Line1, 1, "gyroraw: %f", gyro->GetAngle());
+        	ds->Printf(DriverStationLCD::kUser_Line2, 1, "gycorrected: %f", gycorrected);
+        	ds->UpdateLCD();
+        	
+    		autotime += GetPeriod();
         }
         
         void TeleopInit(void)
         {
         	spike->Start();
-        	pot_setpoint = ParadoxArm->GetPot()->GetVoltage();
+        	ParadoxArm->PIDOn(0);
         } 
         
         void TeleopContinuous(void)
         {
-        	if ((Absol(stickL->GetY()) > 0.2) || (Absol(stickL->GetThrottle()) > 0.2))
-        	{
-        		if (stickL->GetTrigger()) HighGear = 1;
-        		if (stickL->GetRawButton(2)) HighGear = 0;
-        	}
-        	shifting->Set(HighGear);
-        	shifting2->Set(!(HighGear));
-        	
-        	if (stickL->GetRawButton(9))spike->Start();
-        	if (stickL->GetRawButton(10))spike->Stop();
-        	
-
         	distance = sonar->GetRangeInches();
-            myRobot->ArcadeDrive(-1*stickL->GetY(),-1*stickL->GetRawAxis(6));
-
+        	myRobot->ArcadeDrive(-1*stickL->GetY(),-1*stickL->GetRawAxis(6));
+        	
             ds->Clear();
 
           /*  UINT16 buttonState_1 = DriverStation::GetInstance()->GetStickButtons( 1 );
@@ -219,21 +117,22 @@ public:
             ds->Printf(DriverStationLCD::kUser_Line1, 1, "Sonar: %f", distance);
             ds->Printf(DriverStationLCD::kUser_Line2, 1, "absArmPot: %f", s_absArmPot);
             ds->Printf(DriverStationLCD::kUser_Line3, 1, "sen: %f", 0.5+(0.5*stickL->GetTwist()));
-            ds->Printf(DriverStationLCD::kUser_Line4, 1, "pot pidget %f", (float) ParadoxArm->GetPot()->PIDGet());
-            ds->Printf(DriverStationLCD::kUser_Line5, 1, "error %f", (float) ParadoxArm->m_pPidController->GetError());
+            //ds->Printf(DriverStationLCD::kUser_Line4, 1, "pot pidget %f", (float) ParadoxArm->GetPot()->PIDGet());
+            //ds->Printf(DriverStationLCD::kUser_Line5, 1, "error %f", (float) ParadoxArm->m_pPidController->GetError());
             
-//            ds->Printf(DriverStationLCD::kUser_Line4, 1, "l %08d", LSensor->Get());
-//            ds->Printf(DriverStationLCD::kUser_Line5, 1, "m %08d", MSensor->Get());
-//            ds->Printf(DriverStationLCD::kUser_Line6, 1, "r %08d", RSensor->Get());
+        //    ds->Printf(DriverStationLCD::kUser_Line4, 1, "l %08d", LSensor->Get());
+          //  ds->Printf(DriverStationLCD::kUser_Line5, 1, "m %08d", MSensor->Get());
+            //ds->Printf(DriverStationLCD::kUser_Line6, 1, "r %08d", RSensor->Get());
             
-            ds->UpdateLCD();
+        	ds->UpdateLCD();
 
             // Update the dashboard...
         	SendDashboardData();
-       }
+        }
         
         void TeleopPeriodic(void)
         {
+        	//printf("TRACE: TeleopPeriodic ENTER\n");
             const float kThrottleFreeMin = -0.57f;
             const float kThrottleFreeMax = 0.7f;
             float throttleT = (stickL->GetThrottle() - kThrottleFreeMin) / (kThrottleFreeMax - kThrottleFreeMin); // [0,1]
@@ -243,15 +142,28 @@ public:
             	throttleT = 0.0f;
             float absArmPot = (kArmPOT_Max - kArmPOT_Min) * throttleT + kArmPOT_Min; // [kArmPOT_Min, kArmPOT_Max]
             s_absArmPot = absArmPot;
-            ParadoxArm->SetPosition(absArmPot, 0.5+(0.5*stickL->GetTwist()));
+            //ParadoxArm->SetPosition(absArmPot, 0.5+(0.5*stickL->GetTwist()));
             
-            if (stickL->GetRawButton(7)) ParadoxArm->Hand(1);
-            else ParadoxArm->Hand(0);
-            if (stickL->GetRawButton(2))MiniOut->Set(1);
-            if (stickL->GetRawButton(2))MiniIn->Set(0);
-            if (stickL->GetRawButton(6))MiniOut->Set(0);
-            if (stickL->GetRawButton(6))MiniIn->Set(1);
-            if (stickL->GetRawButton(3))
+            
+            if (stickR->GetTrigger()== 1)hand=1;
+            else if (stickR->GetRawButton(2)== 1)hand=-1;
+            else hand=0;
+ 
+            ParadoxArm->Set(stickR->GetY());
+            if (hand != 0) ParadoxArm->Hand(hand);
+            else ParadoxArm->Turn(stickR->GetRawAxis(6));
+            ParadoxArm->Wrist(stickR->GetZ());
+            if (stickL->GetRawButton(2))
+            {
+            	MiniOut->Set(1);
+            	MiniIn->Set(0);
+            }
+            else 
+            {
+            	MiniOut->Set(0);
+            	MiniIn->Set(1);
+            }
+            /*if (stickL->GetRawButton(3))
             {
             	distance = sonar->GetRangeInches();
             	if (distance > 52.0)
@@ -306,7 +218,8 @@ public:
             		x=turn;
             		myRobot->Drive(stickL->GetY(),turn);
             	}
-            }
+            }*/
+        	//printf("TRACE: TeleopPerdiodic Exit\n");
         }
         
         void DisabledInit(void)
@@ -458,6 +371,5 @@ void RobotDemo::SendDashboardData()
 	dash_packet_2.FinalizeCluster(); // wire
 	dash_packet_2.Finalize();
 }
-
 
 START_ROBOT_CLASS(RobotDemo);
