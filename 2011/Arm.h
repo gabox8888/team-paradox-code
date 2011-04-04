@@ -25,7 +25,7 @@ public:
 	virtual ~Arm() {}
 	
 	void Set(float);
-	void SetPosition(float pot_pos, float sensitivity);
+	void SetPosition(float setpoint, float sens);
 	void Hand(float on);
 	void Turn(float turn);
 	void PIDWrite(float output);
@@ -33,7 +33,20 @@ public:
 	//ParadoxAnalogChannel* GetPot() const { return POT; }
 	void PIDOn(bool wanton);
 	
+	void GyroCalibrate(float period);
+	void GyroUpdate(float time, float period);
+	float GyroGet();
+	void GyroIsOn(bool enabled);
+	
+	UINT32 EncoGet();
 	UINT32 GetLimitSwitch();
+	
+	float gyrocorrect;
+	float driftperperiod;
+	bool gyrodisable;
+	bool gyrowascalibrated;
+	
+	
 	
 public:
 	PIDController* m_pPidController;
@@ -51,6 +64,7 @@ protected:
 	Victor *wrist;
 	DigitalInput *limitswitch;
 	DigitalInput *bumpswitch;
+	Gyro *gyro;
 	
 private:
 	DISALLOW_COPY_AND_ASSIGN(Arm);

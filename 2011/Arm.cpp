@@ -1,9 +1,10 @@
 #include "WPILib.h"
 #include "Arm.h"
-
+/*
 const float kTower_P = 4.0f;
 const float kTower_I = 0.1f;
 const float kTower_D = 0.0f;
+*/
 
 Arm::Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvictor, UINT32 encoA, UINT32 encoB, UINT32 huvictor, UINT32 hdvictor, UINT32 wristvictor, UINT32 limit, UINT32 limit2)
 {
@@ -17,6 +18,11 @@ Arm::Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvi
 	wrist		= new Victor(wristvictor);
 	limitswitch	= new DigitalInput(limit);
 	bumpswitch	= new DigitalInput(limit2);
+	gyro		= new Gyro(1);
+	ENCO->Start();
+	
+	gyrodisable = false;
+	gyrowascalibrated = false;
 
 	//m_pPidController = new PIDController(0.0f, 0.0f, 0.0f, encoder, this);
 	//m_pPidController->Disable();
@@ -40,7 +46,7 @@ void Arm::PIDWrite(float output)
 
  void Arm::Set(float arm)
 {
-	if (limitswitch->Get() == 1)
+	if (gyrodisable = true)
 	{
 		green->Set(arm);
 		blue ->Set(arm);
@@ -49,26 +55,45 @@ void Arm::PIDWrite(float output)
 	}
 	else
 	{
-		if (arm < 0)
+		if (gyrocorrect < 14.7)
 		{
-			green->Set(arm);
-			blue ->Set(arm);
-			red->Set(arm);
-			black->Set(arm);
+			if (arm < 0)
+			{
+				green->Set(arm);
+				blue ->Set(arm);
+				red->Set(arm);
+				black->Set(arm);
+			}
+			else
+			{
+				green->Set(0.0);
+				blue ->Set(0.0);
+				red->Set(0.0);
+				black->Set(0.0);
+			}
 		}
-		else
+		else if (gyrocorrect > 178)
 		{
-			green->Set(0.0);
-			blue ->Set(0.0);
-			red->Set(0.0);
-			black->Set(0.0);
+			if (arm > 0)
+			{
+				green->Set(arm);
+				blue ->Set(arm);
+				red->Set(arm);
+				black->Set(arm);
+			}
+			else
+			{
+				green->Set(0.0);
+				blue ->Set(0.0);
+				red->Set(0.0);
+				black->Set(0.0);
+			}
 		}
-		ENCO->Reset();
 	}
 }
 
 
-void Arm::SetPosition(float pot_pos, float sens)
+void Arm::SetPosition(float setpoint, float sens)
 {
 	/*if (sens < 0.001f)
 	{
@@ -77,31 +102,6 @@ void Arm::SetPosition(float pot_pos, float sens)
 	}*/
 	//m_pPidController->SetPID((kTower_P * sens),(kTower_I * sens),(kTower_D * sens));
 	//m_pPidController->SetSetpoint(pot_pos);
-/*
-	float mindead = pot_pos - 0.05;
-	float maxdead = pot_pos + 0.05;
-	if (POT->GetVoltage() > maxdead)
-	{
-		green->Set(-0.5*sensitivity);
-		blue->Set(-0.5*sensitivity);
-		red->Set(-0.5*sensitivity);
-		black->Set(-0.5*sensitivity);
-	}
-	if ((POT->GetVoltage() < mindead) && (limitswitch->Get() == 1.0))
-	{
-		green->Set(0.5*sensitivity);
-		blue->Set(0.5*sensitivity);
-		red->Set(0.5*sensitivity);
-		black->Set(0.5*sensitivity);
-	}
-	if ((POT->GetVoltage() > mindead) && (POT->GetVoltage() < maxdead))
-	{
-		green->Set(0.0);
-		blue->Set(0.0);
-		red->Set(0.0);
-		black->Set(0.0);
-	}
-*/
 }
 
 void Arm::Hand(float on)
@@ -116,11 +116,10 @@ void Arm::Hand(float on)
 		close->Set(!wantopen);
 		open->Set(wantopen);
 	}*/
-	printf("dumpswitch = %d\n", bumpswitch->Get());
 	if ((bumpswitch->Get() == 1) || (on < 0))
 	{
-		handup->Set(on);
-		handdw->Set(-on);
+		handup->Set(-on);
+		handdw->Set(on);
 	}
 	else 
 	{
@@ -136,12 +135,31 @@ void Arm::Turn(float turn)
 
 void Arm::Wrist(float hwrist)
 {
-	wrist->Set(hwrist);
+	if (hwrist>.9) wrist->Set(0.7*hwrist);
+	else if (hwrist<-.9) wrist->Set(0.7*hwrist);
+	else wrist->Set(0.0);
+	
 }
 
 UINT32 Arm::GetLimitSwitch()
 {
 	return limitswitch->Get();
+}
+
+void Arm::GyroCalibrate(float period)
+{
+	if (!gyrowascalibrated)
+	{
+		gyro->Reset();
+		Wait(1.0);
+		driftperperiod = gyro->GetAngle() * period;
+		gyrocorrect = 0.0;
+	}
+}
+
+void Arm::GyroUpdate(float time, float period)
+{
+	gyrocorrect = gyro->GetAngle() - (driftperperiod * (time/period));
 }
 
 void Arm::PIDOn(bool wanton)
