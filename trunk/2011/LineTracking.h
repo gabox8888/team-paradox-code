@@ -23,6 +23,7 @@ protected:
 	DigitalInput *right;
 
 private:
+	float Calculate(bool trueforturn);
 	DISALLOW_COPY_AND_ASSIGN(LineTracking);
 	
 };
