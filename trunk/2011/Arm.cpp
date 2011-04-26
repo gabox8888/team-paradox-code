@@ -6,21 +6,14 @@ const float kTower_I = 0.1f;
 const float kTower_D = 0.0f;
 */
 
-Arm::Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvictor, UINT32 encoA, UINT32 encoB, UINT32 huvictor, UINT32 hdvictor, UINT32 wristvictor, UINT32 limit, UINT32 limit2)
+Arm::Arm(UINT32 shldrChannel, UINT32 upperhandChannel, UINT32 lowerhandChannel, UINT32 extpistonChannel, UINT32 retpistonChannel)
 {
-	green		= new Victor(greenvictor);
-	blue		= new Victor(bluevictor);
-	red			= new Victor(redvictor);
-	black		= new Victor(blackvictor);
-	ENCO		= new Encoder(encoA,encoB);
-	handup		= new Victor(huvictor);
-	handdw		= new Victor(hdvictor);
-	wrist		= new Victor(wristvictor);
-	limitswitch	= new DigitalInput(limit);
-	bumpswitch	= new DigitalInput(limit2);
-	gyro		= new Gyro(1);
-	ENCO->Start();
-	
+	shldrVictor		= new Victor(shldrChannel);
+	upperhandJag	= new CANJaguar(upperhandChannel);
+	lowerhandJag	= new CANJaguar(lowerhandChannel);
+	extSolenoid		= new Solenoid (extpistonChannel);
+	gyro			= new Gyro(1);
+
 	gyrodisable = false;
 	gyrowascalibrated = false;
 
@@ -28,30 +21,22 @@ Arm::Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvi
 	//m_pPidController->Disable();
 	//m_pPidController->SetInputRange(kArmPOT_Min, kArmPOT_Max); // kTowerExtendedEncoderCount is negative, so make it the minimum.
 }
+float Arm::Return ( void )
+{
+	double amp=	upperhandJag->GetOutputCurrent();
+	return (float)amp;
+}
 
 void Arm::PIDWrite(float output)
 {
-	if (limitswitch->Get() == 0)
-	{
-		if (output > 0.0f)
-		{
-			output = 0.0f;
-		}
-	}
-	green->PIDWrite(output);
-	blue->PIDWrite(output);
-	red->PIDWrite(output);
-	black->PIDWrite(output);
+	shldrVictor->PIDWrite(output);
 }
 
  void Arm::Set(float arm)
 {
 	if (gyrodisable = true)
 	{
-		green->Set(arm);
-		blue ->Set(arm);
-		red->Set(arm);
-		black->Set(arm);
+		shldrVictor->Set(arm);
 	}
 	else
 	{
@@ -59,34 +44,22 @@ void Arm::PIDWrite(float output)
 		{
 			if (arm < 0)
 			{
-				green->Set(arm);
-				blue ->Set(arm);
-				red->Set(arm);
-				black->Set(arm);
+				shldrVictor->Set(arm);
 			}
 			else
 			{
-				green->Set(0.0);
-				blue ->Set(0.0);
-				red->Set(0.0);
-				black->Set(0.0);
+				shldrVictor->Set(0.0);
 			}
 		}
 		else if (gyrocorrect > 178)
 		{
 			if (arm > 0)
 			{
-				green->Set(arm);
-				blue ->Set(arm);
-				red->Set(arm);
-				black->Set(arm);
+				shldrVictor->Set(arm);
 			}
 			else
 			{
-				green->Set(0.0);
-				blue ->Set(0.0);
-				red->Set(0.0);
-				black->Set(0.0);
+				shldrVictor->Set(arm);
 			}
 		}
 	}
@@ -106,6 +79,7 @@ void Arm::SetPosition(float setpoint, float sens)
 
 void Arm::Hand(float on)
 {
+	int d;
 	/*if (ENCO->PIDGet() < -1)
 	{
 		close->Set(0);
@@ -116,34 +90,29 @@ void Arm::Hand(float on)
 		close->Set(!wantopen);
 		open->Set(wantopen);
 	}*/
-	if ((bumpswitch->Get() == 1) || (on < 0))
+	if ((upperhandJag->GetOutputCurrent() < 28) || (on < 0) || (d<200))
 	{
-		handup->Set(-on);
-		handdw->Set(on);
+		upperhandJag->Set(on);
+		lowerhandJag->Set(-on);
+		d++;
 	}
 	else 
 	{
-		handup->Set(0.0);
-		handdw->Set(0.0);
+		upperhandJag->Set(0.0);
+		lowerhandJag->Set(0.0);
+		d=0;
 	}
 }
 void Arm::Turn(float turn)
 {
-	handup->Set(turn);
-	handdw->Set(turn);
+	upperhandJag->Set(.5*turn);
+	lowerhandJag->Set(.5*turn);
 }
 
-void Arm::Wrist(float hwrist)
+void Arm::Extended(bool extend)
 {
-	if (hwrist>.9) wrist->Set(0.7*hwrist);
-	else if (hwrist<-.9) wrist->Set(0.7*hwrist);
-	else wrist->Set(0.0);
-	
-}
-
-UINT32 Arm::GetLimitSwitch()
-{
-	return limitswitch->Get();
+	extSolenoid->Set(extend);
+	retSolenoid->Set(!extend);
 }
 
 void Arm::GyroCalibrate(float period)

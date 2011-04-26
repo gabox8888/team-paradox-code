@@ -10,8 +10,8 @@ public:
 	virtual ~Recorder() {}
 	void StartRecording();
 	void StopRecording();
-	void RecordLine(float speed, float turn, float armspeed, float wristspeed, bool armsuck, bool armeject, float armtwist);
-	void GetLine(float *speed, float *turn, float *armspeed, float *wristspeed, bool *armsuck, bool *armeject, float *armtwist);
+	void RecordLine(float speed, float turn, float shldr, float twist, bool handsuck, bool handeject, bool armextended, bool linetrack);
+	void GetLine(float *speed, float *turn, float *shldr, float *twist, bool *handsuck, bool *handeject, bool *armextended, bool *linetrack);
 	void StartPlayback();
 	void StopPlayback();
 	bool IsRecording;

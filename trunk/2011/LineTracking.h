@@ -15,6 +15,8 @@ public:
 
 	float GetSpeed();
 	float GetTurn();
+	void UpdateTotal();
+	UINT32 total;
 	
 protected:
 	
@@ -24,6 +26,9 @@ protected:
 
 private:
 	float Calculate(bool trueforturn);
+	int c;
+	int g;
+	float x;
 	DISALLOW_COPY_AND_ASSIGN(LineTracking);
 	
 };
