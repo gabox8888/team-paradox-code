@@ -21,7 +21,7 @@ public:
 class Arm : public PIDOutput
 {
 public:
-	Arm(UINT32 greenvictor, UINT32 bluevictor, UINT32 redvictor, UINT32 blackvictor, UINT32 encoA, UINT32 encoB, UINT32 huvictor, UINT32 hdvictor, UINT32 wristvictor, UINT32 limit, UINT32 limit2);
+	Arm(UINT32 shldrChannel, UINT32 upperhandChannel, UINT32 lowerhandChannel, UINT32 extpistonChannel, UINT32 retpistonChannel);
 	virtual ~Arm() {}
 	
 	void Set(float);
@@ -29,9 +29,10 @@ public:
 	void Hand(float on);
 	void Turn(float turn);
 	void PIDWrite(float output);
-	void Wrist (float hwrist);
+	void Extended(bool extended);
 	//ParadoxAnalogChannel* GetPot() const { return POT; }
 	void PIDOn(bool wanton);
+	float Return();
 	
 	void GyroCalibrate(float period);
 	void GyroUpdate(float time, float period);
@@ -54,16 +55,11 @@ public:
 protected:
 
 
-	Victor *green;
-	Victor *blue;
-	Victor *red;
-	Victor *black;
-	Encoder *ENCO;
-	Victor *handup;
-	Victor *handdw;
-	Victor *wrist;
-	DigitalInput *limitswitch;
-	DigitalInput *bumpswitch;
+	Victor *shldrVictor;
+	CANJaguar *upperhandJag;
+	CANJaguar *lowerhandJag;
+	Solenoid *extSolenoid;
+	Solenoid *retSolenoid;
 	Gyro *gyro;
 	
 private:

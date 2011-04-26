@@ -11,14 +11,19 @@ class RobotDemo : public IterativeRobot
 		//Ultrasonic       *sonar;
 		Compressor 	     *spike;
         Arm         *ParadoxArm;
-        Victor			  *Left; 
-        Victor			 *Right; 
+        //Victor			  *Left; 
+        //Victor			 *Right; 
+        CANJaguar		  *Left; 
+        CANJaguar		 *Right; 
         RobotDrive	   *myRobot;
         Joystick 		*stickL;
         Joystick 		*stickR;
         DriverStationLCD 	*ds;
         Recorder	  *recorder;
-        LineTracking *linetrack;
+        LineTracking *linetracker;
+        DigitalInput *L;
+        DigitalInput *M;
+        DigitalInput *R;
         
         float autotime, teleoptime;
         float presetramp;
@@ -30,15 +35,17 @@ public:
         		MiniIn		= new Solenoid	   (3);
 //        		sonar		= new Ultrasonic (10,11);        		
         		spike		= new Compressor  (14,1);
-        		ParadoxArm  = new Arm(9,10,7,4,10,5,5,6,3,8,9);
-        		Left		= new Victor(1);
-        		Right		= new Victor(2);
-                myRobot		= new RobotDrive(Left,Right);
+        		//						shldr	hup		hlow	solext	solrec
+        		ParadoxArm  = new Arm(	1,		2,		3,		4,		5);
+                myRobot		= new RobotDrive(1,3,2,4);
         		stickL  	= new Joystick(1);
         		stickR  	= new Joystick(2);
                 ds			= DriverStationLCD::GetInstance();
                 recorder	= new Recorder();
-                linetrack	= new LineTracking(1,2,3);
+                linetracker	= new LineTracking(1,2,3);
+                L			= new DigitalInput(4);
+                M			= new DigitalInput(5);
+                R			= new DigitalInput(6);
                 
                 MiniOut->Set(0);
                 MiniIn->Set(1); 
@@ -62,27 +69,32 @@ public:
         	//establish variables
         	float speed = 0;
         	float turn = 0;
-        	float armspeed = 0;
-        	float wristspeed = 0;
-        	bool armsuck = false;
-        	bool armeject = false;
-        	float armtwist = 0;
+        	float shldr = 0;
+        	float twist = 0;
+        	bool handsuck = false;
+        	bool handeject = false;
+        	bool armextended = false;
+        	bool linetrack = false;
         	
         	//get values from recorded file
-        	recorder->GetLine(&speed, &turn, &armspeed, &wristspeed, &armsuck, &armeject, &armtwist);
-        	printf("%f %f %f %f %d %d %f\n", speed, turn, armspeed, wristspeed, (int)armsuck, (int)armeject, armtwist);
+        	recorder->GetLine(&speed, &turn, &shldr, &twist, &handsuck, &handeject, &armextended, &linetrack);
+        	printf("%f %f %f %f %d %d %d %d\n", speed, turn, shldr, twist, (int)handsuck, (int)handeject, (int)armextended, (int)linetrack);
+        	
+        	// linetrack
+        	linetracker->UpdateTotal();
         	
         	//drive
-           	myRobot->ArcadeDrive(speed, turn);
+        	if (linetrack) myRobot->ArcadeDrive(linetracker->GetSpeed(), linetracker->GetTurn());
+        	else myRobot->ArcadeDrive(speed,turn);
            	
            	//arm ; rollers
-            if (armsuck) ParadoxArm->Hand(1);
-            else if (armeject) ParadoxArm->Hand(-1);
-            else ParadoxArm->Turn(armtwist);
+            if (handsuck) ParadoxArm->Hand(1);
+            else if (handeject) ParadoxArm->Hand(-1);
+            else ParadoxArm->Turn(twist);
  
             //arm ; shoulder & wrist
-            ParadoxArm->Set(armspeed);
-            ParadoxArm->Wrist(wristspeed);
+            ParadoxArm->Set(shldr);
+            ParadoxArm->Extended(armextended);
 
             //driver station data
         	ds->Clear();
@@ -111,11 +123,13 @@ public:
             //declare writing entities
             float speed = stickL->GetY();
             float turn = -1 * stickL->GetRawAxis(6);
-            float armspeed = stickR->GetY();
-            float wristspeed = stickL->GetZ();
-            bool armsuck = stickR->GetTrigger();
-            bool armeject = stickR->GetRawButton(2);
-            float armtwist = stickR->GetRawAxis(6);
+            float shldr = stickR->GetY();
+            float twist = stickR->GetTwist();
+            bool handsuck = stickR->GetTrigger();
+            bool handeject = stickR->GetRawButton(2);
+            bool armextended = stickR->GetRawButton(3);
+            bool linetrack = stickL->GetRawButton(6);
+            
             
             //arm preset constants
             float factor = 0.1;
@@ -128,31 +142,28 @@ public:
             if (stickR->GetRawButton(8)) chosen = 3;
             if (chosen != 0)
             {
-            	if (presetramp > 0) armspeed = factor * presetramp * (levels[chosen] - ParadoxArm->gyrocorrect);
-            	if (armspeed > 0.25) armspeed = 0.25;
-            	if (armspeed < -0.25) armspeed = 0.25;
+            	if (presetramp > 0) shldr = factor * presetramp * (levels[chosen] - ParadoxArm->gyrocorrect);
+            	if (shldr > 0.25) shldr = 0.25;
+            	if (shldr < -0.25) shldr = 0.25;
             	presetramp -= GetPeriod()/1.5;
             }
             else presetramp = 1.0;
-            
-            //pinky linetracking override
-            if (stickL->GetRawButton(6))
-            {
-            	speed = linetrack->GetSpeed();
-            	turn = linetrack->GetTurn();
-            }
+           
+            //update linetracking
+            linetracker->UpdateTotal();
             
         	//drive
-           	myRobot->ArcadeDrive(speed, turn);
+            if (linetrack) myRobot->ArcadeDrive(linetracker->GetSpeed(), linetracker->GetTurn());
+            else myRobot->ArcadeDrive(speed,turn);
            	
            	//arm ; rollers
-            if (armsuck) ParadoxArm->Hand(1);
-            else if (armeject) ParadoxArm->Hand(-1);
-            else ParadoxArm->Turn(armtwist);
+            if (handsuck) ParadoxArm->Hand(1);
+            else if (handeject) ParadoxArm->Hand(-0.3);
+            else ParadoxArm->Turn(twist);
  
             //arm ; shoulder & wrist
-            ParadoxArm->Set(armspeed);
-            ParadoxArm->Wrist(wristspeed);
+            ParadoxArm->Set(shldr);
+            ParadoxArm->Extended(armextended);
             
             //minibot deployment
             MiniOut->Set(stickL->GetRawButton(2));
@@ -174,11 +185,19 @@ public:
             }
             
             //write to file
-            if (recorder->IsRecording) recorder->RecordLine(speed, turn, armspeed, wristspeed, armsuck, armeject, armtwist);
+            if (recorder->IsRecording) recorder->RecordLine(speed, turn, shldr, twist, handsuck, handeject, armextended, linetrack);
             
         	//dashboard data
             ds->Clear(); 
-            ds->Printf(DriverStationLCD::kUser_Line1, 1, "gyro %f", ParadoxArm->gyrocorrect);
+            //ds->Printf(DriverStationLCD::kUser_Line1, 1, "gyro %f", ParadoxArm->gyrocorrect);
+            //ds->Printf(DriverStationLCD::kUser_Line1, 1, "CAN: %f", Right->GetOutputCurrent());
+            ds->Printf(DriverStationLCD::kUser_Line1, 1, "amp %f", ParadoxArm->Return());
+            ds->Printf(DriverStationLCD::kUser_Line2, 1, "Line: %f", linetracker->GetSpeed());
+            ds->Printf(DriverStationLCD::kUser_Line3, 1, "Line2: %f", linetracker->GetTurn());
+            ds->Printf(DriverStationLCD::kUser_Line4, 1, "L: %d", L->Get());
+            ds->Printf(DriverStationLCD::kUser_Line5, 1, "M: %d", M->Get());
+            ds->Printf(DriverStationLCD::kUser_Line6, 1, "R: %d", R->Get());
+            
         	ds->UpdateLCD();
         	SendDashboardData();
         	
