@@ -48,16 +48,30 @@ void Recorder::RecordLine(float speed, float turn, float shldr, float twist, boo
 
 void Recorder::GetLine(float *speed, float *turn, float *shldr, float *twist, bool *handsuck, bool *handeject, bool *armextended, bool *linetrack)
 {
-	printf("REC )( enter getline:\nREC )( declare ints to get booleans...\n");
-	int i_handsuck, i_handeject, i_armextended, i_linetrack;
-	printf("REC )( about to scan for values...\n");
-	fscanf(recordfile, "%f %f %f %f %d %d %d %d\n", speed, turn, shldr, twist, &i_handsuck, &i_handeject, &i_armextended, &i_linetrack);
-	printf("REC )( scanned, injecting boolean values...\n");
-	*handsuck = (i_handsuck != 0);
-	*handsuck = (i_handeject != 0);
-	*armextended = (i_armextended != 0);
-	*linetrack = (i_linetrack != 0);
-	printf("REC )( line read\nREC )( .\n");
+	if(recordfile)
+	{
+		printf("REC )( enter getline:\nREC )( declare ints to get booleans...\n");
+		int i_handsuck, i_handeject, i_armextended, i_linetrack;
+		printf("REC )( about to scan for values...\n");
+		fscanf(recordfile, "%f %f %f %f %d %d %d %d\n", speed, turn, shldr, twist, &i_handsuck, &i_handeject, &i_armextended, &i_linetrack);
+		printf("REC )( scanned, injecting boolean values...\n");
+		*handsuck = (i_handsuck != 0);
+		*handsuck = (i_handeject != 0);
+		*armextended = (i_armextended != 0);
+		*linetrack = (i_linetrack != 0);
+		printf("REC )( line read\nREC )( .\n");
+	}
+	else
+	{
+		*speed = 0.0;
+		*turn = 0.0;
+		*shldr = 0.0;
+		*twist = 0.0;
+		*handsuck = false;
+		*handeject = false;
+		*armextended = false;
+		*linetrack = false;
+	}
 }
 
 void Recorder::StartPlayback()

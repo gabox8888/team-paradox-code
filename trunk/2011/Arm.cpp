@@ -9,11 +9,21 @@ const float kTower_D = 0.0f;
 Arm::Arm(UINT32 shldrChannel, UINT32 upperhandChannel, UINT32 lowerhandChannel, UINT32 extpistonChannel, UINT32 retpistonChannel)
 {
 	shldrVictor		= new Victor(shldrChannel);
+#ifdef CAN_ENABLED
 	upperhandJag	= new CANJaguar(upperhandChannel);
 	lowerhandJag	= new CANJaguar(lowerhandChannel);
+#else
+	upperhandJag	= new Jaguar(upperhandChannel);
+	lowerhandJag	= new Jaguar(lowerhandChannel);
+#endif
 	extSolenoid		= new Solenoid (extpistonChannel);
+	retSolenoid		= new Solenoid (retpistonChannel);
 	gyro			= new Gyro(1);
 
+	upperhandJag->SetSafetyEnabled(false);
+	lowerhandJag->SetSafetyEnabled(false);
+	
+	sucklock = false;
 	gyrodisable = false;
 	gyrowascalibrated = false;
 
@@ -23,8 +33,12 @@ Arm::Arm(UINT32 shldrChannel, UINT32 upperhandChannel, UINT32 lowerhandChannel, 
 }
 float Arm::Return ( void )
 {
+#ifdef CAN_ENABLED
 	double amp=	upperhandJag->GetOutputCurrent();
 	return (float)amp;
+#else
+	return 0.0;
+#endif
 }
 
 void Arm::PIDWrite(float output)
@@ -79,7 +93,6 @@ void Arm::SetPosition(float setpoint, float sens)
 
 void Arm::Hand(float on)
 {
-	int d;
 	/*if (ENCO->PIDGet() < -1)
 	{
 		close->Set(0);
@@ -90,23 +103,32 @@ void Arm::Hand(float on)
 		close->Set(!wantopen);
 		open->Set(wantopen);
 	}*/
-	if ((upperhandJag->GetOutputCurrent() < 28) || (on < 0) || (d<200))
+#ifdef CAN_ENABLED
+	if (upperhandJag->GetOutputCurrent() > 45) sucklock = true;
+#endif
+	if ((on < 0) || (!sucklock))
 	{
 		upperhandJag->Set(on);
-		lowerhandJag->Set(-on);
-		d++;
+		lowerhandJag->Set(on);
 	}
 	else 
 	{
 		upperhandJag->Set(0.0);
 		lowerhandJag->Set(0.0);
-		d=0;
 	}
 }
 void Arm::Turn(float turn)
 {
-	upperhandJag->Set(.5*turn);
-	lowerhandJag->Set(.5*turn);
+	if (turn > 0)
+	{
+		upperhandJag->Set(-0.25*turn);
+		lowerhandJag->Set(0.50*turn);
+	}
+	else
+	{
+		upperhandJag->Set(-0.50*turn);
+		lowerhandJag->Set(0.25*turn);
+	}
 }
 
 void Arm::Extended(bool extend)

@@ -1,5 +1,6 @@
 #ifndef ARM_H_
 #define ARM_H_
+#define CAN_ENABLED
 
 #include "WPILib.h"
 
@@ -29,23 +30,19 @@ public:
 	void Hand(float on);
 	void Turn(float turn);
 	void PIDWrite(float output);
-	void Extended(bool extended);
+	void Extended(bool extend);
 	//ParadoxAnalogChannel* GetPot() const { return POT; }
 	void PIDOn(bool wanton);
 	float Return();
 	
 	void GyroCalibrate(float period);
 	void GyroUpdate(float time, float period);
-	float GyroGet();
-	void GyroIsOn(bool enabled);
-	
-	UINT32 EncoGet();
-	UINT32 GetLimitSwitch();
 	
 	float gyrocorrect;
 	float driftperperiod;
 	bool gyrodisable;
 	bool gyrowascalibrated;
+	bool sucklock;
 	
 	
 	
@@ -56,8 +53,13 @@ protected:
 
 
 	Victor *shldrVictor;
+#ifdef CAN_ENABLED
 	CANJaguar *upperhandJag;
 	CANJaguar *lowerhandJag;
+#else
+	Jaguar *upperhandJag;
+	Jaguar *lowerhandJag;
+#endif
 	Solenoid *extSolenoid;
 	Solenoid *retSolenoid;
 	Gyro *gyro;
