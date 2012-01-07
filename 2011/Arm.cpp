@@ -1,13 +1,23 @@
 #include "WPILib.h"
 #include "Arm.h"
-/*
-const float kTower_P = 4.0f;
-const float kTower_I = 0.1f;
-const float kTower_D = 0.0f;
-*/
 
-Arm::Arm(UINT32 shldrChannel, UINT32 upperhandChannel, UINT32 lowerhandChannel, UINT32 extpistonChannel, UINT32 retpistonChannel)
+//const float kTower_P = 2.0f;
+//const float kTower_I = 0.0f;
+//const float kTower_D = 0.0f;
+
+extern float kTower_P;
+extern float kTower_I;
+extern float kTower_D;
+
+Arm::Arm(UINT32 armvictor, UINT32 pot, UINT32 solen_close, UINT32 solen_open, UINT32 limit)
 {
+<<<<<<< .mine
+        armVic           = new Victor(armvictor);
+        POT             = new ParadoxAnalogChannel(pot);
+        close           = new Solenoid(solen_close);
+        open            = new Solenoid(solen_open);
+        limitswitch     = new DigitalInput(limit);
+=======
 	shldrVictor		= new Victor(shldrChannel);
 #ifdef CAN_ENABLED
 	upperhandJag	= new CANJaguar(upperhandChannel);
@@ -19,23 +29,36 @@ Arm::Arm(UINT32 shldrChannel, UINT32 upperhandChannel, UINT32 lowerhandChannel, 
 	extSolenoid		= new Solenoid (extpistonChannel);
 	retSolenoid		= new Solenoid (retpistonChannel);
 	gyro			= new Gyro(1);
+>>>>>>> .r75
 
+<<<<<<< .mine
+        m_pPidController = new PIDController(0.0f, 0.0f, 0.0f, POT, this);
+        m_pPidController->Enable();
+        m_pPidController->SetInputRange(kArmPOT_Min, kArmPOT_Max); // kTowerExtendedEncoderCount is negative, so make it the minimum.
+}
+=======
 	upperhandJag->SetSafetyEnabled(false);
 	lowerhandJag->SetSafetyEnabled(false);
 	
 	sucklock = false;
 	gyrodisable = false;
 	gyrowascalibrated = false;
+>>>>>>> .r75
 
-	//m_pPidController = new PIDController(0.0f, 0.0f, 0.0f, encoder, this);
-	//m_pPidController->Disable();
-	//m_pPidController->SetInputRange(kArmPOT_Min, kArmPOT_Max); // kTowerExtendedEncoderCount is negative, so make it the minimum.
-}
-float Arm::Return ( void )
+float Arm::GetPos()
 {
+	return (POT->GetVoltage() - kArmPOT_Min) / (kArmPOT_Max - kArmPOT_Min);
+}
+
+float Arm::GetSetPoint()
+{
+<<<<<<< .mine
+	return (m_pPidController->GetSetpoint() - kArmPOT_Min) / (kArmPOT_Max - kArmPOT_Min);
+=======
 #ifdef CAN_ENABLED
 	double amp=	upperhandJag->GetOutputCurrent();
 	return (float)amp;
+>>>>>>> .r75
 #else
 	return 0.0;
 #endif
@@ -43,54 +66,32 @@ float Arm::Return ( void )
 
 void Arm::PIDWrite(float output)
 {
-	shldrVictor->PIDWrite(output);
+        if (limitswitch->Get() == 0)
+        {
+                if (output > 0.0f)
+                {
+                        output = 0.0f;
+                }
+        }
+        armVic->PIDWrite(output);
 }
 
  void Arm::Set(float arm)
 {
-	if (gyrodisable = true)
-	{
-		shldrVictor->Set(arm);
-	}
-	else
-	{
-		if (gyrocorrect < 14.7)
-		{
-			if (arm < 0)
-			{
-				shldrVictor->Set(arm);
-			}
-			else
-			{
-				shldrVictor->Set(0.0);
-			}
-		}
-		else if (gyrocorrect > 178)
-		{
-			if (arm > 0)
-			{
-				shldrVictor->Set(arm);
-			}
-			else
-			{
-				shldrVictor->Set(arm);
-			}
-		}
-	}
+	 armVic->Set(arm);
 }
 
 
-void Arm::SetPosition(float setpoint, float sens)
+void Arm::Dump(DriverStationLCD* ds)
 {
-	/*if (sens < 0.001f)
-	{
-		m_pPidController->Reset();
-		m_pPidController->Enable();
-	}*/
-	//m_pPidController->SetPID((kTower_P * sens),(kTower_I * sens),(kTower_D * sens));
-	//m_pPidController->SetSetpoint(pot_pos);
+	const float volts = POT->GetVoltage();
+	//const float piderror = m_pPidController->GetError();
+    ds->Printf(DriverStationLCD::kUser_Line1, 1, "volts: %f", volts);
+    //ds->Printf(DriverStationLCD::kUser_Line2, 1, "piderror: %f",piderror);
 }
 
+<<<<<<< .mine
+=======
 void Arm::Hand(float on)
 {
 	/*if (ENCO->PIDGet() < -1)
@@ -130,31 +131,51 @@ void Arm::Turn(float turn)
 		lowerhandJag->Set(0.25*turn);
 	}
 }
+>>>>>>> .r75
 
-void Arm::Extended(bool extend)
+void Arm::ClearPIDVars()
 {
-	extSolenoid->Set(extend);
-	retSolenoid->Set(!extend);
+    m_pPidController->Reset();
+    m_pPidController->Enable();
 }
 
-void Arm::GyroCalibrate(float period)
+
+void Arm::SetPosition(float pot_pos, float sens)
 {
-	if (!gyrowascalibrated)
-	{
-		gyro->Reset();
-		Wait(1.0);
-		driftperperiod = gyro->GetAngle() * period;
-		gyrocorrect = 0.0;
-	}
+	pot_pos = pot_pos * (kArmPOT_Max - kArmPOT_Min) + kArmPOT_Min;
+	if (sens < 0.001f)
+        {
+                m_pPidController->Reset();
+                m_pPidController->Enable();
+        }
+        m_pPidController->SetPID(kTower_P, (kTower_I * sens), kTower_D);
+        m_pPidController->SetSetpoint(pot_pos);
+
+ /*
+  *        float mindead = pot_pos - 0.05;
+        float maxdead = pot_pos + 0.05;
+        if (POT->GetVoltage() > maxdead)
+        {
+                armVic->Set(-0.5*sens);
+        }
+        if ((POT->GetVoltage() < mindead) && (limitswitch->Get() == 1.0))
+        {
+                armVic->Set(0.5*sens);
+        }
+        if ((POT->GetVoltage() > mindead) && (POT->GetVoltage() < maxdead))
+        {
+                armVic->Set(0.0);
+        }
+*/
 }
 
-void Arm::GyroUpdate(float time, float period)
+void Arm::Hand(bool wantopen)
 {
-	gyrocorrect = gyro->GetAngle() - (driftperperiod * (time/period));
+        close->Set(!wantopen);
+        open->Set(wantopen);
 }
 
-void Arm::PIDOn(bool wanton)
+UINT32 Arm::GetLimitSwitch()
 {
-	//if (wanton) m_pPidController->Enable();
-	//if (!wanton) m_pPidController->Disable();
+        return limitswitch->Get();
 }
