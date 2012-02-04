@@ -1,84 +1,84 @@
 #include "WPILib.h"
+#include "Balance.h"
 
-class RobotDemo : public IterativeRobot
+class Protodox : public IterativeRobot
 {
-	RobotDrive myRobot; // robot drive system
-	Joystick stickR; // only joystick
-	Joystick stickL; // only joystick
-	Solenoid PistonOUT1;
-	Solenoid PistonOUT2;
-	Solenoid PistonIN1;
-	Solenoid PistonIN2;
-	DriverStationLCD *dslcd;
+	RobotDrive *myRobot;
+	Joystick *stick;
+	Joystick *quadrant;
+	Solenoid *PistonOUT1;
+	Solenoid *PistonOUT2;
+	Solenoid *PistonIN1;
+	Solenoid *PistonIN2;
 	Encoder *rays;
+	Compressor *spike;
+	DriverStationLCD *dslcd;
+	Balance *bal;
+	Victor *SHOOT;
 	
-	float x;
+	bool shoot_armed;
+	bool balancing;
 	
 public:
-	RobotDemo(void):
-		myRobot(1, 2),	// these must be initialized in the same order
-		stickR(1),// as they are declared above.
-		stickL(2),
-		PistonOUT1(1),
-		PistonOUT2(2),
-		PistonIN1(3),
-		PistonIN2(5)
+	Protodox()
 	{
-		x = 0;
-		myRobot.SetExpiration(0.1);
-		rays = new Encoder(14, 14);
+		SetPeriod(0.05);
+		myRobot = new RobotDrive(1,2);
+		stick = new Joystick(1);
+		quadrant = new Joystick(2);
+		PistonOUT1 = new Solenoid(1);
+		PistonOUT2 = new Solenoid(2);
+		PistonIN1 = new Solenoid(3);
+		PistonIN2 = new Solenoid(4);
+		rays = new Encoder(13,14);
+		spike = new Compressor(6,1);
 		dslcd = DriverStationLCD::GetInstance();
-	}
-
-	void AutonomousInit(void)
-	{
-		myRobot.SetSafetyEnabled(false);
-		myRobot.Drive(0.0, 0.0); 	// stop robot
-	}
+		bal = new Balance(GetPeriod());
+		SHOOT = new Victor(3);
+	};
 	
 	void TeleopInit(void)
 	{
-		myRobot.SetSafetyEnabled(true);
+		shoot_armed = false;
 		rays->Start();
-	}
-	
-	void TeleopPeriodic(void)
-	{
-		if (stickR.GetRawButton(2)) x = (stickR.GetX() + 1)*-30;
-		myRobot.ArcadeDrive(stickR.GetY(),stickR.GetZ()); // drive with arcade style (use right stick)
-		if (stickR.GetTrigger() && (rays->GetRaw() > x))
-		{
-			PistonOUT1.Set(true);
-			PistonOUT2.Set(true);
-			PistonIN1.Set(false);
-			PistonIN2.Set(false);
-		}
-		else
-		{
-			PistonIN1.Set(true);
-			PistonIN2.Set(true);
-			PistonOUT1.Set(false);
-			PistonOUT2.Set(false);
-		}
+		spike->Start();
+		balancing = false;
 	}
 	
 	void TeleopContinuous(void)
 	{
-		dslcd->PrintfLine(DriverStationLCD::kUser_Line1, "setpoint : %f", x);
-		dslcd->PrintfLine(DriverStationLCD::kUser_Line2, "sensor : %d", rays->GetRaw());
-		dslcd->UpdateLCD();
-		if (stickR.GetRawButton(12))
-		{
-			x=0;
-			rays->Reset();
-		}
+		if (balancing) myRobot->ArcadeDrive((stick->GetRawAxis(4)+1)*0.5*(bal->drivespeed), 0.0);
+		else myRobot->ArcadeDrive(stick->GetY(),stick->GetZ()); // drive with arcade style (use right stick)
+		
+		bool shootout = (stick->GetTrigger() && (rays->GetRaw() < ((stick->GetRawAxis(4) + 1)*15))) ? true : false;
+		PistonOUT1->Set(shootout);
+		PistonOUT2->Set(shootout);
+		PistonIN1->Set(!shootout);
+		PistonIN2->Set(!shootout);
+		if (stick->GetRawButton(12)) rays->Reset();
+		
+		if (quadrant->GetRawButton(1)) shoot_armed = true;
+		if (quadrant->GetRawButton(2)) shoot_armed = false;
+		SHOOT->Set((quadrant->GetRawAxis(1) - 1) * (shoot_armed ? -0.5 : 0.0));
 	}
 	
-	void DisabledInit(void)
+	void TeleopPeriodic(void)
 	{
-//		BigEncoder->Stop();
+		if (stick->GetRawButton(7)) balancing = true;
+		if (stick->GetRawButton(9)) balancing = false;
+		bal->Compute(balancing);
+		if (bal->drivespeed == 0.0) balancing = false;
+		
+		dslcd->PrintfLine(DriverStationLCD::kUser_Line1, "setpoint : %f", ((stick->GetRawAxis(4) + 1)*15));
+		dslcd->PrintfLine(DriverStationLCD::kUser_Line2, "sensor : %d", rays->GetRaw());
+		dslcd->PrintfLine(DriverStationLCD::kUser_Line3, "rawangle : %f", bal->DebugNum());
+		if (balancing) dslcd->PrintfLine(DriverStationLCD::kUser_Line4, "balancing ON %f", bal->drivespeed);
+		else dslcd->PrintfLine(DriverStationLCD::kUser_Line4, "balancing OFF");
+		if (shoot_armed) dslcd->PrintfLine(DriverStationLCD::kUser_Line5, "shooter : ARMED %f", ((quadrant->GetRawAxis(1) - 1) * -0.5));
+		else dslcd->PrintfLine(DriverStationLCD::kUser_Line5, "shooter : OFF");
+		dslcd->UpdateLCD();
 	}
 };
 
-START_ROBOT_CLASS(RobotDemo);
+START_ROBOT_CLASS(Protodox);
 
