@@ -2,56 +2,49 @@
 #include "WPILib.h"
 #include "math.h"
 
-Balance::Balance(float dt)
+Balance::Balance(float period)
 {
-	period = dt;
-	gyro = new Gyro(1);
-	on = false;
+	Period = period;
+	myGyro = new Gyro(1);
 }
 
 float Balance::DebugNum()
 {
-	return delta[1];
+	if (Active) return GyroDT[1];
+	else return myGyro->GetAngle();
 }
 
 // when fully down, the bridge has about a 16 degree slope
-void Balance::Compute(bool enabled)
+float Balance::PassiveCompute(float bypass)
 {
-	delta[0] = delta[1];
-	delta[1] = gyro->GetAngle();
-	
-	if (enabled)
+	if (Active && (fabs(bypass) < 0.1))
 	{
-		if (!on)
-		{
-			drivespeed = 1.0;
-			on = true;
-			gyro->Reset();
-			resting = 0.0;
-		}
-		float vel = (fabs(delta[1] - delta[0]))/period;
-		float angle = fabs(delta[1]);
+		if (GyroDT[1] == 0.0) myGyro->Reset();
+		GyroDT[0] = GyroDT[1];
+		GyroDT[1] = myGyro->GetAngle();
+		if (fabs(GyroDT[1]) > 12) OnBridge = true;
 		
-		if (angle > 4)
+		float computation = 0.0;
+		if (OnBridge)
 		{
-			resting = 0.0;
-			if (drivespeed != 1.0) drivespeed = (angle/10) - (vel/100);
-			if (drivespeed < 0.001) drivespeed = 0.001;
-			if (drivespeed > 0.999) drivespeed = 0.999;
-		}
-		else
-		{
-			if (drivespeed != 1.0)
+			if (fabs(GyroDT[1]) > 4)
 			{
-				resting += period;
-				drivespeed = (resting > 2.0) ? 0.0 : 0.001;
+				float angfactor = GyroDT[1]/10;
+				float velfactor = ((GyroDT[1] - GyroDT[0])/Period)/100;
+				if (fabs(velfactor) < fabs(angfactor)) computation = angfactor - velfactor;
 			}
 		}
-		if ((delta[1] < 0.0) && (drivespeed != 1.0)) drivespeed = drivespeed * -1.0;
+		else computation = 1.0;
+		if (computation > 1.0) computation = 1.0;
+		if (computation < -1.0) computation = -1.0;
+		return computation;
 	}
 	else
 	{
-		if (on) on = false;
-		drivespeed = 0.0;
+		Active = false;
+		GyroDT[0] = 0.0;
+		GyroDT[1] = 0.0;
+		OnBridge = false;
+		return bypass;
 	}
 }
