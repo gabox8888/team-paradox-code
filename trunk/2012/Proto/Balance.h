@@ -6,21 +6,20 @@
 class Balance
 {
 public:
-	Balance(float dt);
+	Balance(float period);
 	virtual ~Balance() {}
 	
 	float DebugNum();
-	void Compute(bool enabled);
-	float drivespeed;
+	float PassiveCompute(float bypass);
+	bool Active;
 	
 protected:
-	Gyro *gyro;
+	Gyro *myGyro;
 
 private:
-	float period;
-	float delta[2];
-	float resting;
-	bool on;
+	float Period;
+	float GyroDT[2];
+	bool OnBridge;
 	DISALLOW_COPY_AND_ASSIGN(Balance);
 };
 
