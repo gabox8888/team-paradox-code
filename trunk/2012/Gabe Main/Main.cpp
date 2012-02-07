@@ -34,6 +34,12 @@ public:
 
 	void OperatorControl(void)
 	{
+		Threshold threshold(25, 255, 0, 45, 0, 47);
+		ParticleFilterCriteria2 criteria[] = 
+		{
+				{IMAQ_MT_BOUNDING_RECT_WIDTH, 30, 400, false, false},
+				{IMAQ_MT_BOUNDING_RECT_HEIGHT, 40, 400, false, false}
+		};
 		while (IsOperatorControl())
 		{
 			myParadox->ArcadeDrive(stick->GetY(),stick->GetZ()); 
@@ -42,40 +48,28 @@ public:
 
 			if (camera->IsFreshImage())
 			{
-				// get the gyro heading that goes with this image
-
-				// get the camera image
-				HSLImage *image = camera->GetImage();
-				bool oneshot = false;
-				if (!oneshot) 
+				ColorImage *image;
+				image = new HSLImage("/10ft2.jpg");		// get the sample image from the cRIO flash
+				BinaryImage *thresholdImage = image->ThresholdRGB(threshold);	// get just the red target pixels
+				BinaryImage *bigObjectsImage = thresholdImage->RemoveSmallObjects(false, 2);  // remove small objects (noise)
+				BinaryImage *convexHullImage = bigObjectsImage->ConvexHull(false);  // fill in partial and full rectangles
+				BinaryImage *filteredImage = convexHullImage->ParticleFilter(criteria, 2);  // find the rectangles
+				vector<ParticleAnalysisReport> *reports = filteredImage->GetOrderedParticleAnalysisReports();  // get the results
+							
+				for (unsigned i = 0; i < reports->size(); i++) 
 				{
-					image->Write("TestShot.jpeg");
-					oneshot = true;
+					ParticleAnalysisReport *r = &(reports->at(i));
+					printf("particle: %d  center_mass_x: %d\n", i, r->center_mass_x);
 				}
-				if (stick->GetRawButton(2))oneshot=false;
-				// find FRC targets in the image
-				vector<Target> targets = Target::FindCircularTargets(image);
+				printf("\n");
+			
+				// be sure to delete images after using them
+				delete reports;
+				delete filteredImage;
+				delete convexHullImage;
+				delete bigObjectsImage;
+				delete thresholdImage;
 				delete image;
-				/*if (targets.size() == 0 || targets[0].m_score < MINIMUM_SCORE)
-				{
-					// no targets found. Make sure the first one in the list is 0,0
-					// since the dashboard program annotates the first target in green
-					// and the others in magenta. With no qualified targets, they'll all
-					// be magenta.
-					Target nullTarget;
-					nullTarget.m_majorRadius = 0.0;
-					nullTarget.m_minorRadius = 0.0;
-					nullTarget.m_score = 0.0;
-					if (targets.size() == 0)
-						targets.push_back(nullTarget);
-					else
-						targets.insert(targets.begin(), nullTarget);
-					dds->sendVisionData(0.0, gyro->GetAngle(), 0.0, 0.0, targets);
-					if (targets.size() == 0)
-						printf("No target found\n\n");
-					else
-						printf("No valid targets found, best score: %f ", targets[0].m_score);*/
-				//}
 			}
 
 			
