@@ -7,7 +7,7 @@
 class ParadoxShooter
 {
 public:
-        ParadoxShooter(UINT32 motor1, UINT32 motor2, UINT32 tilt1, UINT32 encoa1, UINT32 encob1, UINT32 encoa2, UINT32 encob2);
+        ParadoxShooter(UINT32 motor1, UINT32 tilt1, UINT32 encoa1, UINT32 encob1, UINT32 encoa2, UINT32 encob2, UINT32 limitr, UINT32 limitl);
         virtual ~ParadoxShooter() {}
         
         void Shoot(bool on);
@@ -16,10 +16,11 @@ public:
 protected:
         
        Victor *Shoot1;
-       Victor *Shoot2;
        Victor   *Tilt;
        Encoder *ENCO1;
        Encoder *ENCO2;
+       DigitalInput *LimitR;
+       DigitalInput *LimitL;
         
 private:
         DISALLOW_COPY_AND_ASSIGN(ParadoxShooter);
