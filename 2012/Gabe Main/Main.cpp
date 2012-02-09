@@ -1,7 +1,32 @@
 #include "WPILib.h"
 #include "ParadoxDrive.h"
 #include "ParadoxCatapult.h"
- 
+
+static void PrintImageStats(Image* pImage)
+{
+	int W, H;
+	imaqGetImageSize (pImage, &W, &H);
+	float fMin = 1.0e30f;
+	float fMax = -1.0e30f;
+	int nWhite = 0;
+	int nBlack = 0;
+	for (int iy = 0; iy < H; iy++)
+		for (int ix = 0; ix < W; ix++)
+		{
+			PixelValue pix;
+						
+			int iFoo = imaqGetPixel(pImage, imaqMakePoint(ix,iy), &pix);
+			if (pix.grayscale > 0.5f)
+				nWhite += 1;
+			else
+				nBlack += 1;
+			if (pix.grayscale < fMin) fMin = pix.grayscale;
+			if (pix.grayscale > fMax) fMax = pix.grayscale;
+		}
+	printf("gray min = %f, max = %f; nWhite=%d; nBlack=%d\n", fMin, fMax, nWhite, nBlack);
+}
+				
+				
 class ParadoxBot : public SimpleRobot
 {
 	ParadoxDrive 			*myParadox; 
@@ -34,7 +59,6 @@ public:
 
 	void OperatorControl(void)
 	{
-		Threshold threshold(25, 255, 0, 45, 0, 47);
 		ParticleFilterCriteria2 criteria[] = 
 		{
 				{IMAQ_MT_BOUNDING_RECT_WIDTH, 30, 400, false, false},
@@ -42,20 +66,34 @@ public:
 		};
 		while (IsOperatorControl())
 		{
-			myParadox->ArcadeDrive(stick->GetY(),stick->GetZ()); 
+			myParadox->ArcadeDrive(stick->GetY()*stick->GetRawAxis(4),stick->GetZ()); 
 			myCatapult->SetDistance(Sonar->GetRangeInches());
 			myCatapult->Fire(stick->GetTrigger());
 
-			if (camera->IsFreshImage())
-			{
-				ColorImage *image;
-				image = new HSLImage("/10ft2.jpg");		// get the sample image from the cRIO flash
-				BinaryImage *thresholdImage = image->ThresholdRGB(threshold);	// get just the red target pixels
+			//if (camera->IsFreshImage())
+			//{
+				HSLImage *image = camera->GetImage();
+				BinaryImage *thresholdImage = image->ThresholdHSL(0, 255, 0, 255, 115, 167);	// get just the red target pixels
+				
+				Image* pNiImageCapture = image->GetImaqImage();
+				Image* pNiImage = thresholdImage->GetImaqImage();
+
+				//PrintImageStats(pNiImage);
+				
 				BinaryImage *bigObjectsImage = thresholdImage->RemoveSmallObjects(false, 2);  // remove small objects (noise)
 				BinaryImage *convexHullImage = bigObjectsImage->ConvexHull(false);  // fill in partial and full rectangles
 				BinaryImage *filteredImage = convexHullImage->ParticleFilter(criteria, 2);  // find the rectangles
 				vector<ParticleAnalysisReport> *reports = filteredImage->GetOrderedParticleAnalysisReports();  // get the results
 							
+				bool oneshot = false;
+				if (!oneshot) 
+				{
+					filteredImage->Write("TestShot1.png");
+					oneshot = true;
+					
+				}
+				if (stick->GetTrigger())oneshot=false;
+				
 				for (unsigned i = 0; i < reports->size(); i++) 
 				{
 					ParticleAnalysisReport *r = &(reports->at(i));
@@ -70,7 +108,7 @@ public:
 				delete bigObjectsImage;
 				delete thresholdImage;
 				delete image;
-			}
+			//}
 
 			
 			Wait(0.005);				
