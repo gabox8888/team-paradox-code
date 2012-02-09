@@ -1,6 +1,8 @@
 #include "WPILib.h"
 #include "ParadoxDrive.h"
 #include "ParadoxCatapult.h"
+#include "ParadoxShooter.h"
+#include "ParadoxBallManager.h"
 
 static void PrintImageStats(Image* pImage)
 {
@@ -30,7 +32,9 @@ static void PrintImageStats(Image* pImage)
 class ParadoxBot : public SimpleRobot
 {
 	ParadoxDrive 			*myParadox; 
+	ParadoxBallManager		*myManager;
 	ParadoxCatapult 	   *myCatapult;
+	ParadoxShooter			*myShooter;
 	Ultrasonic 				    *Sonar;
 	Joystick 					*stick;
 	Compressor			     *Compress;
@@ -40,7 +44,9 @@ public:
 	ParadoxBot()
 	{
 		myParadox 	= new ParadoxDrive (1,2,3,4,5,6);
+		myManager	= new ParadoxBallManager(false,false,false,false,false,false);
 		myCatapult  = new ParadoxCatapult(1,2,3,4,8,14);
+		myShooter	= new ParadoxShooter(false,false,false,false,false,false,false,false);
 		Sonar		= new Ultrasonic(10,11);
 		stick 		= new Joystick (1);	
 		Compress  	= new Compressor(!stick->GetRawButton(12),1); 
