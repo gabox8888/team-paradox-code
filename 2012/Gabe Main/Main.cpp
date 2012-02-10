@@ -31,6 +31,11 @@ static void PrintImageStats(Image* pImage)
 				
 class ParadoxBot : public SimpleRobot
 {
+	enum eAutonomousState
+	{
+		Shoot,
+		DriveBack,
+	};
 	ParadoxDrive 			*myParadox; 
 	ParadoxBallManager		*myManager;
 	ParadoxCatapult 	   *myCatapult;
@@ -39,6 +44,7 @@ class ParadoxBot : public SimpleRobot
 	Joystick 					*stick;
 	Compressor			     *Compress;
 	AxisCamera 				   *camera; 
+	eAutonomousState 			myAuto;
 
 public:
 	ParadoxBot()
@@ -54,13 +60,25 @@ public:
 		camera->WriteResolution(AxisCamera::kResolution_320x240);
 		camera->WriteCompression(20);
 		camera->WriteBrightness(0);
+		
+		myAuto = Shoot;
 
 
 	};
 
 	void Autonomous(void)
 	{
-		
+		switch (myAuto)
+		{
+			default:
+				break;
+			case Shoot:
+				myShooter->Shoot(true);
+				break;
+			case DriveBack:
+				myParadox->ArcadeDrive(-1,0);
+				break;
+		}
 	}
 
 	void OperatorControl(void)
