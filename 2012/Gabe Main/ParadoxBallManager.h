@@ -7,7 +7,7 @@
 class ParadoxBallManager
 {
 public:
-        ParadoxBallManager(UINT32 sucker, UINT32 store, UINT32 feedball, UINT32 in, UINT32 mid, UINT32 out);
+        ParadoxBallManager(UINT32 sucker, UINT32 store, UINT32 feedball, UINT32 in, UINT32 mid, UINT32 out, UINT32 pout, UINT32 pin);
         virtual ~ParadoxBallManager() {}
         
         void Intake(bool suck);
@@ -18,12 +18,14 @@ public:
         
 protected:
         
-       Victor 	 	 *Sucker;
-       Victor		  *Spine;
+       Relay 	 	 *Sucker;
+       Relay		  *Spine;
        Victor	  	   *Feed; 
        DigitalInput *LimitIN;
        DigitalInput *LimitMID;
        DigitalInput *LimitOUT;
+       Solenoid 	*PistonOut;
+       Solenoid 	*PistonIn;
        
        int counter;
        
