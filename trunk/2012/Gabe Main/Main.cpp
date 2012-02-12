@@ -50,12 +50,12 @@ public:
 	ParadoxBot()
 	{
 		myParadox 	= new ParadoxDrive (1,2,3,4,5,6);
-		myManager	= new ParadoxBallManager(false,false,false,false,false,false);
+		myManager	= new ParadoxBallManager(3,2,false,false,false,false,1,2);
 		myCatapult  = new ParadoxCatapult(1,2,3,4,8,14);
-		myShooter	= new ParadoxShooter(false,false,false,false,false,false,false,false);
+		myShooter	= new ParadoxShooter(false,false,false,false,false,false,false,false,false);
 		Sonar		= new Ultrasonic(10,11);
 		stick 		= new Joystick (1);	
-		Compress  	= new Compressor(!stick->GetRawButton(12),1); 
+		Compress  	= new Compressor(14,1); 
 		camera	 	= &AxisCamera::GetInstance("10.21.2.11");
 		camera->WriteResolution(AxisCamera::kResolution_320x240);
 		camera->WriteCompression(20);
@@ -93,6 +93,10 @@ public:
 			myParadox->ArcadeDrive(stick->GetY()*stick->GetRawAxis(4),stick->GetZ()); 
 			myCatapult->SetDistance(Sonar->GetRangeInches());
 			myCatapult->Fire(stick->GetTrigger());
+			myShooter->Shoot(stick->GetTwist());
+			myManager->FeedToShoot(stick->GetTrigger());
+			myManager->Intake(true);
+			myManager->Storage(true);
 
 			//if (camera->IsFreshImage())
 			//{
