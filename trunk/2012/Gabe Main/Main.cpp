@@ -42,26 +42,35 @@ class ParadoxBot : public SimpleRobot
 	ParadoxShooter			*myShooter;
 	Ultrasonic 				    *Sonar;
 	Joystick 					*stick;
+	Joystick 					*stick2;
 	Compressor			     *Compress;
 	AxisCamera 				   *camera; 
 	eAutonomousState 			myAuto;
+	Victor						*r;
+	Victor						*l;
+	RobotDrive					*myRobot;
 
 public:
 	ParadoxBot()
 	{
-		myParadox 	= new ParadoxDrive (1,2,3,4,5,6);
+		//myParadox 	= new ParadoxDrive (1,2,3,4,5,6);
 		myManager	= new ParadoxBallManager(3,2,false,false,false,false,1,2);
 		myCatapult  = new ParadoxCatapult(1,2,3,4,8,14);
 		myShooter	= new ParadoxShooter(false,false,false,false,false,false,false,false,false);
 		Sonar		= new Ultrasonic(10,11);
 		stick 		= new Joystick (1);	
+		stick2 		= new Joystick (2);	
 		Compress  	= new Compressor(14,1); 
 		camera	 	= &AxisCamera::GetInstance("10.21.2.11");
 		camera->WriteResolution(AxisCamera::kResolution_320x240);
 		camera->WriteCompression(20);
 		camera->WriteBrightness(0);
+		r			= new Victor(1);
+		l			= new Victor(2);
+		myRobot		= new RobotDrive(r,l);
 		
 		myAuto = Shoot;
+		Compress->Start();
 
 
 	};
@@ -90,15 +99,27 @@ public:
 		};
 		while (IsOperatorControl())
 		{
-			myParadox->ArcadeDrive(stick->GetY()*stick->GetRawAxis(4),stick->GetZ()); 
+			bool go;
+			if (stick2->GetTrigger())
+			{
+				go=true;
+			}
+			else
+			{
+				go=false;
+			}
+			//myParadox->ArcadeDrive(stick->GetY(),stick->GetZ()); 
+			myRobot->ArcadeDrive(-1*stick->GetY(),-1*stick->GetZ());
 			myCatapult->SetDistance(Sonar->GetRangeInches());
 			myCatapult->Fire(stick->GetTrigger());
 			myShooter->Shoot(stick->GetTwist());
 			myManager->FeedToShoot(stick->GetTrigger());
-			myManager->Intake(true);
-			myManager->Storage(true);
+			myManager->Intake(go);
+			myManager->Storage(go);
+			myManager->ShootOut(stick2->GetRawButton(2));
+			myManager->Practice(stick2->GetRawButton(3));
 
-			//if (camera->IsFreshImage())
+			/*//if (camera->IsFreshImage())
 			//{
 				HSLImage *image = camera->GetImage();
 				BinaryImage *thresholdImage = image->ThresholdHSL(0, 255, 0, 255, 115, 167);	// get just the red target pixels
@@ -136,7 +157,7 @@ public:
 				delete bigObjectsImage;
 				delete thresholdImage;
 				delete image;
-			//}
+			//}*/
 
 			
 			Wait(0.005);				

@@ -14,17 +14,17 @@ ParadoxBallManager::ParadoxBallManager(UINT32 sucker, UINT32 store, UINT32 feedb
 	PistonIn	= new Solenoid(pin);
 	
 	counter = 0;
-	Sucker->kOn;
 }
 void ParadoxBallManager::Intake(bool suck)
 {
-	if (counter<4)Sucker->kForward;
-	else Sucker->kOff;
+	if ((counter<4)&&(suck))Sucker->Set(Relay::kForward);
+	else Sucker->Set(Relay::kOff);
 }
 
 void ParadoxBallManager::Storage(bool storage)
 {
-	Spine->kForward;
+	if (storage)Spine->Set(Relay::kForward);
+	else Spine->Set(Relay::kOff);
 }
 void ParadoxBallManager::FeedToShoot(bool feed)
 {
@@ -32,9 +32,30 @@ void ParadoxBallManager::FeedToShoot(bool feed)
 	else if (feed)Feed->Set(1);
 	else Feed->Set(0);
 }
+void ParadoxBallManager::ShootOut(bool out)
+{
+	if (out) 
+	{
+		PistonOut->Set(0);
+		PistonIn->Set(1);
+	}
+	else
+	{
+		PistonOut->Set(1);
+		PistonIn->Set(0);
+	}
+}
 float ParadoxBallManager::ToCount(void)
 {
 	if (LimitIN->Get()==1)counter++;
 	if (LimitOUT->Get()==1)counter--;
 	return counter;
+}
+void ParadoxBallManager::Practice(bool prac)
+{
+	if (prac)
+	{
+		Sucker->Set(Relay::kReverse);
+		Spine->Set(Relay::kReverse);
+	}
 }

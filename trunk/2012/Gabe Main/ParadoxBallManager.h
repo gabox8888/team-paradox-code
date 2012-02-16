@@ -13,7 +13,9 @@ public:
         void Intake(bool suck);
         void Storage(bool storage);
         void FeedToShoot(bool feed);
+        void ShootOut(bool out);
         float ToCount();
+        void Practice(bool prac);
 
         
 protected:
