@@ -51,11 +51,18 @@ float ParadoxBallManager::ToCount(void)
 	if (LimitOUT->Get()==1)counter--;
 	return counter;
 }
-void ParadoxBallManager::Practice(bool prac)
+void ParadoxBallManager::Practice(INT32 device, INT32 dir)
 {
-	if (prac)
+	if (device == 0)
 	{
-		Sucker->Set(Relay::kReverse);
-		Spine->Set(Relay::kReverse);
+		if (dir == -1) Sucker->Set(Relay::kReverse);
+		if (dir ==  0) Sucker->Set(Relay::kOff);
+		if (dir ==  1) Sucker->Set(Relay::kForward);
+	}
+	if (device == 1)
+	{
+		if (dir == -1) Spine->Set(Relay::kReverse);
+		if (dir ==  0) Spine->Set(Relay::kOff);
+		if (dir ==  1) Spine->Set(Relay::kForward);
 	}
 }

@@ -5,14 +5,12 @@ class Protodox : public IterativeRobot
 {
 	RobotDrive *myRobot;
 	Joystick *stick;
-        Solenoid *PistonOUT1;
-        Solenoid *PistonOUT2;
-        Solenoid *PistonIN1;
-        Solenoid *PistonIN2;
+	Solenoid *SuckOut;
+	Solenoid *SuckIn;
 	Compressor *spike;
+	Relay *spine;
+	Relay *rollers;
 	DriverStationLCD *dslcd;
-	Balance *bal;
-	Victor *tmpvic;
 	
 public:
 	Protodox()
@@ -20,48 +18,39 @@ public:
 		SetPeriod(0.05);
 		myRobot = new RobotDrive(1,2);
 		stick = new Joystick(1);
-		PistonOUT1 = new Solenoid(1);
-		PistonOUT2 = new Solenoid(2);
-		PistonIN1 = new Solenoid(3);
-		PistonIN2 = new Solenoid(4);
-		spike = new Compressor(6,1);
+		SuckOut = new Solenoid(1);
+		SuckIn = new Solenoid(2);
+		spike = new Compressor(14,1);
+		spine = new Relay(2);
+		rollers = new Relay(3);
 		dslcd = DriverStationLCD::GetInstance();
-		bal = new Balance(GetPeriod());
-		tmpvic = new Victor(3);
 	};
 	
 	void TeleopInit(void)
 	{
-		tmpvic->SetSafetyEnabled(false);
-		bal->Active = false;
 		spike->Start();
 	}
-	
+	/*
 	void TeleopPeriodic(void)
 	{
-		if (stick->GetRawButton(7)) bal->Active = true;
-		if (stick->GetRawButton(9)) bal->Active = false;
-		
-		float speed = bal->PassiveCompute(stick->GetY());
-		myRobot->ArcadeDrive(speed, stick->GetZ());
-		
 		dslcd->PrintfLine(DriverStationLCD::kUser_Line1, "axis4 %f", stick->GetRawAxis(4));
-		dslcd->PrintfLine(DriverStationLCD::kUser_Line2, "balancer debug %f", bal->DebugNum());
-		if (bal->Active) dslcd->PrintfLine(DriverStationLCD::kUser_Line3, "balancer ON %f", speed);
-		else dslcd->PrintfLine(DriverStationLCD::kUser_Line3, "balancer OFF");
 		dslcd->UpdateLCD();
+		
 	}
-	
+	*/
 	void TeleopContinuous(void)
 	{
-		if (stick->GetRawButton(8)) tmpvic->Set(stick->GetRawAxis(4));
-		else tmpvic->Set(0.0);
+		if (stick->GetRawButton(5)) rollers->Set(Relay::kForward);
+		else if (stick->GetRawButton(3)) rollers->Set(Relay::kReverse);
+		else rollers->Set(Relay::kOff);
+		
+		if (stick->GetRawButton(6)) spine->Set(Relay::kForward);
+		else if (stick->GetRawButton(4)) spine->Set(Relay::kReverse);
+		else spine->Set(Relay::kOff);
 		
 		bool shoot = (stick->GetTrigger()) ? true : false;
-		PistonOUT1->Set(shoot);
-		PistonOUT2->Set(shoot);
-		PistonIN1->Set(!shoot);
-		PistonIN2->Set(!shoot);
+		SuckOut->Set(shoot);
+		SuckIn->Set(!shoot);
 	}
 };
 
