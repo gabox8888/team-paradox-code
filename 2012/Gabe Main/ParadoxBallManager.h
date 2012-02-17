@@ -15,7 +15,7 @@ public:
         void FeedToShoot(bool feed);
         void ShootOut(bool out);
         float ToCount();
-        void Practice(bool prac);
+        void Practice(INT32 device, INT32 dir);
 
         
 protected:
