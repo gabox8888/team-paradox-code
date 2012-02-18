@@ -110,22 +110,22 @@ public:
 			}
 			//myParadox->ArcadeDrive(stick->GetY(),stick->GetZ()); 
 			myRobot->ArcadeDrive(stick->GetY(),-1*stick->GetZ());
-			/*
+			
 			myCatapult->SetDistance(Sonar->GetRangeInches());
 			myCatapult->Fire(stick->GetTrigger());
 			myShooter->Shoot(stick->GetTwist());
-			myManager->FeedToShoot(stick->GetTrigger());
+			myManager->FeedToShoot(go);
 			myManager->Intake(go);
 			myManager->Storage(go);
 			myManager->ShootOut(stick2->GetRawButton(2));
-			myManager->Practice(stick2->GetRawButton(3));
-			*/
+			//myManager->Practice(stick2->GetRawButton(3));
 			
-			myManager->ShootOut(stick->GetRawButton(6));
-			myManager->Intake(stick->GetRawButton(8));
-			if (stick->GetRawButton(5)) myManager->Practice(1, 1);
-			else if (stick->GetRawButton(7)) myManager->Practice(1, -1);
-			else myManager->Practice(1, 0);
+			
+			//myManager->ShootOut(stick->GetRawButton(6));
+			//myManager->Intake(stick->GetRawButton(8));
+			//if (stick->GetRawButton(5)) myManager->Practice(1, 1);
+			//else if (stick->GetRawButton(7)) myManager->Practice(1, -1);
+			//else myManager->Practice(1, 0);
 			
 
 			/*//if (camera->IsFreshImage())

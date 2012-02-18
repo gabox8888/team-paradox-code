@@ -22,7 +22,7 @@ protected:
         
        Relay 	 	 *Sucker;
        Relay		  *Spine;
-       Victor	  	   *Feed; 
+       CANJaguar	   *Feed; 
        DigitalInput *LimitIN;
        DigitalInput *LimitMID;
        DigitalInput *LimitOUT;
