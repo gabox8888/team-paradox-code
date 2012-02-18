@@ -6,7 +6,7 @@ ParadoxBallManager::ParadoxBallManager(UINT32 sucker, UINT32 store, UINT32 feedb
 {
 	Sucker 		= new Relay(sucker);
 	Spine		= new Relay(store);
-	Feed		= new Victor(feedball);
+	Feed		= new CANJaguar(feedball);
 	LimitIN		= new DigitalInput(in);	
 	LimitMID	= new DigitalInput(mid);
 	LimitOUT	= new DigitalInput(out);
