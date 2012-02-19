@@ -12,9 +12,9 @@ ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2, UINT32 tilt1, UINT
 	LimitR 	= new DigitalInput(limitr);
 	LimitL 	= new DigitalInput(limitl); 
 }
-void ParadoxShooter::Shoot(float wheels)
+void ParadoxShooter::Shoot(float wheels,float sens)
 {
-	Shoot1->Set(wheels);
+	Shoot1->Set(wheels*sens);
 	Shoot2->Set(wheels);	
 }
 
@@ -33,4 +33,9 @@ void ParadoxShooter::FindTarget(bool stop)
 		if (sweep == false)Tilt->Set(-1);
 
 	}
+}
+void ParadoxShooter::SideToSide(float twist)
+{
+	if (fabs(twist)>.5)Tilt->Set(twist);
+	else Tilt->Set(0);
 }

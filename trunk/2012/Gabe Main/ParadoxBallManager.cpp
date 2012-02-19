@@ -29,7 +29,7 @@ void ParadoxBallManager::Storage(bool storage)
 void ParadoxBallManager::FeedToShoot(bool feed)
 {
 	if (LimitMID->Get()==1)Feed->Set(1);
-	else if (feed)Feed->Set(1);
+	else if (feed)Feed->Set(-1);
 	else Feed->Set(0);
 }
 void ParadoxBallManager::ShootOut(bool out)
