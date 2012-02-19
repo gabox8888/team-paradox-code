@@ -26,10 +26,11 @@ void ParadoxBallManager::Storage(bool storage)
 	if (storage)Spine->Set(Relay::kForward);
 	else Spine->Set(Relay::kOff);
 }
-void ParadoxBallManager::FeedToShoot(bool feed)
+void ParadoxBallManager::FeedToShoot(bool feed, bool rev)
 {
 	if (LimitMID->Get()==1)Feed->Set(1);
 	else if (feed)Feed->Set(-1);
+	else if (rev)Feed->Set(1);
 	else Feed->Set(0);
 }
 void ParadoxBallManager::ShootOut(bool out)

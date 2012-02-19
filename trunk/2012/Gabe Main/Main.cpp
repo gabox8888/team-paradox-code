@@ -101,25 +101,17 @@ public:
 		};
 		while (IsOperatorControl())
 		{
-			bool go;
-			if (stick2->GetTrigger())
-			{
-				go=true;
-			}
-			else
-			{
-				go=false;
-			}
+			bool go = (stick2->GetTrigger()) ? true : false;
 			//myParadox->ArcadeDrive(stick->GetY(),stick->GetZ()); 
 			myRobot->ArcadeDrive(stick->GetY(),-1*stick->GetZ());
 			
 			myCatapult->SetDistance(Sonar->GetRangeInches());
 			myCatapult->Fire(stick->GetTrigger());
-			myShooter->Shoot(stick2->GetY(),(stick2->GetRawAxis(4)*.5)+.5);
-			myManager->FeedToShoot(stick2->GetRawButton(4));
-			myManager->Intake(go);
-			myManager->Storage(go);
-			myManager->ShootOut(stick2->GetRawButton(2));
+			myShooter->Shoot(stick2->GetY(),stick2->GetRawAxis(4));
+			myManager->FeedToShoot(stick2->GetRawButton(4),stick2->GetRawButton(3));
+			//myManager->Intake(go);
+			//myManager->Storage(go);
+			//myManager->ShootOut(stick2->GetRawButton(2));
 			myShooter->SideToSide(stick2->GetZ());
 			if (stick2->GetRawButton(5))Bridge->Set(.25);
 			else if (stick2->GetRawButton(6))Bridge->Set(-.25);
@@ -127,11 +119,11 @@ public:
 			//myManager->Practice(stick2->GetRawButton(3));
 			
 			
-			//myManager->ShootOut(stick->GetRawButton(6));
-			//myManager->Intake(stick->GetRawButton(8));
-			//if (stick->GetRawButton(5)) myManager->Practice(1, 1);
-			//else if (stick->GetRawButton(7)) myManager->Practice(1, -1);
-			//else myManager->Practice(1, 0);
+			myManager->ShootOut(stick->GetRawButton(6));
+			myManager->Intake(stick->GetRawButton(8));
+			if (stick->GetRawButton(5)) myManager->Practice(1, 1);
+			else if (stick->GetRawButton(7)) myManager->Practice(1, -1);
+			else myManager->Practice(1, 0);
 			
 
 			/*//if (camera->IsFreshImage())

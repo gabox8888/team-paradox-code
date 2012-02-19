@@ -14,8 +14,8 @@ ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2, UINT32 tilt1, UINT
 }
 void ParadoxShooter::Shoot(float wheels,float sens)
 {
-	Shoot1->Set(wheels*sens);
-	Shoot2->Set(wheels);	
+	Shoot1->Set(wheels);
+	Shoot2->Set(wheels*sens);	
 }
 
 void ParadoxShooter::FindTarget(bool stop)
@@ -38,4 +38,9 @@ void ParadoxShooter::SideToSide(float twist)
 {
 	if (fabs(twist)>.5)Tilt->Set(twist);
 	else Tilt->Set(0);
+}
+void ParadoxShooter::Dump(DriverStationLCD* ds)
+{
+	float amps = Shoot1->GetOutputCurrent();
+	ds->Printf(DriverStationLCD::kUser_Line1, 1, "Amps: %f", amps);
 }

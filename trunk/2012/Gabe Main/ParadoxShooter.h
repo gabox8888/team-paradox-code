@@ -13,6 +13,7 @@ public:
         void Shoot(float wheels, float sens);
         void FindTarget(bool stop);
         void SideToSide(float twist);
+        void Dump(DriverStationLCD* ds);
         
 protected:
         
