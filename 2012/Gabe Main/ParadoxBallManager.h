@@ -12,7 +12,7 @@ public:
         
         void Intake(bool suck);
         void Storage(bool storage);
-        void FeedToShoot(bool feed);
+        void FeedToShoot(bool feed, bool rev);
         void ShootOut(bool out);
         float ToCount();
         void Practice(INT32 device, INT32 dir);
