@@ -49,14 +49,15 @@ class ParadoxBot : public SimpleRobot
 	Victor						*r;
 	Victor						*l;
 	RobotDrive					*myRobot;
+	Victor						*Bridge;
 
 public:
 	ParadoxBot()
 	{
 		//myParadox 	= new ParadoxDrive (1,2,3,4,5,6);
-		myManager	= new ParadoxBallManager(3,2,false,false,false,false,1,2);
+		myManager	= new ParadoxBallManager(3,2,3,false,false,false,1,2);
 		myCatapult  = new ParadoxCatapult(1,2,3,4,8,14);
-		myShooter	= new ParadoxShooter(false,false,false,false,false,false,false,false,false);
+		myShooter	= new ParadoxShooter(4,5,2,false,false,false,false,false,false);
 		Sonar		= new Ultrasonic(10,11);
 		stick 		= new Joystick (1);	
 		stick2 		= new Joystick (2);	
@@ -68,6 +69,7 @@ public:
 		r			= new Victor(1);
 		l			= new Victor(2);
 		myRobot		= new RobotDrive(r,l);
+		Bridge		= new Victor(3);
 		
 		myAuto = Shoot;
 		Compress->Start();
@@ -82,7 +84,7 @@ public:
 			default:
 				break;
 			case Shoot:
-				myShooter->Shoot(true);
+				//myShooter->Shoot(true);
 				break;
 			case DriveBack:
 				myParadox->ArcadeDrive(-1,0);
@@ -113,11 +115,15 @@ public:
 			
 			myCatapult->SetDistance(Sonar->GetRangeInches());
 			myCatapult->Fire(stick->GetTrigger());
-			myShooter->Shoot(stick->GetTwist());
-			myManager->FeedToShoot(go);
+			myShooter->Shoot(stick2->GetY(),(stick2->GetRawAxis(4)*.5)+.5);
+			myManager->FeedToShoot(stick2->GetRawButton(4));
 			myManager->Intake(go);
 			myManager->Storage(go);
 			myManager->ShootOut(stick2->GetRawButton(2));
+			myShooter->SideToSide(stick2->GetZ());
+			if (stick2->GetRawButton(5))Bridge->Set(.25);
+			else if (stick2->GetRawButton(6))Bridge->Set(-.25);
+			else Bridge->Set(0);
 			//myManager->Practice(stick2->GetRawButton(3));
 			
 			
