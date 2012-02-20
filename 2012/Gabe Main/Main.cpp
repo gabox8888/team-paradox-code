@@ -28,7 +28,6 @@ static void PrintImageStats(Image* pImage)
 	printf("gray min = %f, max = %f; nWhite=%d; nBlack=%d\n", fMin, fMax, nWhite, nBlack);
 }
 				
-				
 class ParadoxBot : public SimpleRobot
 {
 	enum eAutonomousState
@@ -40,6 +39,7 @@ class ParadoxBot : public SimpleRobot
 	ParadoxBallManager		*myManager;
 	ParadoxCatapult 	   *myCatapult;
 	ParadoxShooter			*myShooter;
+	Task*					m_pTrackingTask;
 	Ultrasonic 				    *Sonar;
 	Joystick 					*stick;
 	Joystick 					*stick2;
@@ -53,6 +53,7 @@ class ParadoxBot : public SimpleRobot
 	DriverStationLCD			*ds;
 
 public:
+
 	ParadoxBot()
 	{
 		//myParadox 	= new ParadoxDrive (1,2,3,4,5,6);
@@ -72,6 +73,9 @@ public:
 		myRobot		= new RobotDrive(r,l);
 		Bridge		= new Victor(3);
 		ds			= DriverStationLCD::GetInstance();
+
+		m_pTrackingTask = new Task("TrackingTask", (FUNCPTR)TrackingTaskEntry, Task::kDefaultPriority + 1);
+		m_pTrackingTask->Start((UINT32)this);
 		
 		myAuto = Shoot;
 		Compress->Start();
@@ -79,6 +83,11 @@ public:
 
 	};
 
+	~ParadoxBot()
+	{
+		delete m_pTrackingTask;
+	}
+	
 	void Autonomous(void)
 	{
 		switch (myAuto)
@@ -93,6 +102,9 @@ public:
 				break;
 		}
 	}
+
+	static int TrackingTaskEntry(ParadoxBot* pBot);
+	void ProcessTracking();
 
 	void OperatorControl(void)
 	{
@@ -129,17 +141,11 @@ public:
 			else myManager->Practice(1, 0);
 			
 
-			/*//if (camera->IsFreshImage())
+			//if (camera->IsFreshImage())
 			//{
 				HSLImage *image = camera->GetImage();
-				BinaryImage *thresholdImage = image->ThresholdHSL(0, 255, 0, 255, 115, 167);	// get just the red target pixels
-				
-				Image* pNiImageCapture = image->GetImaqImage();
-				Image* pNiImage = thresholdImage->GetImaqImage();
-
-				//PrintImageStats(pNiImage);
-				
-				BinaryImage *bigObjectsImage = thresholdImage->RemoveSmallObjects(false, 2);  // remove small objects (noise)
+				BinaryImage *thresholdImage = image->ThresholdHSL(60, 138, 0, 255, 104, 138);	// get just the red target pixels
+				BinaryImage *bigObjectsImage = thresholdImage->RemoveSmallObjects(false, 1);  // remove small objects (noise)
 				BinaryImage *convexHullImage = bigObjectsImage->ConvexHull(false);  // fill in partial and full rectangles
 				BinaryImage *filteredImage = convexHullImage->ParticleFilter(criteria, 2);  // find the rectangles
 				vector<ParticleAnalysisReport> *reports = filteredImage->GetOrderedParticleAnalysisReports();  // get the results
@@ -147,16 +153,16 @@ public:
 				bool oneshot = false;
 				if (!oneshot) 
 				{
-					filteredImage->Write("TestShot1.png");
+					convexHullImage->Write("TestShot1.png");
 					oneshot = true;
 					
 				}
-				if (stick->GetTrigger())oneshot=false;
+				if (stick2->GetTrigger())oneshot=false;
 				
 				for (unsigned i = 0; i < reports->size(); i++) 
 				{
 					ParticleAnalysisReport *r = &(reports->at(i));
-					printf("particle: %d  center_mass_x: %d\n", i, r->center_mass_x);
+					printf("particle: %d  center_mass_x: %f\n", i, (float)r->center_mass_x_normalized);
 				}
 				printf("\n");
 			
@@ -167,13 +173,27 @@ public:
 				delete bigObjectsImage;
 				delete thresholdImage;
 				delete image;
-			//}*/
+			//}
 
 			myShooter->Dump(ds);
+			ds->UpdateLCD();
 			
 			Wait(0.005);				
 		}
 	}
 };
+
+void ParadoxBot::ProcessTracking()
+{
+	printf("PING!\n");
+	Wait(0.1f);
+}
+
+int ParadoxBot::TrackingTaskEntry(ParadoxBot* pBot)
+{
+	pBot->ProcessTracking();
+	return 0;
+}
+
 
 START_ROBOT_CLASS(ParadoxBot);
