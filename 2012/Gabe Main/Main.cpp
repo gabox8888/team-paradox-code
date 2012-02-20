@@ -50,6 +50,7 @@ class ParadoxBot : public SimpleRobot
 	Victor						*l;
 	RobotDrive					*myRobot;
 	Victor						*Bridge;
+	DriverStationLCD			*ds;
 
 public:
 	ParadoxBot()
@@ -70,6 +71,7 @@ public:
 		l			= new Victor(2);
 		myRobot		= new RobotDrive(r,l);
 		Bridge		= new Victor(3);
+		ds			= DriverStationLCD::GetInstance();
 		
 		myAuto = Shoot;
 		Compress->Start();
@@ -101,14 +103,15 @@ public:
 		};
 		while (IsOperatorControl())
 		{
-			bool go = (stick2->GetTrigger()) ? true : false;
+			bool out = (stick2->GetRawButton(4)) ? true : false;
+			bool in = (stick2->GetRawButton(3)) ? true : false;
 			//myParadox->ArcadeDrive(stick->GetY(),stick->GetZ()); 
 			myRobot->ArcadeDrive(stick->GetY(),-1*stick->GetZ());
 			
 			myCatapult->SetDistance(Sonar->GetRangeInches());
 			myCatapult->Fire(stick->GetTrigger());
 			myShooter->Shoot(stick2->GetY(),stick2->GetRawAxis(4));
-			myManager->FeedToShoot(stick2->GetRawButton(4),stick2->GetRawButton(3));
+			myManager->FeedToShoot(out,in);
 			//myManager->Intake(go);
 			//myManager->Storage(go);
 			//myManager->ShootOut(stick2->GetRawButton(2));
@@ -166,6 +169,7 @@ public:
 				delete image;
 			//}*/
 
+			myShooter->Dump(ds);
 			
 			Wait(0.005);				
 		}
