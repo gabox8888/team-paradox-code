@@ -3,30 +3,6 @@
 #include "ParadoxCatapult.h"
 #include "ParadoxShooter.h"
 #include "ParadoxBallManager.h"
-
-static void PrintImageStats(Image* pImage)
-{
-	int W, H;
-	imaqGetImageSize (pImage, &W, &H);
-	float fMin = 1.0e30f;
-	float fMax = -1.0e30f;
-	int nWhite = 0;
-	int nBlack = 0;
-	for (int iy = 0; iy < H; iy++)
-		for (int ix = 0; ix < W; ix++)
-		{
-			PixelValue pix;
-						
-			int iFoo = imaqGetPixel(pImage, imaqMakePoint(ix,iy), &pix);
-			if (pix.grayscale > 0.5f)
-				nWhite += 1;
-			else
-				nBlack += 1;
-			if (pix.grayscale < fMin) fMin = pix.grayscale;
-			if (pix.grayscale > fMax) fMax = pix.grayscale;
-		}
-	printf("gray min = %f, max = %f; nWhite=%d; nBlack=%d\n", fMin, fMax, nWhite, nBlack);
-}
 				
 class ParadoxBot : public SimpleRobot
 {
@@ -35,51 +11,68 @@ class ParadoxBot : public SimpleRobot
 		Shoot,
 		DriveBack,
 	};
-	ParadoxDrive 			*myParadox; 
-	ParadoxBallManager		*myManager;
-	ParadoxCatapult 	   *myCatapult;
-	ParadoxShooter			*myShooter;
-	Task*					m_pTrackingTask;
-	Ultrasonic 				    *Sonar;
-	Joystick 					*stick;
-	Joystick 					*stick2;
+	enum eSemiAutoBridgeState
+	{
+		Position,
+		Tip,
+		Drive,
+	};
+	
 	Compressor			     *Compress;
-	AxisCamera 				   *camera; 
-	eAutonomousState 			myAuto;
 	Victor						*r;
 	Victor						*l;
+	AnalogChannel				*asonar;
+	DigitalInput				*tak1;
+	DigitalInput				*tak2;
+	Solenoid					*BridgeOUT;
+	Solenoid					*BridgeIN;
+	AxisCamera 				   *camera; 
+		
 	RobotDrive					*myRobot;
-	Victor						*Bridge;
+	ParadoxBallManager		*myManager;
+	ParadoxShooter			*myShooter;
+	
+	Joystick 					*stick;
+	Joystick 					*stick2;
 	DriverStationLCD			*ds;
+	eAutonomousState 			myAuto;
+	eSemiAutoBridgeState		myBridge;
+	
+	Task*					m_pTrackingTask;
 
+	
+	
 public:
 
 	ParadoxBot()
 	{
-		//myParadox 	= new ParadoxDrive (1,2,3,4,5,6);
-		myManager	= new ParadoxBallManager(3,2,3,false,false,false,1,2);
-		myCatapult  = new ParadoxCatapult(1,2,3,4,8,14);
+		Compress  	= new Compressor(14,1); 
+		r			= new Victor(1);
+		l			= new Victor(2);
+		asonar		= new AnalogChannel(4);
+		tak1		= new DigitalInput(4);
+		tak2		= new DigitalInput(3);
+		BridgeOUT	= new Solenoid(3);
+		BridgeIN	= new Solenoid(4);
+		camera	 	= &AxisCamera::GetInstance("10.21.2.11");
+		
+		myRobot		= new RobotDrive(r,l);
+		myManager	= new ParadoxBallManager(4,3,3,false,false,false,1,2);
 		myShooter	= new ParadoxShooter(4,5,2,false,false,false,false,false,false);
-		Sonar		= new Ultrasonic(10,11);
+		
 		stick 		= new Joystick (1);	
 		stick2 		= new Joystick (2);	
-		Compress  	= new Compressor(14,1); 
-		camera	 	= &AxisCamera::GetInstance("10.21.2.11");
+		ds			= DriverStationLCD::GetInstance();
+		
+		m_pTrackingTask = new Task("TrackingTask", (FUNCPTR)TrackingTaskEntry, Task::kDefaultPriority + 1);
+		
+		myAuto = Shoot;
+		myBridge = Position;
+		Compress->Start();
+		m_pTrackingTask->Start((UINT32)this);
 		camera->WriteResolution(AxisCamera::kResolution_320x240);
 		camera->WriteCompression(20);
 		camera->WriteBrightness(0);
-		r			= new Victor(1);
-		l			= new Victor(2);
-		myRobot		= new RobotDrive(r,l);
-		Bridge		= new Victor(3);
-		ds			= DriverStationLCD::GetInstance();
-
-		m_pTrackingTask = new Task("TrackingTask", (FUNCPTR)TrackingTaskEntry, Task::kDefaultPriority + 1);
-		m_pTrackingTask->Start((UINT32)this);
-		
-		myAuto = Shoot;
-		Compress->Start();
-
 
 	};
 
@@ -95,10 +88,10 @@ public:
 			default:
 				break;
 			case Shoot:
-				//myShooter->Shoot(true);
+				myShooter->Shoot(.7f,-1);
 				break;
 			case DriveBack:
-				myParadox->ArcadeDrive(-1,0);
+				myRobot->Drive(-1,0);
 				break;
 		}
 	}
@@ -113,36 +106,47 @@ public:
 				{IMAQ_MT_BOUNDING_RECT_WIDTH, 30, 400, false, false},
 				{IMAQ_MT_BOUNDING_RECT_HEIGHT, 40, 400, false, false}
 		};
+		float inches = asonar->GetVoltage()/0.009766;
+		int counter1;
+		int counter2;
+		if(tak1->Get()==1) counter1++;
+		if(tak2->Get()==1) counter2++;
+					
 		while (IsOperatorControl())
 		{
 			bool out = (stick2->GetRawButton(4)) ? true : false;
 			bool in = (stick2->GetRawButton(3)) ? true : false;
-			//myParadox->ArcadeDrive(stick->GetY(),stick->GetZ()); 
-			myRobot->ArcadeDrive(stick->GetY(),-1*stick->GetZ());
-			
-			myCatapult->SetDistance(Sonar->GetRangeInches());
-			myCatapult->Fire(stick->GetTrigger());
+			bool go = (stick2->GetTrigger()) ? true : false;
+			myRobot->ArcadeDrive(stick->GetY(),-1*stick->GetZ());			
 			myShooter->Shoot(stick2->GetY(),stick2->GetRawAxis(4));
 			myManager->FeedToShoot(out,in);
-			//myManager->Intake(go);
-			//myManager->Storage(go);
-			//myManager->ShootOut(stick2->GetRawButton(2));
+			myManager->Intake(go);
+			myManager->Storage(go);
+			myManager->ShootOut(stick2->GetRawButton(2));
 			myShooter->SideToSide(stick2->GetZ());
-			if (stick2->GetRawButton(5))Bridge->Set(.25);
-			else if (stick2->GetRawButton(6))Bridge->Set(-.25);
-			else Bridge->Set(0);
+			
+			if (stick2->GetRawButton(3))
+			{
+				BridgeOUT->Set(1);
+				BridgeIN->Set(0);
+			}
+			else if (stick2->GetRawButton(4))
+			{
+				BridgeOUT->Set(0);
+				BridgeIN->Set(1);
+			}
 			//myManager->Practice(stick2->GetRawButton(3));
 			
 			
-			myManager->ShootOut(stick->GetRawButton(6));
+			/*myManager->ShootOut(stick->GetRawButton(6));
 			myManager->Intake(stick->GetRawButton(8));
 			if (stick->GetRawButton(5)) myManager->Practice(1, 1);
 			else if (stick->GetRawButton(7)) myManager->Practice(1, -1);
-			else myManager->Practice(1, 0);
+			else myManager->Practice(1, 0);*/
 			
 
-			//if (camera->IsFreshImage())
-			//{
+			if (camera->IsFreshImage())
+			{
 				HSLImage *image = camera->GetImage();
 				BinaryImage *thresholdImage = image->ThresholdHSL(60, 138, 0, 255, 104, 138);	// get just the red target pixels
 				BinaryImage *bigObjectsImage = thresholdImage->RemoveSmallObjects(false, 1);  // remove small objects (noise)
@@ -173,9 +177,14 @@ public:
 				delete bigObjectsImage;
 				delete thresholdImage;
 				delete image;
-			//}
-
+			}
+	
 			myShooter->Dump(ds);
+			ds->PrintfLine(DriverStationLCD::kUser_Line2, "sonar : %f", inches);
+			ds->PrintfLine(DriverStationLCD::kUser_Line3, "tak1 : %d", tak1->Get());
+			ds->PrintfLine(DriverStationLCD::kUser_Line4, "tak1 : %d", counter1);
+			ds->PrintfLine(DriverStationLCD::kUser_Line5, "tak2 : %d", tak2->Get());
+			ds->PrintfLine(DriverStationLCD::kUser_Line6, "tak2 : %d", counter2);
 			ds->UpdateLCD();
 			
 			Wait(0.005);				
