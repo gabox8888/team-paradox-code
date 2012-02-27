@@ -4,18 +4,33 @@
 
 ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2, UINT32 tilt1, UINT32 encoa1, UINT32 encob1, UINT32 encoa2, UINT32 encob2, UINT32 limitr, UINT32 limitl)
 {
-	Shoot1	= new CANJaguar(motor1);
-	Shoot2	= new CANJaguar(motor2);
+	Shoot1	= new CANJaguar(motor1,CANJaguar::kSpeed);
+	Shoot2	= new CANJaguar(motor2,CANJaguar::kSpeed);
 	Tilt	= new CANJaguar(tilt1);
-	ENCO1	= new Encoder(encoa1,encob1);
-	ENCO2	= new Encoder(encoa2,encob2);
 	LimitR 	= new DigitalInput(limitr);
-	LimitL 	= new DigitalInput(limitl); 
+	LimitL 	= new DigitalInput(limitl);
+	
+	Shoot1->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
+	Shoot2->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
+	Shoot1->SetPID(2,.1,0);
+	Shoot2->SetPID(2,.1,0);
+	Shoot1->ConfigEncoderCodesPerRev(1);
+	Shoot2->ConfigEncoderCodesPerRev(1);
 }
-void ParadoxShooter::Shoot(float wheels,float sens)
+void ParadoxShooter::Shoot(float topWheel,float bottomWheel, float sens, bool on)
 {
-	Shoot1->Set(wheels);
-	Shoot2->Set(wheels*sens);	
+	Shoot1->SetSafetyEnabled(false);
+	Shoot2->SetSafetyEnabled(false);
+	if (on == true)
+	{
+		Shoot1->Set(topWheel);
+		Shoot2->Set(bottomWheel);
+	}
+	else
+	{
+		Shoot1->Set(0);
+		Shoot2->Set(0);
+	}	
 }
 
 void ParadoxShooter::FindTarget(bool stop)
