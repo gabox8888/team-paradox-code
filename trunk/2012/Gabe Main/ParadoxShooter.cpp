@@ -14,10 +14,15 @@ ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2, UINT32 tilt1, UINT
 	Shoot2->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
 	Shoot1->SetPID(2,.1,0);
 	Shoot2->SetPID(2,.1,0);
-	Shoot1->ConfigEncoderCodesPerRev(1);
-	Shoot2->ConfigEncoderCodesPerRev(1);
+	Shoot1->ConfigEncoderCodesPerRev(250);
+	Shoot2->ConfigEncoderCodesPerRev(250);
+	m_targetCM_X = 0.0f;
+	m_hasTarget = false;
+	m_bAutoTrackingTurret = true;
+	m_turretMotorPWM = 0.0f;
 }
-void ParadoxShooter::Shoot(float topWheel,float bottomWheel, float sens, bool on)
+
+void ParadoxShooter::Shoot(float topWheel,float bottomWheel, bool on)
 {
 	Shoot1->SetSafetyEnabled(false);
 	Shoot2->SetSafetyEnabled(false);
@@ -49,6 +54,79 @@ void ParadoxShooter::FindTarget(bool stop)
 
 	}
 }
+
+static inline float SignedPowerFunction( const float x, const float gamma, const float scale, const float deadBand, const float clampLower, const float clampUpper )
+{
+	const bool bSign = ( x < 0.0f );
+	float y = scale * pow(fabs(x), gamma);
+	if ( y < deadBand )
+	{
+		y = 0.0f;
+	}
+	else if ( y < clampLower )
+	{
+		y = clampLower;
+	}
+	else if ( y > clampUpper )
+	{
+		y = clampUpper;
+	}
+
+	return ( bSign ) ? -y : y;	
+}
+
+
+void ParadoxShooter::ProcessShooter()
+{
+	if ( m_bAutoTrackingTurret )
+	{
+		if ( m_hasTarget )
+		{
+			const float kTurretPwmScale    = 1.0f;
+			const float kTurretPwmGamma    = 1.0f;
+			const float kTurretPwmDeadband = 0.01f;
+			const float kTurretPwmLower    = 0.1f;
+			const float kTurretPwmUpper    = 1.0f;
+			const float turretMotorTargetPWM =
+				SignedPowerFunction( m_targetCM_X, kTurretPwmGamma, kTurretPwmScale, kTurretPwmDeadband, kTurretPwmLower, kTurretPwmUpper );
+
+			const float kTurretMotorApproach = 0.5f;
+			m_turretMotorPWM = kTurretMotorApproach * ( turretMotorTargetPWM - m_turretMotorPWM ) + m_turretMotorPWM;
+		}
+		else
+		{
+			const float kTurretMotorDecay = 0.1f;
+			m_turretMotorPWM *= kTurretMotorDecay;
+		}
+
+		const bool bHitLimit = SetLimitedTurretPWM( m_turretMotorPWM );
+		if (bHitLimit)
+		{
+			// Hit a turret limit switch, reverse direction...
+			m_turretMotorPWM = -m_turretMotorPWM;
+		}
+	}
+}
+
+bool ParadoxShooter::SetLimitedTurretPWM( const float pwm )
+{
+	
+	const bool bRightTurretLimitPressed = !Tilt->GetForwardLimitOK();
+	const bool bLeftTurretLimitPressed  = !Tilt->GetReverseLimitOK();;
+	//printf("bRightTurretLimitPressed = %d\n", (int) bRightTurretLimitPressed);
+	//printf("bLeftTurretLimitPressed = %d\n", (int) bLeftTurretLimitPressed);
+	const bool bTurretLimitReached = ( pwm >= 0.0f ) ? bRightTurretLimitPressed : bLeftTurretLimitPressed;
+	Tilt->Set( pwm );
+
+	return bTurretLimitReached;
+}
+
+void ParadoxShooter::SetTargetData(float targetCM_X, bool hasTarget)
+{
+	m_targetCM_X = targetCM_X;
+	m_hasTarget = hasTarget;
+}
+
 void ParadoxShooter::SideToSide(float twist)
 {
 	if (fabs(twist)>.5)Tilt->Set(twist);
@@ -58,4 +136,9 @@ void ParadoxShooter::Dump(DriverStationLCD* ds)
 {
 	float amps = Shoot1->GetOutputCurrent();
 	ds->Printf(DriverStationLCD::kUser_Line1, 1, "Amps: %f", amps);
+}
+void ParadoxShooter::Start(bool on)
+{
+	Shoot1->Set((on) ? 200 : 0);
+	Shoot2->Set((on) ? 200 : 0);
 }

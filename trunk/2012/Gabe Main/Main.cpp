@@ -1,9 +1,6 @@
-#include "WPILib.h"
-#include "ParadoxDrive.h"
-#include "ParadoxCatapult.h"
-#include "ParadoxShooter.h"
-#include "ParadoxBallManager.h"
-#include "ParadoxTipper.h"
+#include "ParadoxLib.h"
+
+#define USE_CAMERA
 				
 class ParadoxCameraTracking : public PIDSource
 {
@@ -24,6 +21,8 @@ public:
 	{
 		return (double)m_trackedTargetCM_X;
 	}
+	float GetTrackedTargetCM_X() const { return m_trackedTargetCM_X; }
+	bool GetIsTrackingTarget() const { return m_IsTrackingTarget; }
 	
 protected:
 	void ProcessTracking();
@@ -31,12 +30,20 @@ protected:
 };
 
 
-class ParadoxBot : public SimpleRobot
+class ParadoxBot : public IterativeRobot
 {
+	enum Contstants
+	{
+		kNumAutoTimers = 2,
+	};
+	
 	enum eAutonomousState
 	{
+		AlignToShoot,
+		RevUp,
 		Shoot,
 		DriveBack,
+		End,
 	};
 	
 	Compressor			     *Compress;
@@ -44,8 +51,10 @@ class ParadoxBot : public SimpleRobot
 	Victor							*l;
 	DigitalInput				 *tak1;
 	DigitalInput				 *tak2;
+	#if defined(USE_CAMERA)
 	AxisCamera 				   *camera; 
-		
+	#endif
+			
 	RobotDrive				  *myRobot;
 	ParadoxBallManager		*myManager;
 	ParadoxShooter			*myShooter;
@@ -56,7 +65,9 @@ class ParadoxBot : public SimpleRobot
 	Joystick 				   *stick2;
 	Joystick 				   *stick3;
 	DriverStationLCD			   *ds;
-	eAutonomousState 			 myAuto;
+	eAutonomousState			myAuto;
+	Gyro						 *gyro;
+	float					Autotime[kNumAutoTimers];
 		
 	
 public:
@@ -68,7 +79,9 @@ public:
 		l			= new Victor(2);
 		tak1		= new DigitalInput(4);
 		tak2		= new DigitalInput(3);
-		//camera	 	= &AxisCamera::GetInstance("10.21.2.11");
+		#if defined(USE_CAMERA)
+		camera	 	= &AxisCamera::GetInstance("10.21.2.11");
+		#endif
 		
 		myRobot		= new RobotDrive(r,l);
 		myManager	= new ParadoxBallManager(4,3,3,false,false,false,1,2);
@@ -82,15 +95,24 @@ public:
 		stick2 		= new Joystick (2);	
 		stick3 		= new Joystick (3);	
 		ds			= DriverStationLCD::GetInstance();
+		gyro		= new Gyro(1);
 
-		//myCameraTracking = new ParadoxCameraTracking(camera, stick2);
-
+		#if defined(USE_CAMERA)
+		myCameraTracking = new ParadoxCameraTracking(camera, stick2);
+		#else
+		myCameraTracking = NULL;
+		#endif
+	
 		myAuto = Shoot;
 		Compress->Start();
-		/*camera->WriteResolution(AxisCamera::kResolution_320x240);
+		#if defined(USE_CAMERA)
+		camera->WriteResolution(AxisCamera::kResolution_320x240);
 		camera->WriteCompression(20);
-		camera->WriteBrightness(0);*/
+		camera->WriteBrightness(0);
+		#endif
 		GetWatchdog().SetEnabled(false);
+		
+		SetPeriod(0.1);
 
 	};
 
@@ -99,70 +121,142 @@ public:
 		delete myCameraTracking;
 	}
 	
-	void Autonomous(void)
+	void AutonomousInit(void)
 	{
-		switch (myAuto)
+		for (int i = 0; i < kNumAutoTimers; i++)
+			Autotime[i] = 5;
+		myAuto = AlignToShoot;
+		ds->Clear();
+	}
+	
+	void ProcessCommon()
+	{
+		//double currentTimestamp = Timer::GetFPGATimestamp();
+		//m_dT = currentTimestamp - m_timestampOfPreviousUpdate;
+		//m_timestampOfPreviousUpdate = currentTimestamp;
+
+		// Here we make a copy of the volatile camera tracking variables.  We only want to
+		// make this copy in one spot!
+		if (myCameraTracking)
 		{
-			default:
+			myShooter->SetTargetData(myCameraTracking->GetTrackedTargetCM_X(),
+					myCameraTracking->GetIsTrackingTarget());
+		}
+
+		myShooter->ProcessShooter();
+
+		GetWatchdog().Feed();
+	}
+	
+	void AutonomousPeriodic(void)
+	{
+		const float dT = GetPeriod();
+		if (Autotime[0] == 0.0)
+		{
+			switch (myAuto)
+			{
+			case DriveBack:
+				Autotime[0] = 5;
+				myAuto = End;
 				break;
 			case Shoot:
-				myShooter->Shoot(.7f,.7f,-1,0);
+				Autotime[0] = 5;
+				myAuto = DriveBack;
 				break;
-			case DriveBack:
-				myRobot->Drive(-1,0);
+			case RevUp:
+				Autotime[0] = 5;
+				myAuto = Shoot;
 				break;
+			case AlignToShoot:
+				Autotime[0] = 3;
+				myAuto = RevUp;
+				break;
+			default:
+				Autotime[0] = -1;
+				break;
+			}
 		}
+		Autotime[0] -= dT;
+		Autotime[1] -= dT;
+	}
+	
+	void AutonomousContinuous(void)
+	{
+		ProcessCommon();
+		if (fabs(gyro->GetAngle()) > 360) gyro->Reset();
+		ds->PrintfLine(DriverStationLCD::kUser_Line1, "gyroget : %f", gyro->GetAngle());
+		switch (myAuto)
+		{
+		case AlignToShoot:
+			//myCameraTracking->ProcessTracking();
+			break;
+		case RevUp:
+			myShooter->Shoot(3950.0f, 3600.0f, true);
+			break;
+		case Shoot:
+			myManager->FeedToShoot(true,false);
+			break;
+		case DriveBack:
+			myShooter->Shoot(0, 0, false);
+			float rotatespeed = (gyro->GetAngle() - 180)*.006;
+			if (fabs(gyro->GetAngle()) < 170) myRobot->Drive(0, rotatespeed);
+			else myRobot->ArcadeDrive(0.5, 0);
+			ds->PrintfLine(DriverStationLCD::kUser_Line2, "rotspd : %f", rotatespeed);
+			break;
+		case End:
+			myRobot->Drive(0,0);
+			break;
+		default:
+			myRobot->Drive(0,0);
+			break;
+		}
+		
+		ds->PrintfLine(DriverStationLCD::kUser_Line5, "Autotime : %f", Autotime);
+		ds->UpdateLCD();
+		Wait(0.01);	// This gives other threads some time to run!
 	}
 
-	void OperatorControl(void)
+	void TeleopContinuous(void)
 	{
-		int counter1;
-		int counter2;
-		if(tak1->Get()==1) counter1++;
-		if(tak2->Get()==1) counter2++;
-					
-		while (IsOperatorControl())
-		{
-			GetWatchdog().Feed();
-			bool out = (stick2->GetRawButton(4)) ? true : false;
-			bool in = (stick2->GetRawButton(3)) ? true : false;
-			bool go = (stick2->GetTrigger()) ? true : false;
-			bool on;
-			if(stick2->GetRawButton(5))on=true;
-			if(stick2->GetRawButton(6))on=false;
-			myRobot->ArcadeDrive(stick->GetY(),-1*stick->GetZ());
-			float shootJoy = ((stick3->GetX()*.5)+.5)*5200;
-			float shootTopModulate = stick3->GetY();
-			float shootBottomModulate  = stick3->GetZ();
-			myShooter->Shoot(shootJoy * shootTopModulate, shootJoy * shootBottomModulate, 1.0f,on);
-			myManager->FeedToShoot(out,in);
-			myManager->Intake(go);
-			myManager->Storage(go);
-			myManager->ShootOut(stick2->GetRawButton(2));
-			myShooter->SideToSide(stick2->GetZ());
-			
+		ProcessCommon();
+		bool out = (stick2->GetRawButton(4)) ? true : false;
+		bool in = (stick2->GetRawButton(3)) ? true : false;
+		bool go = (stick2->GetTrigger()) ? true : false;
+		bool on;
+		myShooter->Start(true);
+		if(stick2->GetRawButton(5))on=true;
+		if(stick2->GetRawButton(6))on=false;
+		myRobot->ArcadeDrive(stick->GetY(),-1*stick->GetZ());
+		float shootJoy = ((stick3->GetX()*.5)+.5)*5200;
+		float shootTopModulate = stick3->GetY();
+		float shootBottomModulate  = stick3->GetZ();
+		myShooter->Shoot(shootJoy * shootTopModulate, shootJoy * shootBottomModulate,on);
+		myManager->FeedToShoot(out,in);
+		myManager->Intake(go);
+		myManager->Storage(go);
+		myManager->ShootOut(stick2->GetRawButton(2));
+		myShooter->SideToSide(stick2->GetZ());
 		
-			//myManager->Practice(stick2->GetRawButton(3));
-			
-			
-			/*myManager->ShootOut(stick->GetRawButton(6));
-			myManager->Intake(stick->GetRawButton(8));
-			if (stick->GetRawButton(5)) myManager->Practice(1, 1);
-			else if (stick->GetRawButton(7)) myManager->Practice(1, -1);
-			else myManager->Practice(1, 0);*/
-			
+	
+		//myManager->Practice(stick2->GetRawButton(3));
+		
+		
+		/*myManager->ShootOut(stick->GetRawButton(6));
+		myManager->Intake(stick->GetRawButton(8));
+		if (stick->GetRawButton(5)) myManager->Practice(1, 1);
+		else if (stick->GetRawButton(7)) myManager->Practice(1, -1);
+		else myManager->Practice(1, 0);*/
+		
 
 
-			myShooter->Dump(ds);
-			ds->PrintfLine(DriverStationLCD::kUser_Line3, "Joy : %f",shootJoy);
-			ds->PrintfLine(DriverStationLCD::kUser_Line4, "Top: %.2f; Bot: %.2f", shootTopModulate, shootBottomModulate);
-			//ds->PrintfLine(DriverStationLCD::kUser_Line4, "tak1 : %d", counter1);
-			ds->PrintfLine(DriverStationLCD::kUser_Line5, "tak2 : %d", tak1->Get());
-			ds->PrintfLine(DriverStationLCD::kUser_Line6, "tak2 : %d", counter2);
-			ds->UpdateLCD();
-			
-			Wait(0.005);				
-		}
+		myShooter->Dump(ds);
+		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Joy : %f",shootJoy);
+		ds->PrintfLine(DriverStationLCD::kUser_Line4, "Top: %.2f; Bot: %.2f", shootTopModulate, shootBottomModulate);
+		//ds->PrintfLine(DriverStationLCD::kUser_Line4, "tak1 : %d", counter1);
+		ds->PrintfLine(DriverStationLCD::kUser_Line5, "tak2 : %d", tak1->Get());
+		ds->UpdateLCD();
+
+		Wait(0.01);	// This gives other threads some time to run!
 	}
 };
 
