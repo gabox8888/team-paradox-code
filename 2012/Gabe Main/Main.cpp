@@ -1,7 +1,27 @@
 #include "ParadoxLib.h"
 
 #define USE_CAMERA
-				
+
+static inline float SignedPowerFunction( const float x, const float gamma, const float scale, const float deadBand, const float clampLower, const float clampUpper )
+{
+	const bool bSign = ( x < 0.0f );
+	float y = scale * pow(fabs(x), gamma);
+	if ( y < deadBand )
+	{
+		y = 0.0f;
+	}
+	else if ( y < clampLower )
+	{
+		y = clampLower;
+	}
+	else if ( y > clampUpper )
+	{
+		y = clampUpper;
+	}
+
+	return ( bSign ) ? -y : y;	
+}
+
 class ParadoxCameraTracking : public PIDSource
 {
 protected:
@@ -34,7 +54,9 @@ class ParadoxBot : public IterativeRobot
 {
 	enum Contstants
 	{
-		kNumAutoTimers = 2,
+		kAutoTime_A,
+		kAutoTime_B,
+		kNumAutoTimers,
 	};
 	
 	enum eAutonomousState
@@ -84,9 +106,9 @@ public:
 		#endif
 		
 		myRobot		= new RobotDrive(r,l);
-		myManager	= new ParadoxBallManager(4,3,3,false,false,false,1,2);
+		myManager	= new ParadoxBallManager(3,4,3,false,false,false,3,4);
 		myShooter	= new ParadoxShooter(4,5,2,false,false,false,false,false,false);
-		myTipper	= new ParadoxTipper(3,4,4);
+		myTipper	= new ParadoxTipper(1,2,4);
 		
 		//m_pShootingPidController = new PIDController(kP, kI, kD, PIDSource *source,
 		//	PIDOutput *output, float period = 0.05)
@@ -97,7 +119,7 @@ public:
 		ds			= DriverStationLCD::GetInstance();
 		gyro		= new Gyro(1);
 
-		#if defined(USE_CAMERA)
+		#if defined(USE_CAMERA)&&0
 		myCameraTracking = new ParadoxCameraTracking(camera, stick2);
 		#else
 		myCameraTracking = NULL;
@@ -151,33 +173,9 @@ public:
 	void AutonomousPeriodic(void)
 	{
 		const float dT = GetPeriod();
-		if (Autotime[0] == 0.0)
-		{
-			switch (myAuto)
-			{
-			case DriveBack:
-				Autotime[0] = 5;
-				myAuto = End;
-				break;
-			case Shoot:
-				Autotime[0] = 5;
-				myAuto = DriveBack;
-				break;
-			case RevUp:
-				Autotime[0] = 5;
-				myAuto = Shoot;
-				break;
-			case AlignToShoot:
-				Autotime[0] = 3;
-				myAuto = RevUp;
-				break;
-			default:
-				Autotime[0] = -1;
-				break;
-			}
-		}
-		Autotime[0] -= dT;
-		Autotime[1] -= dT;
+
+		for (int i = 0; i < kNumAutoTimers; i++)
+			Autotime[i] -= dT;
 	}
 	
 	void AutonomousContinuous(void)
@@ -185,16 +183,30 @@ public:
 		ProcessCommon();
 		if (fabs(gyro->GetAngle()) > 360) gyro->Reset();
 		ds->PrintfLine(DriverStationLCD::kUser_Line1, "gyroget : %f", gyro->GetAngle());
+
 		switch (myAuto)
 		{
 		case AlignToShoot:
 			//myCameraTracking->ProcessTracking();
-			break;
+			myAuto = End;
+			Autotime[kAutoTime_A] = 4.0;
+			// DROP THROUGH...
+			
 		case RevUp:
-			myShooter->Shoot(3950.0f, 3600.0f, true);
+			myShooter->Shoot(1, 1, true);
+			if (Autotime[kAutoTime_A] <= 0.0f)
+			{
+				myAuto = Shoot;
+				Autotime[kAutoTime_A] = 8.0;
+			}
 			break;
 		case Shoot:
-			myManager->FeedToShoot(true,false);
+			myManager->FeedToShoot(false,true);
+			myManager->Storage(true);
+			if (Autotime[kAutoTime_A] <= 0.0f)
+			{
+				myAuto = End;
+			}
 			break;
 		case DriveBack:
 			myShooter->Shoot(0, 0, false);
@@ -205,6 +217,9 @@ public:
 			break;
 		case End:
 			myRobot->Drive(0,0);
+			myManager->FeedToShoot(false,false);
+			myManager->Storage(false);
+			myShooter->Shoot(0,0,false);
 			break;
 		default:
 			myRobot->Drive(0,0);
@@ -222,20 +237,39 @@ public:
 		bool out = (stick2->GetRawButton(4)) ? true : false;
 		bool in = (stick2->GetRawButton(3)) ? true : false;
 		bool go = (stick2->GetTrigger()) ? true : false;
-		bool on;
-		myShooter->Start(true);
+		static bool on = false;
+		//myShooter->Start(true);
 		if(stick2->GetRawButton(5))on=true;
 		if(stick2->GetRawButton(6))on=false;
-		myRobot->ArcadeDrive(stick->GetY(),-1*stick->GetZ());
-		float shootJoy = ((stick3->GetX()*.5)+.5)*5200;
+		if (stick->GetRawButton(5))myRobot->ArcadeDrive(SignedPowerFunction(stick->GetZ(),2,1,0,0,1),SignedPowerFunction(stick->GetY(),2,1,0,0,1));
+		else myRobot->ArcadeDrive(SignedPowerFunction(stick->GetZ(),2,.8,0,0,1),SignedPowerFunction(stick->GetY(),2,.8,0,0,1));
+		//float shootJoy = ((stick3->GetX()*.5)+.5)*5200;
+		float shootJoy = ((stick3->GetX()*.5)+.5);
 		float shootTopModulate = stick3->GetY();
 		float shootBottomModulate  = stick3->GetZ();
 		myShooter->Shoot(shootJoy * shootTopModulate, shootJoy * shootBottomModulate,on);
-		myManager->FeedToShoot(out,in);
-		myManager->Intake(go);
-		myManager->Storage(go);
+		//myShooter->Shoot(0.75f, 0.75f,true);
+		if (on == false)
+		{
+			myManager->Intake(go);
+			if (stick2->GetRawButton(2)==true)
+			{
+				myManager->Storage(false);
+			}
+			else
+			{
+				myManager->Storage(go);
+			}
+		}
+		else
+		{
+			myManager->Intake(0);
+			myManager->Storage(go);
+			myManager->FeedToShoot(0,go);
+		}
 		myManager->ShootOut(stick2->GetRawButton(2));
 		myShooter->SideToSide(stick2->GetZ());
+		myTipper->Manual(stick->GetRawButton(8));
 		
 	
 		//myManager->Practice(stick2->GetRawButton(3));
