@@ -11,7 +11,7 @@ public:
         virtual ~ParadoxTipper() {}
         
         void Tip(bool go);
-        void Manual(bool go);
+        void Manual(bool manualtip);
         
 protected:
         

@@ -22,3 +22,16 @@ void ParadoxTipper::Tip(bool go)
 			break;
 	}*/
 }
+void ParadoxTipper::Manual(bool manualtip)
+{
+	if (manualtip==true)
+	{
+		BridgeOUT->Set(0);
+		BridgeIN->Set(1);
+	}
+	else
+	{
+		BridgeOUT->Set(1);
+		BridgeIN->Set(0);
+	}
+}
