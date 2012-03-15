@@ -1,6 +1,6 @@
 #include "ParadoxLib.h"
 
-#define USE_CAMERA
+//#define USE_CAMERA
 
 static inline float SignedPowerFunction( const float x, const float gamma, const float scale, const float deadBand, const float clampLower, const float clampUpper )
 {
@@ -107,7 +107,7 @@ public:
 		
 		myRobot		= new RobotDrive(r,l);
 		myManager	= new ParadoxBallManager(3,4,3,false,false,false,3,4);
-		myShooter	= new ParadoxShooter(4,5,2,false,false,false,false,false,false);
+		myShooter	= new ParadoxShooter(4,2,false,false,false,false,false,false,false);
 		myTipper	= new ParadoxTipper(1,2,4);
 		
 		//m_pShootingPidController = new PIDController(kP, kI, kD, PIDSource *source,
