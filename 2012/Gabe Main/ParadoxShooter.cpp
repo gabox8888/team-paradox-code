@@ -7,15 +7,18 @@ ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2, UINT32 tilt1, UINT
 	//const CANJaguar::ControlMode controlMode = CANJaguar::kPercentVbus;
 	const CANJaguar::ControlMode controlMode = CANJaguar::kSpeed;
 	Shoot1	= new CANJaguar(motor1,CANJaguar::kPercentVbus);
-	Shoot2	= new CANJaguar(motor2,controlMode);
+	Shoot2	= new CANJaguar(motor2,CANJaguar::kPercentVbus);
 	Tilt	= new CANJaguar(tilt1);
 	LimitR 	= new DigitalInput(limitr);
 	LimitL 	= new DigitalInput(limitl);
 	
+	/*Shoot1->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
+	Shoot1->SetPID(2.0,.1,2.0);
+	Shoot1->ConfigEncoderCodesPerRev(360);
 	Shoot2->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
-	Shoot2->SetPID(2,.1,0);
-	Shoot2->ConfigEncoderCodesPerRev(360);
-
+	Shoot2->SetPID(2.0,.1,2.0);
+	Shoot2->ConfigEncoderCodesPerRev(360);*/
+	
 	m_targetCM_X = 0.0f;
 	m_hasTarget = false;
 	m_bAutoTrackingTurret = true;
@@ -29,7 +32,7 @@ void ParadoxShooter::Shoot(float topWheel,float bottomWheel, bool on)
 	if (on == true)
 	{
 		Shoot1->Set(topWheel);
-		Shoot2->Set(-Shoot1->GetBusVoltage());
+		Shoot2->Set(bottomWheel);
 	}
 	else
 	{
