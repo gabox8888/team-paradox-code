@@ -27,7 +27,7 @@ class ParadoxCameraTracking : public PIDSource
 protected:
 	
 	Task*          m_pTrackingTask;
-	AxisCamera*    m_pCamera; 
+	//AxisCamera*    m_pCamera; 
 	Joystick*      m_pStick2;
 	DriverStation* m_pDS;
 	volatile bool  m_bIsTrackingActive;
@@ -74,7 +74,7 @@ class ParadoxBot : public IterativeRobot
 	DigitalInput				 *tak1;
 	DigitalInput				 *tak2;
 	#if defined(USE_CAMERA)
-	AxisCamera 				   *camera; 
+	//AxisCamera 				   *camera; 
 	#endif
 			
 	RobotDrive				  *myRobot;
@@ -107,7 +107,7 @@ public:
 		
 		myRobot		= new RobotDrive(r,l);
 		myManager	= new ParadoxBallManager(3,4,3,false,false,false,3,4);
-		myShooter	= new ParadoxShooter(4,2,false,false,false,false,false,false,false);
+		myShooter	= new ParadoxShooter(2,4,false,false,false,false,false,false,false);
 		myTipper	= new ParadoxTipper(1,2,4);
 		
 		//m_pShootingPidController = new PIDController(kP, kI, kD, PIDSource *source,
@@ -234,21 +234,27 @@ public:
 	void TeleopContinuous(void)
 	{
 		ProcessCommon();
+		GetWatchdog().Feed();
 		bool out = (stick2->GetRawButton(4)) ? true : false;
 		bool in = (stick2->GetRawButton(3)) ? true : false;
 		bool go = (stick2->GetTrigger()) ? true : false;
 		static bool on = false;
+		
+		myShooter->SetSpeedMode(stick2->GetRawAxis(4) > 0.0f);
+
 		//myShooter->Start(true);
 		if(stick2->GetRawButton(5))on=true;
 		if(stick2->GetRawButton(6))on=false;
 		if (stick->GetRawButton(5))myRobot->ArcadeDrive(SignedPowerFunction(stick->GetZ(),2,1,0,0,1),SignedPowerFunction(stick->GetY(),2,1,0,0,1));
 		else myRobot->ArcadeDrive(SignedPowerFunction(stick->GetZ(),2,.8,0,0,1),SignedPowerFunction(stick->GetY(),2,.8,0,0,1));
-		//float shootJoy = ((stick3->GetX()*.5)+.5)*5200;
 		float shootJoy = ((stick3->GetX()*.5)+.5);
+		if (myShooter->IsUsingSpeedMode())
+		{
+			shootJoy *= 4800.0f;
+		}
 		float shootTopModulate = stick3->GetY();
 		float shootBottomModulate  = stick3->GetZ();
 		myShooter->Shoot(shootJoy * shootTopModulate, shootJoy * shootBottomModulate,on);
-		//myShooter->Shoot(0.75f, 0.75f,true);
 		if (on == false)
 		{
 			myManager->Intake(go);
@@ -284,8 +290,11 @@ public:
 
 
 		myShooter->Dump(ds);
-		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Joy : %f",shootJoy);
-		ds->PrintfLine(DriverStationLCD::kUser_Line4, "Top: %.2f; Bot: %.2f", shootTopModulate, shootBottomModulate);
+		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Joy : %.2f (%s)",shootJoy, myShooter->IsUsingSpeedMode() ? "SM":"VM");
+		//ds->PrintfLine(DriverStationLCD::kUser_Line4, "Top: %.2f; Bot: %.2f", shootTopModulate, shootBottomModulate);
+		ds->PrintfLine(DriverStationLCD::kUser_Line4, "T: %.2f; B: %.2f",
+			myShooter->GetAverageTopSpeed(), myShooter->GetAverageBottomSpeed());
+		
 		//ds->PrintfLine(DriverStationLCD::kUser_Line4, "tak1 : %d", counter1);
 		ds->PrintfLine(DriverStationLCD::kUser_Line5, "tak2 : %d", tak1->Get());
 		ds->UpdateLCD();
@@ -308,7 +317,7 @@ int ParadoxCameraTracking::TrackingTaskEntry(ParadoxCameraTracking* pParadoxCame
 
 ParadoxCameraTracking::ParadoxCameraTracking(AxisCamera* pCamera, Joystick* pStick2)
 {
-	m_pCamera = pCamera;
+//	m_pCamera = pCamera;
 	m_pStick2 = pStick2;
 	m_bIsTrackingActive = true;
 	m_pDS = DriverStation::GetInstance();
@@ -341,7 +350,7 @@ void ParadoxCameraTracking::ProcessTracking()
 		
 		if (m_bIsTrackingActive)
 		{
-			if (m_pCamera->IsFreshImage())
+		/*	if (m_pCamera->IsFreshImage())
 			{
 				HSLImage *image = m_pCamera->GetImage();
 				BinaryImage *thresholdImage = image->ThresholdHSL(60, 138, 0, 255, 104, 138);	// get just the red target pixels
@@ -383,7 +392,7 @@ void ParadoxCameraTracking::ProcessTracking()
 				delete bigObjectsImage;
 				delete thresholdImage;
 				delete image;
-			}
+			}*/
 		}
 
 		Wait(0.01);				
