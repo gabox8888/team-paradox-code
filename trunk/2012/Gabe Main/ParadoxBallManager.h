@@ -7,29 +7,16 @@
 class ParadoxBallManager
 {
 public:
-        ParadoxBallManager(UINT32 sucker, UINT32 store, UINT32 feedball, UINT32 in, UINT32 mid, UINT32 out, UINT32 pout, UINT32 pin);
+        ParadoxBallManager(UINT32 store, UINT32 feedball);
         virtual ~ParadoxBallManager() {}
         
-        void Intake(bool suck);
         void Storage(bool storage);
         void FeedToShoot(bool feed, bool rev);
-        void ShootOut(bool out);
-        float ToCount();
-        void Practice(INT32 device, INT32 dir);
-
         
 protected:
-        
        Relay 	 	 *Sucker;
        Relay		  *Spine;
        CANJaguar	   *Feed; 
-       DigitalInput *LimitIN;
-       DigitalInput *LimitMID;
-       DigitalInput *LimitOUT;
-       Solenoid 	*PistonOut;
-       Solenoid 	*PistonIn;
-       
-       int counter;
        
 private:
         DISALLOW_COPY_AND_ASSIGN(ParadoxBallManager);

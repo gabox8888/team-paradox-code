@@ -24,7 +24,6 @@ protected:
         
        Solenoid			*BridgeOUT;
        Solenoid			*BridgeIN;
-       AnalogChannel	*Sonar;
        eTip				*myRoutine;
         
 private:

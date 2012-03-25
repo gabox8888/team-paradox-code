@@ -5,29 +5,29 @@ static const double kP = 2.0;
 static const double kI = 0.1;
 static const double kD = 2.0;
 
-ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2, UINT32 tilt1, UINT32 encoa1, UINT32 encob1, UINT32 encoa2, UINT32 encob2, UINT32 limitr, UINT32 limitl)
+ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2)
 {
 	m_bUseSpeedMode = false;
 	
 	const CANJaguar::ControlMode controlMode = (m_bUseSpeedMode) ? CANJaguar::kSpeed : CANJaguar::kPercentVbus;
 
-	Shoot1	= new CANJaguar(motor1,controlMode);
-	Shoot2	= new CANJaguar(motor2,controlMode);
-	Tilt	= new CANJaguar(tilt1);
-	LimitR 	= new DigitalInput(limitr);
-	LimitL 	= new DigitalInput(limitl);
-	Shoot1->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
-	Shoot2->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
-	Shoot1->EnableControl();
-	Shoot2->EnableControl();
+	Top	= new CANJaguar(motor1,controlMode);
+	Btm	= new CANJaguar(motor2,controlMode);
+	Top->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
+	Btm->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
+	Top->EnableControl();
+	Btm->EnableControl();
+	
+	Top->SetSafetyEnabled(true);
+	Btm->SetSafetyEnabled(true);
 	
 	if (controlMode == CANJaguar::kSpeed)
 	{
-		Shoot1->SetPID(kP, kI, kD);
-		Shoot2->SetPID(kP, kI, kD);
+		Top->SetPID(kP, kI, kD);
+		Btm->SetPID(kP, kI, kD);
 	}
-	Shoot1->ConfigEncoderCodesPerRev(360);
-	Shoot2->ConfigEncoderCodesPerRev(360);
+	Top->ConfigEncoderCodesPerRev(360);
+	Btm->ConfigEncoderCodesPerRev(360);
 
 	m_targetCM_X = 0.0f;
 	m_hasTarget = false;
@@ -47,29 +47,19 @@ ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2, UINT32 tilt1, UINT
 
 void ParadoxShooter::Shoot(float topWheel,float bottomWheel, bool on)
 {
-	Shoot1->SetSafetyEnabled(true);
-	Shoot2->SetSafetyEnabled(true);
-	if (on == true)
-	{
-		Shoot1->Set(topWheel);
-		Shoot2->Set(bottomWheel);
-	}
-	else
-	{
-		Shoot1->Set(0);
-		Shoot2->Set(0);
-	}	
+	Top->Set((on) ? topWheel : 0);
+	Btm->Set((on) ? bottomWheel : 0);
 }
 
 float ParadoxShooter::GetTopSpeed() const
 {
 //	if (controlMode == CANJaguar::kSpeed)
 //	{
-		return (float) Shoot1->GetSpeed();
+		return (float) Top->GetSpeed();
 //	}
 //	else
 //	{
-//		return Shoot1->Get();
+//		return Top->Get();
 //	}
 }
 
@@ -77,29 +67,12 @@ float ParadoxShooter::GetBottomSpeed() const
 {
 //	if (controlMode == CANJaguar::kSpeed)
 //	{
-		return (float) Shoot2->GetSpeed();
+		return (float) Btm->GetSpeed();
 //	}
 //	else
 //	{
-//		return Shoot2->Get();
+//		return Btm->Get();
 //	}
-}
-
-void ParadoxShooter::FindTarget(bool stop)
-{
-	bool sweep;
-	if (stop == true)
-	{
-		Tilt->Set(0);
-	}
-	else
-	{
-		if (LimitR==0)sweep = true;
-		if (LimitL==0)sweep = false;
-		if (sweep == true)Tilt->Set(1);
-		if (sweep == false)Tilt->Set(-1);
-
-	}
 }
 
 static inline float SignedPowerFunction( const float x, const float gamma, const float scale, const float deadBand, const float clampLower, const float clampUpper )
@@ -129,18 +102,18 @@ void ParadoxShooter::SetSpeedMode(const bool bUseSpeedMode)
 		const CANJaguar::ControlMode controlMode = (bUseSpeedMode) ? CANJaguar::kSpeed : CANJaguar::kPercentVbus;
 		if (!bUseSpeedMode)
 		{
-			Shoot1->SetPID(0.0, 0.0, 0.0);
-			Shoot2->SetPID(0.0, 0.0, 0.0);
+			Top->SetPID(0.0, 0.0, 0.0);
+			Btm->SetPID(0.0, 0.0, 0.0);
 		}
-		Shoot1->ChangeControlMode(controlMode);
-		Shoot2->ChangeControlMode(controlMode);
+		Top->ChangeControlMode(controlMode);
+		Btm->ChangeControlMode(controlMode);
 		if (bUseSpeedMode)
 		{
-			Shoot1->SetPID(kP, kI, kD);
-			Shoot2->SetPID(kP, kI, kD);
+			Top->SetPID(kP, kI, kD);
+			Btm->SetPID(kP, kI, kD);
 		}
-		Shoot1->EnableControl();
-		Shoot2->EnableControl();
+		Top->EnableControl();
+		Btm->EnableControl();
 		m_bUseSpeedMode = bUseSpeedMode;
 	}
 }
@@ -196,27 +169,7 @@ void ParadoxShooter::ProcessShooter()
 			const float kTurretMotorDecay = 0.1f;
 			m_turretMotorPWM *= kTurretMotorDecay;
 		}
-
-		const bool bHitLimit = SetLimitedTurretPWM( m_turretMotorPWM );
-		if (bHitLimit)
-		{
-			// Hit a turret limit switch, reverse direction...
-			m_turretMotorPWM = -m_turretMotorPWM;
-		}
 	}
-}
-
-bool ParadoxShooter::SetLimitedTurretPWM( const float pwm )
-{
-	
-	const bool bRightTurretLimitPressed = !Tilt->GetForwardLimitOK();
-	const bool bLeftTurretLimitPressed  = !Tilt->GetReverseLimitOK();;
-	//printf("bRightTurretLimitPressed = %d\n", (int) bRightTurretLimitPressed);
-	//printf("bLeftTurretLimitPressed = %d\n", (int) bLeftTurretLimitPressed);
-	const bool bTurretLimitReached = ( pwm >= 0.0f ) ? bRightTurretLimitPressed : bLeftTurretLimitPressed;
-	Tilt->Set( pwm );
-
-	return bTurretLimitReached;
 }
 
 void ParadoxShooter::SetTargetData(float targetCM_X, bool hasTarget)
@@ -225,18 +178,13 @@ void ParadoxShooter::SetTargetData(float targetCM_X, bool hasTarget)
 	m_hasTarget = hasTarget;
 }
 
-void ParadoxShooter::SideToSide(float twist)
-{
-	if (fabs(twist)>.5)Tilt->Set(twist);
-	else Tilt->Set(0);
-}
 void ParadoxShooter::Dump(DriverStationLCD* ds)
 {
-	float amps = Shoot1->GetOutputCurrent();
+	float amps = Top->GetOutputCurrent();
 	ds->Printf(DriverStationLCD::kUser_Line1, 1, "Amps: %f", amps);
 }
 void ParadoxShooter::Start(bool on)
 {
-	Shoot1->Set((on) ? 200 : 0);
-	Shoot2->Set((on) ? 200 : 0);
+	Top->Set((on) ? 200 : 0);
+	Btm->Set((on) ? 200 : 0);
 }
