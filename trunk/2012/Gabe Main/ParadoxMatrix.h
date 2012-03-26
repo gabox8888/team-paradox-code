@@ -3,23 +3,17 @@
 
 #include "WPILib.h"
 
-class Recorder
+class ParadoxMatrix
 {
 public:
-	Recorder();
-	virtual ~Recorder() {}
-	void StartRecording();
-	void StopRecording();
-	void RecordLine(float speed, float turn, float shldr, float twist, bool handsuck, bool handeject, bool armextended, bool linetrack);
-	void GetLine(float *speed, float *turn, float *shldr, float *twist, bool *handsuck, bool *handeject, bool *armextended, bool *linetrack);
-	void StartPlayback();
-	void StopPlayback();
-	bool IsRecording;
-	bool IsPlaying;
-	
+	ParadoxMatrix(int mtxc);
+	float GetMidpoint(float n, int mtxpos);
+	void WriteEntry(float n, float entry[]);
 	
 protected:
 	FILE	*valFile;
+	int		mtxcount;
+	bool	readlock;
 };
 
 #endif

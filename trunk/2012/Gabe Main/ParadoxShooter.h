@@ -11,7 +11,6 @@ public:
         virtual ~ParadoxShooter() {}
         
         void Shoot(float topWheel,float bottomWheel, bool go);
-        void Dump(DriverStationLCD* ds);
         void Start(bool on);
         void SetTargetData(float targetCM_X, bool  hasTarget);
         void ProcessShooter();
