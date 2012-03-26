@@ -47,7 +47,7 @@ ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2)
 
 void ParadoxShooter::Shoot(float topWheel,float bottomWheel, bool on)
 {
-	Top->Set((on) ? topWheel : 0);
+	Top->Set((on) ? -topWheel : 0);
 	Btm->Set((on) ? bottomWheel : 0);
 }
 
@@ -178,11 +178,6 @@ void ParadoxShooter::SetTargetData(float targetCM_X, bool hasTarget)
 	m_hasTarget = hasTarget;
 }
 
-void ParadoxShooter::Dump(DriverStationLCD* ds)
-{
-	float amps = Top->GetOutputCurrent();
-	ds->Printf(DriverStationLCD::kUser_Line1, 1, "Amps: %f", amps);
-}
 void ParadoxShooter::Start(bool on)
 {
 	Top->Set((on) ? 200 : 0);
