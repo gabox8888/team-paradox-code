@@ -17,7 +17,7 @@ int ParadoxMatrix::GetMidpoint(int n, int mtxpos)
 	if (!readlock)
 	{
 		rewind(valFile);
-		while (in[1] <= n)
+		while (in[1] < n)
 		{
 			in[0] = in[1];
 			if (fscanf(valFile, "%d", &in[1]) == -1) break;
