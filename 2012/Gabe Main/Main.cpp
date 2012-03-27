@@ -91,7 +91,7 @@ class ParadoxBot : public IterativeRobot
 	AnalogChannel				*Sonar;
 	float					Autotime[kNumAutoTimers];
 	
-	float distance, shootRPM, shootBottomAug;
+	int distance, shootRPM, shootBottomAug;
 	
 public:
 
@@ -135,7 +135,7 @@ public:
 		#endif
 		GetWatchdog().SetEnabled(false);
 		
-		SetPeriod(0.2);
+		SetPeriod(0.1);
 
 	};
 
@@ -262,19 +262,13 @@ public:
 		
 		if (joy->GetRawButton(12) && rec)
 		{
-			float tofile[] = {2102.0f};
-			myMatrix->WriteEntry(distance, tofile);
+			int tofile[] = {shootRPM, shootBottomAug};
+			myMatrix->Plot(distance, tofile);
 			rec = false;
 		}
 		if (!joy->GetRawButton(12) && !rec) rec = true;
 
 		//ds->PrintfLine(DriverStationLCD::kUser_Line1, "Joy : %.2f (%s)",((quad->GetX()*.5)+.5)*4800.0f, myShooter->IsUsingSpeedMode() ? "SM":"VM");
-		ds->PrintfLine(DriverStationLCD::kUser_Line1, "%4.1f B+ %4.1f", shootRPM, shootBottomAug);
-		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Ts %.2f; Bs %.2f",
-		myShooter->GetAverageTopSpeed(), myShooter->GetAverageBottomSpeed());
-		ds->PrintfLine(DriverStationLCD::kUser_Line2, "Mtx : %4.2f", shootRPM);
-		ds->PrintfLine(DriverStationLCD::kUser_Line4, "Sonar : %3.2f", distance);
-		ds->UpdateLCD();
 		
 		Wait(0.01);	// This gives other threads some time to run!
 	}
@@ -284,6 +278,13 @@ public:
 		distance = Sonar->GetVoltage()/0.009766 + 54;
 		shootRPM = myMatrix->GetMidpoint(distance, 0) + 400*quad->GetX();
 		shootBottomAug = (joy->GetRawButton(11)) ? (quad->GetY() - 1)*-200 : myMatrix->GetMidpoint(distance, 1);
+		
+		ds->PrintfLine(DriverStationLCD::kUser_Line1, "%d B+ %d", shootRPM, shootBottomAug);
+		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Ts %.2f; Bs %.2f",
+		myShooter->GetAverageTopSpeed(), myShooter->GetAverageBottomSpeed());
+		ds->PrintfLine(DriverStationLCD::kUser_Line2, "Mtx : %d", shootRPM);
+		ds->PrintfLine(DriverStationLCD::kUser_Line4, "Sonar : %d", distance);
+		ds->UpdateLCD();
 	}
 };
 
