@@ -6,58 +6,102 @@ ParadoxMatrix::ParadoxMatrix(int mtxc)
 {
 	readlock = false;
 	mtxcount = mtxc;
-	valFile = fopen("values.txt", "r+");
+	valFile = fopen("values.txt", "r");
 }
 
-float ParadoxMatrix::GetMidpoint(float n, int mtxpos)
+int ParadoxMatrix::GetMidpoint(int n, int mtxpos)
 {
-	float out[2][mtxcount];
-	float in[2];
+	int in[2];
+	int out[2][mtxcount];
 
 	if (!readlock)
 	{
 		rewind(valFile);
-		while (1)
+		while (in[1] <= n)
 		{
 			in[0] = in[1];
-			if (fscanf(valFile, "%f", &in[1]) == -1) break;
+			if (fscanf(valFile, "%d", &in[1]) == -1) break;
 			else
 			{
 				for (int i = 0; i != mtxcount; i++)
 				{
 					out[0][i] = out[1][i];
-					fscanf(valFile, " %f", &out[1][i]);
+					fscanf(valFile, " %d", &out[1][i]);
 				}
 				fscanf(valFile, "\n");
 			}
-			if (in[1] > n) break;
 		}
+		
+		//return (fabs(in[1] - n) > fabs(in[0] - n)) ? out[0][mtxpos] : out[1][mtxpos];
+		return ((out[1][mtxpos] - out[0][mtxpos]) / (in[1] - in[0])) * (n - in[0]) + out[0][mtxpos];
 	}
-	//return (fabs(in[1] - n) > fabs(in[0] - n)) ? out[0][mtxpos] : out[1][mtxpos];
-	return ((out[1][mtxpos] - out[0][mtxpos]) / (in[1] - in[0])) * (n - in[0]) + out[0][mtxpos];
+	else return 0;
 }
 
-void ParadoxMatrix::WriteEntry(float n, float entry[])
+void ParadoxMatrix::Plot(int n, int entry[])
 {
-	float in;
+	int in;
+	fpos_t pos;
 	
 	readlock = true;
+	freopen("values.txt", "r+", valFile);
 	rewind(valFile);
-	while (readlock)
+	
+	while (in < n)
 	{
-		fpos_t pos;
 		fgetpos(valFile, &pos);
-		fscanf(valFile, "%f", &in);
-		for (int i = 0; i != mtxcount; i++) fscanf(valFile, " %f");
-		fscanf(valFile, "\n");
-		if (in > n)
+		if (fscanf(valFile, "%d", &in) == -1) break;
+		else
 		{
-			if (in == n) in += 0.1;
-			fsetpos(valFile, &pos);
-			fprintf(valFile, "%3.1f", n);
-			for (int i = 0; i != mtxcount; i++) fprintf(valFile, " %4.2f", entry[i]);
-			fprintf(valFile, "\n");
-			readlock = false;
+			int g;
+			for (int i = 0; i != mtxcount; i++) fscanf(valFile, " %d", &g);
+			fscanf(valFile, "\n");
 		}
 	}
+	
+	fsetpos(valFile, &pos);
+	
+	if (in == n)
+	{
+		fprintf(valFile, "%d", n);
+		for (int i = 0; i != mtxcount; i++) fprintf(valFile, " %d", entry[i]);
+		fprintf(valFile, "\n");
+	}
+	else
+	{
+		int tmp_in;
+		int tmp_out[mtxcount];
+		FILE *tmpf;
+		tmpf = tmpfile();
+		
+		fprintf(tmpf, "%d", n);
+		for (int i = 0; i != mtxcount; i++) fprintf(tmpf, " %d", entry[i]);
+		fprintf(tmpf, "\n");
+		
+		while (fscanf(valFile, "%d", &tmp_in) != -1)
+		{
+			for (int i = 0; i != mtxcount; i++) fscanf(valFile, " %d", &tmp_out[i]);
+			fscanf(valFile, "\n");
+			
+			fprintf(tmpf, "%d", tmp_in);
+			for (int i = 0; i != mtxcount; i++) fprintf(tmpf, " %d", tmp_out[i]);
+			fprintf(tmpf, "\n");
+		}
+		
+		fsetpos(valFile, &pos);
+		rewind(tmpf);
+		while (fscanf(tmpf, "%d", &tmp_in) != -1)
+		{
+			for (int i = 0; i != mtxcount; i++) fscanf(tmpf, " %d", &tmp_out[i]);
+			fscanf(tmpf, "\n");
+			
+			fprintf(valFile, "%d", tmp_in);
+			for (int i = 0; i != mtxcount; i++) fprintf(valFile, " %d", tmp_out[i]);
+			fprintf(valFile, "\n");
+		}
+		
+		fclose(tmpf);
+	}
+	freopen("values.txt", "r", valFile);
+	readlock = false;
 }

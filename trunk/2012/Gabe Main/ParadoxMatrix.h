@@ -7,8 +7,8 @@ class ParadoxMatrix
 {
 public:
 	ParadoxMatrix(int mtxc);
-	float GetMidpoint(float n, int mtxpos);
-	void WriteEntry(float n, float entry[]);
+	int GetMidpoint(int n, int mtxpos);
+	void Plot(int n, int entry[]);
 	
 protected:
 	FILE	*valFile;
