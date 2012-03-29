@@ -1,6 +1,6 @@
 #include "ParadoxLib.h"
 
-//#define USE_CAMERA
+#define USE_CAMERA
 
 static inline float SignedPowerFunction( const float x, const float gamma, const float scale, const float deadBand, const float clampLower, const float clampUpper )
 {
@@ -72,7 +72,7 @@ class ParadoxBot : public IterativeRobot
 	Victor							*r;
 	Victor							*l;
 	#if defined(USE_CAMERA)
-	//AxisCamera 				   *camera; 
+	AxisCamera 				   *camera; 
 	#endif
 			
 	RobotDrive				  *myRobot;
@@ -237,28 +237,46 @@ public:
 		ProcessCommon();
 		bool go = (joy->GetTrigger()) ? true : false;
 		static bool on = false;
-		static bool rec = true;
 		
 		myShooter->SetSpeedMode(joy->GetRawAxis(4) > 0.0f);
 
 		if(joy->GetRawButton(5))on=true;
 		if(joy->GetRawButton(6))on=false;
+		
 		if (gpad->GetRawButton(5))myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetZ(),2,1,0,0,1),SignedPowerFunction(gpad->GetY(),2,1,0,0,1));
 		else myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetZ(),2,.8,0,0,1),SignedPowerFunction(gpad->GetY(),2,.8,0,0,1));
-		//float shootJoy = ((quad->GetX()*.5)+.5) * ((myShooter->IsUsingSpeedMode()) ? 4800.0f : 1.0f);
-		//myShooter->Shoot(shootJoy * shootTopModulate, shootJoy * shootBottomModulate,on);
-		myShooter->Shoot(shootRPM, shootRPM + shootBottomAug, on);
-		if (on)
+		
+		float shootJoy = ((quad->GetX()+1)*.5);
+		if (myShooter->IsUsingSpeedMode())
 		{
-			myManager->Storage(go);
-			myManager->FeedToShoot(0,go);
+			shootJoy *= 4800.0f;
+			if (!quad->GetRawButton(9)) myShooter->Shoot(-(shootRPM), -(shootRPM + shootBottomAug), on);
+			else myShooter->Shoot(-shootJoy, -shootJoy, on);
 		}
-		else
-		{
-			myManager->Storage((joy->GetRawButton(2)) ? false : go);
-			myManager->FeedToShoot(0,0);
-		}
+		else myShooter->Shoot(shootJoy , shootJoy,on);
+		
+		myManager->Storage((on) ? go : ((joy->GetRawButton(2)) ? false : go));
+		myManager->FeedToShoot(0,(on) ? go : 0);
+		
 		myTipper->Manual(gpad->GetRawButton(8));
+
+		ds->PrintfLine(DriverStationLCD::kUser_Line1, "%d B+ %d", shootRPM, shootBottomAug);
+		ds->PrintfLine(DriverStationLCD::kUser_Line2, "%f", shootJoy);
+		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Ts %.2f; Bs %.2f",
+		myShooter->GetAverageTopSpeed(), myShooter->GetAverageBottomSpeed());
+		ds->PrintfLine(DriverStationLCD::kUser_Line4, "Sonar : %d", distance);
+		ds->UpdateLCD();
+		
+		Wait(0.01);	// This gives other threads some time to run!
+	}
+	
+	void TeleopPeriodic(void)
+	{
+		distance = Sonar->GetVoltage()/0.009766 + 54;
+		shootRPM = myMatrix->GetMidpoint(distance, 0) + 400*quad->GetZ();
+		shootBottomAug = (quad->GetRawButton(8)) ? myMatrix->GetMidpoint(distance, 1) : (quad->GetY() - 1)*-200;
+		
+		static bool rec = true;
 		
 		if (joy->GetRawButton(12) && rec)
 		{
@@ -267,24 +285,6 @@ public:
 			rec = false;
 		}
 		if (!joy->GetRawButton(12) && !rec) rec = true;
-
-		//ds->PrintfLine(DriverStationLCD::kUser_Line1, "Joy : %.2f (%s)",((quad->GetX()*.5)+.5)*4800.0f, myShooter->IsUsingSpeedMode() ? "SM":"VM");
-		
-		Wait(0.01);	// This gives other threads some time to run!
-	}
-	
-	void TeleopPeriodic(void)
-	{
-		distance = Sonar->GetVoltage()/0.009766 + 54;
-		shootRPM = myMatrix->GetMidpoint(distance, 0) + 400*quad->GetX();
-		shootBottomAug = (joy->GetRawButton(11)) ? (quad->GetY() - 1)*-200 : myMatrix->GetMidpoint(distance, 1);
-		
-		ds->PrintfLine(DriverStationLCD::kUser_Line1, "%d B+ %d", shootRPM, shootBottomAug);
-		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Ts %.2f; Bs %.2f",
-		myShooter->GetAverageTopSpeed(), myShooter->GetAverageBottomSpeed());
-		ds->PrintfLine(DriverStationLCD::kUser_Line2, "Mtx : %d", shootRPM);
-		ds->PrintfLine(DriverStationLCD::kUser_Line4, "Sonar : %d", distance);
-		ds->UpdateLCD();
 	}
 };
 
