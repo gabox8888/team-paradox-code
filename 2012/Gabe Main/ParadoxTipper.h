@@ -7,7 +7,7 @@
 class ParadoxTipper
 {
 public:
-        ParadoxTipper(UINT32 solo, UINT32 soli, UINT32 asonar);
+        ParadoxTipper(UINT32 lout, UINT32 lin, UINT32 rout, UINT32 rin);
         virtual ~ParadoxTipper() {}
         
         void Tip(bool go);
@@ -22,8 +22,10 @@ protected:
         	Drive,
         };
         
-       Solenoid			*BridgeOUT;
-       Solenoid			*BridgeIN;
+       Solenoid			*lOUT;
+       Solenoid			*lIN;
+       Solenoid			*rOUT;
+       Solenoid			*rIN;
        eTip				*myRoutine;
         
 private:

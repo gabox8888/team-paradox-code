@@ -107,11 +107,9 @@ public:
 		myRobot		= new RobotDrive(r,l);
 		myManager	= new ParadoxBallManager(4,3);
 		myShooter	= new ParadoxShooter(2,4);
-		myTipper	= new ParadoxTipper(1,2,4);
+		myTipper	= new ParadoxTipper(1,2,3,4);
 		myMatrix	= new ParadoxMatrix(2);
 		
-		//m_pShootingPidController = new PIDController(kP, kI, kD, PIDSource *source,
-		//	PIDOutput *output, float period = 0.05)
 
 		gpad 		= new Joystick (1);	
 		joy 		= new Joystick (2);	
@@ -169,6 +167,9 @@ public:
 		myShooter->ProcessShooter();
 
 		GetWatchdog().Feed();
+		
+		distance = Sonar->GetVoltage()/0.009766 + 54;
+		
 	}
 	
 	void AutonomousPeriodic(void)
@@ -194,7 +195,7 @@ public:
 			// DROP THROUGH...
 			
 		case RevUp:
-			myShooter->Shoot(1, 1, true);
+			myShooter->Shoot(1, 1);
 			if (Autotime[kAutoTime_A] <= 0.0f)
 			{
 				myAuto = Shoot;
@@ -202,7 +203,7 @@ public:
 			}
 			break;
 		case Shoot:
-			myManager->FeedToShoot(false,true);
+			myManager->FeedToShoot(1);
 			myManager->Storage(true);
 			if (Autotime[kAutoTime_A] <= 0.0f)
 			{
@@ -210,7 +211,7 @@ public:
 			}
 			break;
 		case DriveBack:
-			myShooter->Shoot(0, 0, false);
+			myShooter->Shoot(0, 0);
 			float rotatespeed = (gyro->GetAngle() - 180)*.006;
 			if (fabs(gyro->GetAngle()) < 170) myRobot->Drive(0, rotatespeed);
 			else myRobot->ArcadeDrive(0.5, 0);
@@ -218,9 +219,9 @@ public:
 			break;
 		case End:
 			myRobot->Drive(0,0);
-			myManager->FeedToShoot(false,false);
+			myManager->FeedToShoot(0);
 			myManager->Storage(false);
-			myShooter->Shoot(0,0,false);
+			myShooter->Shoot(0,0);
 			break;
 		default:
 			myRobot->Drive(0,0);
@@ -234,37 +235,59 @@ public:
 
 	void TeleopContinuous(void)
 	{
-		ProcessCommon();
-		bool go = (joy->GetTrigger()) ? true : false;
-		static bool on = false;
-		
-		myShooter->SetSpeedMode(joy->GetRawAxis(4) > 0.0f);
-
-		if(joy->GetRawButton(5))on=true;
-		if(joy->GetRawButton(6))on=false;
-		
 		if (gpad->GetRawButton(5))myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetZ(),2,1,0,0,1),SignedPowerFunction(gpad->GetY(),2,1,0,0,1));
 		else myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetZ(),2,.8,0,0,1),SignedPowerFunction(gpad->GetY(),2,.8,0,0,1));
+		ProcessCommon();
 		
+		static bool on = false;
+		static bool usemtx = true;
+		static bool fire = true;
 		float shootJoy = ((quad->GetX()+1)*.5);
+
+		if(joy->GetRawButton(5)) on = true;
+		if(joy->GetRawButton(6)) on = false;
+		if(joy->GetRawButton(9)) usemtx = false;
+		if(joy->GetRawButton(11)) usemtx = true;
+		myShooter->SetSpeedMode(joy->GetRawAxis(4) > 0.0f);
+		
+		if (!on)
+		{
+			fire = false;
+			myShooter->Shoot(0.0,0.0);
+			myManager->FeedToShoot(0);
+		}
+		
 		if (myShooter->IsUsingSpeedMode())
 		{
-			shootJoy *= 4800.0f;
-			if (!quad->GetRawButton(9)) myShooter->Shoot(-(shootRPM), -(shootRPM + shootBottomAug), on);
-			else myShooter->Shoot(-shootJoy, -shootJoy, on);
+			shootRPM = (usemtx) ? myMatrix->GetMidpoint(distance, 0) : (shootJoy * 4800.0f);
+			shootBottomAug = (usemtx) ? myMatrix->GetMidpoint(distance, 1) : (400 - (((quad->GetX()+1)*.5)*400));
+			if (on)
+			{
+				if (myShooter->Shoot(shootRPM, shootRPM + shootBottomAug)) fire = true;
+				myManager->FeedToShoot((fire) ? 1 : 0);
+			}
+			
+			if (usemtx) ds->PrintfLine(DriverStationLCD::kUser_Line1, "MTX: %d rpm + %d", shootRPM, shootBottomAug);
+			else ds->PrintfLine(DriverStationLCD::kUser_Line1, "SPD: %d rpm + %d", shootRPM, shootBottomAug);
 		}
-		else myShooter->Shoot(shootJoy , shootJoy,on);
-		
-		myManager->Storage((on) ? go : ((joy->GetRawButton(2)) ? false : go));
-		myManager->FeedToShoot(0,(on) ? go : 0);
-		
-		myTipper->Manual(gpad->GetRawButton(8));
+		else
+		{
+			fire = false;
+			if (on)
+			{
+				myShooter->Shoot(shootJoy, shootJoy);
+				myManager->FeedToShoot(joy->GetTrigger());
+			}
+			
+			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Volt: %3.0f", (shootJoy * 100));
+		}
 
-		ds->PrintfLine(DriverStationLCD::kUser_Line1, "%d B+ %d", shootRPM, shootBottomAug);
-		ds->PrintfLine(DriverStationLCD::kUser_Line2, "%f", shootJoy);
-		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Ts %.2f; Bs %.2f",
+		myManager->Storage(joy->GetTrigger());
+		myTipper->Manual(gpad->GetRawButton(8));
+		
+		ds->PrintfLine(DriverStationLCD::kUser_Line5, "Ts %.2f; Bs %.2f",
 		myShooter->GetAverageTopSpeed(), myShooter->GetAverageBottomSpeed());
-		ds->PrintfLine(DriverStationLCD::kUser_Line4, "Sonar : %d", distance);
+		ds->PrintfLine(DriverStationLCD::kUser_Line6, "Sonar : %d", distance);
 		ds->UpdateLCD();
 		
 		Wait(0.01);	// This gives other threads some time to run!
@@ -272,13 +295,9 @@ public:
 	
 	void TeleopPeriodic(void)
 	{
-		distance = Sonar->GetVoltage()/0.009766 + 54;
-		shootRPM = myMatrix->GetMidpoint(distance, 0) + 400*quad->GetZ();
-		shootBottomAug = (quad->GetRawButton(8)) ? myMatrix->GetMidpoint(distance, 1) : (quad->GetY() - 1)*-200;
-		
 		static bool rec = true;
 		
-		if (joy->GetRawButton(12) && rec)
+		if (joy->GetRawButton(12) && (myShooter->IsUsingSpeedMode()) && rec)
 		{
 			int tofile[] = {shootRPM, shootBottomAug};
 			myMatrix->Plot(distance, tofile);

@@ -2,10 +2,12 @@
 #include "ParadoxTipper.h"
 #include "math.h"
 
-ParadoxTipper::ParadoxTipper (UINT32 solo, UINT32 soli, UINT32 asonar)
+ParadoxTipper::ParadoxTipper (UINT32 lout, UINT32 lin, UINT32 rout, UINT32 rin)
 {
-	BridgeOUT		= new Solenoid(solo);
-	BridgeIN		= new Solenoid(soli);
+	lOUT	= new Solenoid(lout);
+	lIN		= new Solenoid(lin);
+	rOUT	= new Solenoid(rout);
+	rIN		= new Solenoid(rin);
 	
 	//myRoutine= ToTip;
 }
@@ -21,6 +23,8 @@ void ParadoxTipper::Tip(bool go)
 }
 void ParadoxTipper::Manual(bool manualtip)
 {
-	BridgeOUT->Set(!manualtip);
-	BridgeIN->Set(manualtip);
+	lOUT->Set(!manualtip);
+	lIN->Set(manualtip);
+	rOUT->Set(!manualtip);
+	lIN->Set(manualtip);
 }
