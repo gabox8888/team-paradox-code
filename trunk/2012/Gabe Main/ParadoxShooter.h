@@ -10,7 +10,7 @@ public:
         ParadoxShooter(UINT32 motor1, UINT32 motor2);
         virtual ~ParadoxShooter() {}
         
-        void Shoot(float topWheel,float bottomWheel, bool go);
+        bool Shoot(float topWheel,float bottomWheel);
         void Start(bool on);
         void SetTargetData(float targetCM_X, bool  hasTarget);
         void ProcessShooter();

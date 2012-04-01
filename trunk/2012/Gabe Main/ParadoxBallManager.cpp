@@ -12,9 +12,7 @@ void ParadoxBallManager::Storage(bool storage)
 {
 	Spine->Set((storage) ?  Relay::kForward : Relay::kOff);
 }
-void ParadoxBallManager::FeedToShoot(bool feed, bool rev)
+void ParadoxBallManager::FeedToShoot(float dir)
 {
-	if (feed)Feed->Set(-1);
-	else if (rev)Feed->Set(1);
-	else Feed->Set(0);
+	Feed->Set(dir);
 }

@@ -11,7 +11,7 @@ public:
         virtual ~ParadoxBallManager() {}
         
         void Storage(bool storage);
-        void FeedToShoot(bool feed, bool rev);
+        void FeedToShoot(float dir);
         
 protected:
        Relay 	 	 *Sucker;
