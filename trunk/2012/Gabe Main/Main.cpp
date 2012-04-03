@@ -80,7 +80,8 @@ class ParadoxBot : public IterativeRobot
 	ParadoxShooter			*myShooter;
 	ParadoxTipper			 *myTipper;
 	ParadoxCameraTracking   *myCameraTracking;
-	ParadoxMatrix			 *myMatrix;
+	//ParadoxMatrix			 *myMatrix;
+	ParadoxScatterPlot		   *myPlot;
 	
 	Joystick 					*gpad;
 	Joystick 				   *joy;
@@ -111,7 +112,8 @@ public:
 		myManager	= new ParadoxBallManager(4,2);
 		myShooter	= new ParadoxShooter(4,3);
 		myTipper	= new ParadoxTipper(1,2,3,4);
-		myMatrix	= new ParadoxMatrix(2);
+		//myMatrix	= new ParadoxMatrix(2);
+		myPlot		= new ParadoxScatterPlot();
 		
 
 		gpad 		= new Joystick(1);	
@@ -172,15 +174,6 @@ public:
 		
 	}
 	
-	void ProcessMatrix()
-	{
-		static float cache_interval = 0.0;
-		if (cache_interval == 0.0) myMatrix->Cache(distance);
-		
-		cache_interval += GetPeriod();
-		if (cache_interval == 1.5) cache_interval = 0.0;
-	}
-	
 	void AutonomousInit(void)
 	{
 		ProcessCommon();
@@ -189,8 +182,6 @@ public:
 		myAuto = RevUp;
 		ds->Clear();
 		myShooter->SetSpeedMode(true);
-		shootRPM = myMatrix->GetMidpoint(0);
-		shootBottomAug = myMatrix->GetMidpoint(1);
 	}
 
 	void AutonomousPeriodic(void)
@@ -202,8 +193,6 @@ public:
 			if (myAuto == End) Autotime[i] = 0;
 			else Autotime[i] -= dT;
 		}
-		
-		ProcessMatrix();
 	}
 	
 	void AutonomousContinuous(void)
@@ -264,14 +253,14 @@ public:
 		ds->Clear();
 		
 		static bool on = false;
-		static bool usemtx = true;
+		static bool usesp = true;
 		static bool fire = true;
 		float shootJoy = ((quad->GetX()+1)*.5);
 
 		if(joy->GetRawButton(5)) on = true;
 		if(joy->GetRawButton(6)) on = false;
-		if(joy->GetRawButton(12)) usemtx = false;
-		if(joy->GetRawButton(11)) usemtx = true;
+		if(joy->GetRawButton(12)) usesp = false;
+		if(joy->GetRawButton(11)) usesp = true;
 		
 		myShooter->SetSpeedMode(joy->GetRawAxis(4) > 0.0f);
 		
@@ -284,16 +273,16 @@ public:
 		
 		if (myShooter->IsUsingSpeedMode())
 		{
-			shootRPM = (usemtx) ? myMatrix->GetMidpoint(0) : (shootJoy * 4800.0f);
-			shootBottomAug = (usemtx) ? myMatrix->GetMidpoint(1) : (400 - (((quad->GetY()+1)*.5)*400));
+			shootRPM = (usesp) ? myPlot->PointSlope(distance) : (shootJoy * 4800.0f);
+			shootBottomAug = (400 - (((quad->GetY()+1)*.5)*400));
 			if (on)
 			{
 				if (myShooter->Shoot(shootRPM, shootRPM + shootBottomAug)) fire = true;
 				myManager->FeedToShoot((fire) ? 1 : 0);
 			}
 			
-			if (usemtx) ds->PrintfLine(DriverStationLCD::kUser_Line1, "MTX: %d rpm + %d", shootRPM, shootBottomAug);
-			else ds->PrintfLine(DriverStationLCD::kUser_Line1, "SPD: %d rpm + %d", shootRPM, shootBottomAug);
+			if (usesp) ds->PrintfLine(DriverStationLCD::kUser_Line1, "Enc|MAN: %d rpm + %d", shootRPM, shootBottomAug);
+			else ds->PrintfLine(DriverStationLCD::kUser_Line1, "Enc|AUTO: %d rpm + %d", shootRPM, shootBottomAug);
 		}
 		else
 		{
@@ -334,14 +323,12 @@ public:
 	
 	void TeleopPeriodic(void)
 	{
-		ProcessMatrix();
 		static bool rec = true;
 		
 		if (joy->GetRawButton(9) && (myShooter->IsUsingSpeedMode()) && rec)
 		{
 			ds->PrintfLine(DriverStationLCD::kUser_Line3, "RECORDING...");
-			int tofile[] = {shootRPM, shootBottomAug};
-			myMatrix->Plot(distance, tofile);
+			myPlot->Plot(distance, shootRPM);
 			rec = false;
 		}
 		if (!joy->GetRawButton(9) && !rec) rec = true;

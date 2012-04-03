@@ -10,5 +10,6 @@
 #include "ParadoxBallManager.h"
 #include "ParadoxTipper.h"
 #include "ParadoxMatrix.h"
+#include "ParadoxScatterPlot.h"
 
 #endif
