@@ -47,10 +47,15 @@ ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2)
 
 bool ParadoxShooter::Shoot(float topWheel,float bottomWheel)
 {
-	Top->Set(-fabs(topWheel));
+#ifdef Testingmode
+	//Top->Set(toWheel);
+	//Btm->Set(bottomWheel);
+#else
+	Top->Set(fabs(topWheel));
 	Btm->Set(fabs(bottomWheel));
 	if (m_bUseSpeedMode) return (Top->GetSpeed() >= (topWheel+100));
 	else return false;
+#endif
 }
 
 float ParadoxShooter::GetTopSpeed() const
