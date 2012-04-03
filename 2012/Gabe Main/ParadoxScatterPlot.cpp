@@ -44,13 +44,12 @@ int ParadoxScatterPlot::PointSlope(int x)
 	{
 		int a = -1;
 		int b = 9999;
-		int i = 0;
 		int ret = -1;
-		for (i = 0; i != idxmax; i++)
+		for (int i = 0; i != idxmax; i++)
 		{
-			if (x == xcache[i]) ret = xcache[i];
+			if (x == xcache[i]) ret = ycache[i];
 			if ((x > xcache[i]) && (xcache[i] > xcache[a])) a = i;
-			if ((x < xcache[i]) && (xcache[1] < xcache[b])) b = i;
+			if ((x < xcache[i]) && (xcache[i] < xcache[b])) b = i;
 		}
 		if (ret == -1) ret = ((ycache[b] - ycache[a])/(xcache[b] - xcache[a]))*(x - xcache[a]) + ycache[a];
 		return ret;
