@@ -7,13 +7,15 @@ class ParadoxMatrix
 {
 public:
 	ParadoxMatrix(int mtxc);
-	int GetMidpoint(int n, int mtxpos);
+	int GetMidpoint(int mtxpos);
+	void Cache(int n);
 	void Plot(int n, int entry[]);
 	
 protected:
 	FILE	*valFile;
 	int		mtxcount;
 	bool	readlock;
+	int		*cache;
 };
 
 #endif

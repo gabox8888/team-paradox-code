@@ -52,7 +52,7 @@ protected:
 
 class ParadoxBot : public IterativeRobot
 {
-	enum Contstants
+	enum Constants
 	{
 		kAutoTime_A,
 		kAutoTime_B,
@@ -61,7 +61,6 @@ class ParadoxBot : public IterativeRobot
 	
 	enum eAutonomousState
 	{
-		AlignToShoot,
 		RevUp,
 		Shoot,
 		DriveBack,
@@ -71,6 +70,7 @@ class ParadoxBot : public IterativeRobot
 	Compressor			     *Compress;
 	Victor							*r;
 	Victor							*l;
+	Relay	  					  *tip;
 	#if defined(USE_CAMERA)
 	AxisCamera 				   *camera; 
 	#endif
@@ -92,6 +92,8 @@ class ParadoxBot : public IterativeRobot
 	float					Autotime[kNumAutoTimers];
 	
 	int distance, shootRPM, shootBottomAug;
+	int deltaspeed;
+	int deltatip;
 	
 public:
 
@@ -100,20 +102,21 @@ public:
 		Compress  	= new Compressor(14,1); 
 		r			= new Victor(1);
 		l			= new Victor(2);
+		tip			= new Relay(3);
 		#if defined(USE_CAMERA)
 		camera	 	= &AxisCamera::GetInstance("10.21.2.11");
 		#endif
 		
 		myRobot		= new RobotDrive(r,l);
-		myManager	= new ParadoxBallManager(4,3);
-		myShooter	= new ParadoxShooter(2,4);
+		myManager	= new ParadoxBallManager(4,2);
+		myShooter	= new ParadoxShooter(4,3);
 		myTipper	= new ParadoxTipper(1,2,3,4);
 		myMatrix	= new ParadoxMatrix(2);
 		
 
-		gpad 		= new Joystick (1);	
-		joy 		= new Joystick (2);	
-		quad 		= new Joystick (3);	
+		gpad 		= new Joystick(1);	
+		joy 		= new Joystick(2);	
+		quad 		= new Joystick(3);	
 		ds			= DriverStationLCD::GetInstance();
 		gyro		= new Gyro(1);
 		Sonar		= new AnalogChannel(2);
@@ -124,7 +127,6 @@ public:
 		myCameraTracking = NULL;
 		#endif
 	
-		myAuto = Shoot;
 		Compress->Start();
 		#if defined(USE_CAMERA)
 		camera->WriteResolution(AxisCamera::kResolution_320x240);
@@ -133,21 +135,17 @@ public:
 		#endif
 		GetWatchdog().SetEnabled(false);
 		
-		SetPeriod(0.1);
+		SetPeriod(0.2);
+		deltaspeed= 2;
+		deltatip=2;
+
+		
 
 	};
 
 	~ParadoxBot()
 	{
 		delete myCameraTracking;
-	}
-	
-	void AutonomousInit(void)
-	{
-		for (int i = 0; i < kNumAutoTimers; i++)
-			Autotime[i] = 5;
-		myAuto = AlignToShoot;
-		ds->Clear();
 	}
 	
 	void ProcessCommon()
@@ -168,76 +166,102 @@ public:
 
 		GetWatchdog().Feed();
 		
-		distance = Sonar->GetVoltage()/0.009766 + 54;
+		//distance = Sonar->GetVoltage()/0.009766 + 54;
+		float sonar = Sonar->GetVoltage()/(5.0f/512.0f);
+		distance = sonar + 10;
 		
 	}
 	
+	void ProcessMatrix()
+	{
+		static float cache_interval = 0.0;
+		if (cache_interval == 0.0) myMatrix->Cache(distance);
+		
+		cache_interval += GetPeriod();
+		if (cache_interval == 1.5) cache_interval = 0.0;
+	}
+	
+	void AutonomousInit(void)
+	{
+		ProcessCommon();
+		for (int i = 0; i < kNumAutoTimers; i++)
+			Autotime[i] = 3.0f;
+		myAuto = RevUp;
+		ds->Clear();
+		myShooter->SetSpeedMode(true);
+		shootRPM = myMatrix->GetMidpoint(0);
+		shootBottomAug = myMatrix->GetMidpoint(1);
+	}
+
 	void AutonomousPeriodic(void)
 	{
 		const float dT = GetPeriod();
 
 		for (int i = 0; i < kNumAutoTimers; i++)
-			Autotime[i] -= dT;
+		{
+			if (myAuto == End) Autotime[i] = 0;
+			else Autotime[i] -= dT;
+		}
+		
+		ProcessMatrix();
 	}
 	
 	void AutonomousContinuous(void)
 	{
 		ProcessCommon();
-		if (fabs(gyro->GetAngle()) > 360) gyro->Reset();
-		ds->PrintfLine(DriverStationLCD::kUser_Line1, "gyroget : %f", gyro->GetAngle());
 
 		switch (myAuto)
 		{
-		case AlignToShoot:
-			//myCameraTracking->ProcessTracking();
-			myAuto = End;
-			Autotime[kAutoTime_A] = 4.0;
-			// DROP THROUGH...
-			
 		case RevUp:
-			myShooter->Shoot(1, 1);
-			if (Autotime[kAutoTime_A] <= 0.0f)
-			{
-				myAuto = Shoot;
-				Autotime[kAutoTime_A] = 8.0;
-			}
+			myManager->FeedToShoot(0);
+			myManager->Storage(true);
+			
+			if (myShooter->Shoot(shootRPM, shootRPM + shootBottomAug) || (Autotime[kAutoTime_A] <= 0.0f)) myAuto = Shoot;
+			
+			ds->PrintfLine(DriverStationLCD::kUser_Line1, "RevUp");
 			break;
 		case Shoot:
+			if (Autotime[kAutoTime_A] == Autotime[kAutoTime_B]) Autotime[kAutoTime_A] = 3.0f;
 			myManager->FeedToShoot(1);
 			myManager->Storage(true);
-			if (Autotime[kAutoTime_A] <= 0.0f)
-			{
-				myAuto = End;
-			}
+			myShooter->Shoot(shootRPM, shootRPM + shootBottomAug);
+			if (Autotime[kAutoTime_A] <= 0.0f) myAuto = DriveBack;
+			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Shoot");
 			break;
 		case DriveBack:
+			if (Autotime[kAutoTime_A] >= Autotime[kAutoTime_B]) Autotime[kAutoTime_B] = 1.5f;
+			myManager->FeedToShoot(0);
+			myManager->Storage(false);
 			myShooter->Shoot(0, 0);
-			float rotatespeed = (gyro->GetAngle() - 180)*.006;
-			if (fabs(gyro->GetAngle()) < 170) myRobot->Drive(0, rotatespeed);
-			else myRobot->ArcadeDrive(0.5, 0);
-			ds->PrintfLine(DriverStationLCD::kUser_Line2, "rotspd : %f", rotatespeed);
+			myRobot->ArcadeDrive(-0.5*(Autotime[kAutoTime_B] / 1.5f) - 0.2, 0);
+			myTipper->Manual(true);
+			if (Autotime[kAutoTime_B] <= 0.0f) myAuto = End;
+			ds->PrintfLine(DriverStationLCD::kUser_Line1, "DriveBack");
 			break;
 		case End:
 			myRobot->Drive(0,0);
 			myManager->FeedToShoot(0);
 			myManager->Storage(false);
 			myShooter->Shoot(0,0);
+			ds->PrintfLine(DriverStationLCD::kUser_Line1, "End");
 			break;
 		default:
 			myRobot->Drive(0,0);
 			break;
 		}
 		
-		ds->PrintfLine(DriverStationLCD::kUser_Line5, "Autotime : %f", Autotime);
+		ds->PrintfLine(DriverStationLCD::kUser_Line2, "%.1f, %.1f", Autotime[kAutoTime_A], Autotime[kAutoTime_B]);
 		ds->UpdateLCD();
 		Wait(0.01);	// This gives other threads some time to run!
 	}
 
 	void TeleopContinuous(void)
 	{
-		if (gpad->GetRawButton(5))myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetZ(),2,1,0,0,1),SignedPowerFunction(gpad->GetY(),2,1,0,0,1));
-		else myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetZ(),2,.8,0,0,1),SignedPowerFunction(gpad->GetY(),2,.8,0,0,1));
+		if (gpad->GetRawButton(5))deltaspeed++;
+		if (deltaspeed%2)myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetY(),2,1,0,0,1),SignedPowerFunction(gpad->GetZ(),2,1,0,0,1));
+		else myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetY(),2,.8,0,0,1),SignedPowerFunction(gpad->GetZ(),2,.8,0,0,1));
 		ProcessCommon();
+		ds->Clear();
 		
 		static bool on = false;
 		static bool usemtx = true;
@@ -246,8 +270,9 @@ public:
 
 		if(joy->GetRawButton(5)) on = true;
 		if(joy->GetRawButton(6)) on = false;
-		if(joy->GetRawButton(9)) usemtx = false;
+		if(joy->GetRawButton(12)) usemtx = false;
 		if(joy->GetRawButton(11)) usemtx = true;
+		
 		myShooter->SetSpeedMode(joy->GetRawAxis(4) > 0.0f);
 		
 		if (!on)
@@ -259,8 +284,8 @@ public:
 		
 		if (myShooter->IsUsingSpeedMode())
 		{
-			shootRPM = (usemtx) ? myMatrix->GetMidpoint(distance, 0) : (shootJoy * 4800.0f);
-			shootBottomAug = (usemtx) ? myMatrix->GetMidpoint(distance, 1) : (400 - (((quad->GetX()+1)*.5)*400));
+			shootRPM = (usemtx) ? myMatrix->GetMidpoint(0) : (shootJoy * 4800.0f);
+			shootBottomAug = (usemtx) ? myMatrix->GetMidpoint(1) : (400 - (((quad->GetY()+1)*.5)*400));
 			if (on)
 			{
 				if (myShooter->Shoot(shootRPM, shootRPM + shootBottomAug)) fire = true;
@@ -283,7 +308,21 @@ public:
 		}
 
 		myManager->Storage(joy->GetTrigger());
-		myTipper->Manual(gpad->GetRawButton(8));
+		
+		static bool global = true;
+		if (!gpad->GetRawButton(6) && !global) global=true;
+		if (gpad->GetRawButton(6) && global)
+		{
+			deltatip++;
+			global = false;
+		}
+		if(deltatip%2)tip->Set(Relay::kForward);
+		else tip->Set(Relay::kOff);
+		//myTipper->Manual(deltatip%2);
+		
+		if (fire) ds->PrintfLine(DriverStationLCD::kUser_Line2, "FIRE!!! (Uplift Go)");
+		
+		ds->PrintfLine(DriverStationLCD::kUser_Line4, "Y %.2f, Z %.2f", gpad->GetY(), gpad->GetZ());
 		
 		ds->PrintfLine(DriverStationLCD::kUser_Line5, "Ts %.2f; Bs %.2f",
 		myShooter->GetAverageTopSpeed(), myShooter->GetAverageBottomSpeed());
@@ -295,15 +334,17 @@ public:
 	
 	void TeleopPeriodic(void)
 	{
+		ProcessMatrix();
 		static bool rec = true;
 		
-		if (joy->GetRawButton(12) && (myShooter->IsUsingSpeedMode()) && rec)
+		if (joy->GetRawButton(9) && (myShooter->IsUsingSpeedMode()) && rec)
 		{
+			ds->PrintfLine(DriverStationLCD::kUser_Line3, "RECORDING...");
 			int tofile[] = {shootRPM, shootBottomAug};
 			myMatrix->Plot(distance, tofile);
 			rec = false;
 		}
-		if (!joy->GetRawButton(12) && !rec) rec = true;
+		if (!joy->GetRawButton(9) && !rec) rec = true;
 	}
 };
 
