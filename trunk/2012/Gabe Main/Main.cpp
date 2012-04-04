@@ -71,6 +71,7 @@ class ParadoxBot : public IterativeRobot
 	Victor							*r;
 	Victor							*l;
 	Relay	  					  *tip;
+	DigitalInput				*AutoS;
 	#if defined(USE_CAMERA)
 	AxisCamera 				   *camera; 
 	#endif
@@ -95,6 +96,7 @@ class ParadoxBot : public IterativeRobot
 	int distance, shootRPM, shootBottomAug;
 	int deltaspeed;
 	int deltatip;
+	bool rec;
 	
 public:
 
@@ -104,6 +106,7 @@ public:
 		r			= new Victor(1);
 		l			= new Victor(2);
 		tip			= new Relay(3);
+		AutoS		= new DigitalInput(8);
 		#if defined(USE_CAMERA)
 		camera	 	= &AxisCamera::GetInstance("10.21.2.11");
 		#endif
@@ -137,7 +140,7 @@ public:
 		#endif
 		GetWatchdog().SetEnabled(false);
 		
-		SetPeriod(0.2);
+		SetPeriod(0.1);
 		deltaspeed= 2;
 		deltatip=2;
 
@@ -169,9 +172,7 @@ public:
 		GetWatchdog().Feed();
 		
 		//distance = Sonar->GetVoltage()/0.009766 + 54;
-		float sonar = Sonar->GetVoltage()/(5.0f/512.0f);
-		distance = sonar + 10;
-		
+		distance = Sonar->GetVoltage()/(5.0f/512.0f);		
 	}
 	
 	void AutonomousInit(void)
@@ -205,7 +206,7 @@ public:
 			myManager->FeedToShoot(0);
 			myManager->Storage(true);
 			
-			if (myShooter->Shoot(shootRPM, shootRPM + shootBottomAug) || (Autotime[kAutoTime_A] <= 0.0f)) myAuto = Shoot;
+			if (myShooter->Shoot(2150, 2150) || (Autotime[kAutoTime_A] <= 0.0f)) myAuto = Shoot;
 			
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "RevUp");
 			break;
@@ -213,8 +214,8 @@ public:
 			if (Autotime[kAutoTime_A] == Autotime[kAutoTime_B]) Autotime[kAutoTime_A] = 3.0f;
 			myManager->FeedToShoot(1);
 			myManager->Storage(true);
-			myShooter->Shoot(shootRPM, shootRPM + shootBottomAug);
-			if (Autotime[kAutoTime_A] <= 0.0f) myAuto = DriveBack;
+			myShooter->Shoot(2150, 2140);
+			if (Autotime[kAutoTime_A] <= 0.0f) myAuto = (AutoS->Get() == 1) ? DriveBack : End;
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Shoot");
 			break;
 		case DriveBack:
@@ -247,8 +248,8 @@ public:
 	void TeleopContinuous(void)
 	{
 		if (gpad->GetRawButton(5))deltaspeed++;
-		if (deltaspeed%2)myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetY(),2,1,0,0,1),SignedPowerFunction(gpad->GetZ(),2,1,0,0,1));
-		else myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetY(),2,.8,0,0,1),SignedPowerFunction(gpad->GetZ(),2,.8,0,0,1));
+		if (deltaspeed%2)myRobot->ArcadeDrive(SignedPowerFunction(-gpad->GetY(),2,1,0,0,1),SignedPowerFunction(-gpad->GetZ(),2,1,0,0,1));
+		else myRobot->ArcadeDrive(SignedPowerFunction(-gpad->GetY(),2,.8,0,0,1),SignedPowerFunction(-gpad->GetZ(),2,.8,0,0,1));
 		ProcessCommon();
 		ds->Clear();
 		
@@ -261,6 +262,7 @@ public:
 		if(joy->GetRawButton(6)) on = false;
 		if(joy->GetRawButton(12)) usesp = false;
 		if(joy->GetRawButton(11)) usesp = true;
+		if (usesp) rec = false;
 		
 		myShooter->SetSpeedMode(joy->GetRawAxis(4) > 0.0f);
 		
@@ -273,7 +275,7 @@ public:
 		
 		if (myShooter->IsUsingSpeedMode())
 		{
-			shootRPM = (usesp) ? myPlot->PointSlope(distance) : (shootJoy * 4800.0f);
+			shootRPM = (usesp) ? myPlot->PointSlope(distance)+(quad->GetX()*300) : (shootJoy * 4800.0f);
 			shootBottomAug = (400 - (((quad->GetY()+1)*.5)*400));
 			if (on)
 			{
@@ -281,8 +283,8 @@ public:
 				myManager->FeedToShoot((fire) ? 1 : 0);
 			}
 			
-			if (usesp) ds->PrintfLine(DriverStationLCD::kUser_Line1, "Enc|MAN: %d rpm + %d", shootRPM, shootBottomAug);
-			else ds->PrintfLine(DriverStationLCD::kUser_Line1, "Enc|AUTO: %d rpm + %d", shootRPM, shootBottomAug);
+			if (usesp) ds->PrintfLine(DriverStationLCD::kUser_Line1, "Enc|auto: %d rpm + %d", shootRPM, shootBottomAug);
+			else ds->PrintfLine(DriverStationLCD::kUser_Line1, "Enc|man: %d rpm + %d", shootRPM, shootBottomAug);
 		}
 		else
 		{
@@ -323,8 +325,6 @@ public:
 	
 	void TeleopPeriodic(void)
 	{
-		static bool rec = true;
-		
 		if (joy->GetRawButton(9) && (myShooter->IsUsingSpeedMode()) && rec)
 		{
 			ds->PrintfLine(DriverStationLCD::kUser_Line3, "RECORDING...");
