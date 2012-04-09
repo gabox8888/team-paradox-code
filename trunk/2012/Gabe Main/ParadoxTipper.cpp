@@ -26,5 +26,5 @@ void ParadoxTipper::Manual(bool manualtip)
 	lOUT->Set(!manualtip);
 	lIN->Set(manualtip);
 	rOUT->Set(!manualtip);
-	lIN->Set(manualtip);
+	rIN->Set(manualtip);
 }

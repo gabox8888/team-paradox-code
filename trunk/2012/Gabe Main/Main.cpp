@@ -61,6 +61,8 @@ class ParadoxBot : public IterativeRobot
 	
 	enum eAutonomousState
 	{
+		AllianceDelay,
+		FeedToBot,
 		RevUp,
 		Shoot,
 		DriveBack,
@@ -70,7 +72,6 @@ class ParadoxBot : public IterativeRobot
 	Compressor			     *Compress;
 	Victor							*r;
 	Victor							*l;
-	Relay	  					  *tip;
 	DigitalInput				*AutoS;
 	#if defined(USE_CAMERA)
 	AxisCamera 				   *camera; 
@@ -105,15 +106,14 @@ public:
 		Compress  	= new Compressor(14,1); 
 		r			= new Victor(1);
 		l			= new Victor(2);
-		tip			= new Relay(3);
 		AutoS		= new DigitalInput(8);
 		#if defined(USE_CAMERA)
 		camera	 	= &AxisCamera::GetInstance("10.21.2.11");
 		#endif
 		
 		myRobot		= new RobotDrive(r,l);
-		myManager	= new ParadoxBallManager(4,2);
-		myShooter	= new ParadoxShooter(4,3);
+		myManager	= new ParadoxBallManager(4,4);
+		myShooter	= new ParadoxShooter(5,3);
 		myTipper	= new ParadoxTipper(1,2,3,4);
 		//myMatrix	= new ParadoxMatrix(2);
 		myPlot		= new ParadoxScatterPlot();
@@ -177,12 +177,15 @@ public:
 	
 	void AutonomousInit(void)
 	{
+		static double dTime;
+		dTime=5.0;
 		ProcessCommon();
-		for (int i = 0; i < kNumAutoTimers; i++)
-			Autotime[i] = 3.0f;
-		myAuto = RevUp;
+			Autotime[kAutoTime_A] = dTime+3.0;
+			Autotime[kAutoTime_B] = dTime;
+			//Autotime[kAutoTime_C] = dTime;
+		myAuto = AllianceDelay;
 		ds->Clear();
-		myShooter->SetSpeedMode(true);
+		myShooter->SetSpeedMode(false);
 	}
 
 	void AutonomousPeriodic(void)
@@ -202,11 +205,18 @@ public:
 
 		switch (myAuto)
 		{
-		case RevUp:
-			myManager->FeedToShoot(0);
-			myManager->Storage(true);
+		case AllianceDelay:
+			if (Autotime[kAutoTime_B]<=0) myAuto=RevUp;
+			break;
+		case FeedToBot:
 			
-			if (myShooter->Shoot(2150, 2150) || (Autotime[kAutoTime_A] <= 0.0f)) myAuto = Shoot;
+			break;
+		case RevUp:
+			if (Autotime[kAutoTime_B]<=0) Autotime[kAutoTime_A] = 3.0f;
+			myManager->FeedToShoot(1);
+			myManager->Storage(true);
+			myShooter->SetSpeedMode(false);
+			if (myShooter->Shoot(.21, .21) || (Autotime[kAutoTime_A] <= 0.0f)) myAuto = Shoot;
 			
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "RevUp");
 			break;
@@ -214,16 +224,16 @@ public:
 			if (Autotime[kAutoTime_A] == Autotime[kAutoTime_B]) Autotime[kAutoTime_A] = 3.0f;
 			myManager->FeedToShoot(1);
 			myManager->Storage(true);
-			myShooter->Shoot(2150, 2140);
+			myShooter->Shoot(.21,.21 );
 			if (Autotime[kAutoTime_A] <= 0.0f) myAuto = (AutoS->Get() == 1) ? DriveBack : End;
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Shoot");
 			break;
 		case DriveBack:
-			if (Autotime[kAutoTime_A] >= Autotime[kAutoTime_B]) Autotime[kAutoTime_B] = 1.5f;
+			if (Autotime[kAutoTime_A] >= Autotime[kAutoTime_B]) Autotime[kAutoTime_B] = 2.25f;
 			myManager->FeedToShoot(0);
 			myManager->Storage(false);
 			myShooter->Shoot(0, 0);
-			myRobot->ArcadeDrive(-0.5*(Autotime[kAutoTime_B] / 1.5f) - 0.2, 0);
+			myRobot->ArcadeDrive(0.0,0.7*(Autotime[kAutoTime_B] / 2.0f) + 0.2);
 			myTipper->Manual(true);
 			if (Autotime[kAutoTime_B] <= 0.0f) myAuto = End;
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "DriveBack");
@@ -247,14 +257,20 @@ public:
 
 	void TeleopContinuous(void)
 	{
-		if (gpad->GetRawButton(5))deltaspeed++;
-		if (deltaspeed%2)myRobot->ArcadeDrive(SignedPowerFunction(-gpad->GetY(),2,1,0,0,1),SignedPowerFunction(-gpad->GetZ(),2,1,0,0,1));
-		else myRobot->ArcadeDrive(SignedPowerFunction(-gpad->GetY(),2,.8,0,0,1),SignedPowerFunction(-gpad->GetZ(),2,.8,0,0,1));
+		static bool globalspeed = true;
+		if (!gpad->GetRawButton(5) && !globalspeed) globalspeed=true;
+		if (gpad->GetRawButton(5) && globalspeed)
+		{
+			deltaspeed++;
+			globalspeed = false;
+		}
+		if(deltaspeed%2)myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetZ(),2,.5,0,0,1),SignedPowerFunction(gpad->GetY(),2,.5,0,0,1));
+		else myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetZ(),2,1,0,0,1),SignedPowerFunction(gpad->GetY(),2,1,0,0,1));
 		ProcessCommon();
 		ds->Clear();
 		
 		static bool on = false;
-		static bool usesp = true;
+		static bool usesp = false;
 		static bool fire = true;
 		float shootJoy = ((quad->GetX()+1)*.5);
 
@@ -275,7 +291,7 @@ public:
 		
 		if (myShooter->IsUsingSpeedMode())
 		{
-			shootRPM = (usesp) ? myPlot->PointSlope(distance)+(quad->GetX()*300) : (shootJoy * 4800.0f);
+			shootRPM = (usesp) ? myPlot->PointSlope(distance)+(quad->GetX()*300) : (shootJoy * 6400.0f);
 			shootBottomAug = (400 - (((quad->GetY()+1)*.5)*400));
 			if (on)
 			{
@@ -291,6 +307,8 @@ public:
 			fire = false;
 			if (on)
 			{
+				//if((shootJoy<=10)&&(shootJoy>=1))myShooter->Shoot(6400,6400);
+				//else 
 				myShooter->Shoot(shootJoy, shootJoy);
 				myManager->FeedToShoot(joy->GetTrigger());
 			}
@@ -300,16 +318,15 @@ public:
 
 		myManager->Storage(joy->GetTrigger());
 		
-		static bool global = true;
-		if (!gpad->GetRawButton(6) && !global) global=true;
-		if (gpad->GetRawButton(6) && global)
+		static bool globaltip = true;
+		if (!gpad->GetRawButton(6) && !globaltip) globaltip=true;
+		if (gpad->GetRawButton(6) && globaltip)
 		{
 			deltatip++;
-			global = false;
+			globaltip = false;
 		}
-		if(deltatip%2)tip->Set(Relay::kForward);
-		else tip->Set(Relay::kOff);
-		//myTipper->Manual(deltatip%2);
+
+		myTipper->Manual(deltatip%2);
 		
 		if (fire) ds->PrintfLine(DriverStationLCD::kUser_Line2, "FIRE!!! (Uplift Go)");
 		
