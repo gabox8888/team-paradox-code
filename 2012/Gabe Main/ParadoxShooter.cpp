@@ -26,8 +26,8 @@ ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2)
 		Top->SetPID(kP, kI, kD);
 		Btm->SetPID(kP, kI, kD);
 	}
-	Top->ConfigEncoderCodesPerRev(250);
-	Btm->ConfigEncoderCodesPerRev(360);
+	Top->ConfigEncoderCodesPerRev(36);
+	Btm->ConfigEncoderCodesPerRev(36);
 
 	m_targetCM_X = 0.0f;
 	m_hasTarget = false;
