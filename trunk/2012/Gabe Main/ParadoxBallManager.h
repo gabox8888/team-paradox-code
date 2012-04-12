@@ -10,7 +10,7 @@ public:
         ParadoxBallManager(UINT32 store, UINT32 feedball);
         virtual ~ParadoxBallManager() {}
         
-        void Storage(bool storage);
+        void Storage(int storage);
         void FeedToShoot(float dir);
         
 protected:

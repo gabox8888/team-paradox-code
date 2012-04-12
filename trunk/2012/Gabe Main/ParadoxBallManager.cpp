@@ -8,10 +8,13 @@ ParadoxBallManager::ParadoxBallManager(UINT32 store, UINT32 feedball)
 	Feed		= new CANJaguar(feedball);
 }
 
-void ParadoxBallManager::Storage(bool storage)
+void ParadoxBallManager::Storage(int storage)
 {
-	Spine->Set((storage) ?  Relay::kForward : Relay::kOff);
+	if (storage == 1) Spine->Set(Relay::kForward);
+	if (storage == 0) Spine->Set(Relay::kOff);
+	if (storage ==-1) Spine->Set(Relay::kReverse);
 }
+
 void ParadoxBallManager::FeedToShoot(float dir)
 {
 	Feed->Set(dir);
