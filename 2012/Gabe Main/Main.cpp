@@ -214,7 +214,7 @@ public:
 		case RevUp:
 			if (Autotime[kAutoTime_B]<=0) Autotime[kAutoTime_A] = 3.0f;
 			myManager->FeedToShoot(1);
-			myManager->Storage(true);
+			myManager->Storage(1);
 			myShooter->SetSpeedMode(false);
 			if (myShooter->Shoot(.21, .21) || (Autotime[kAutoTime_A] <= 0.0f)) myAuto = Shoot;
 			
@@ -223,7 +223,7 @@ public:
 		case Shoot:
 			if (Autotime[kAutoTime_A] == Autotime[kAutoTime_B]) Autotime[kAutoTime_A] = 3.0f;
 			myManager->FeedToShoot(1);
-			myManager->Storage(true);
+			myManager->Storage(1);
 			myShooter->Shoot(.21,.21 );
 			if (Autotime[kAutoTime_A] <= 0.0f) myAuto = (AutoS->Get() == 1) ? DriveBack : End;
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Shoot");
@@ -231,7 +231,7 @@ public:
 		case DriveBack:
 			if (Autotime[kAutoTime_A] >= Autotime[kAutoTime_B]) Autotime[kAutoTime_B] = 2.25f;
 			myManager->FeedToShoot(0);
-			myManager->Storage(false);
+			myManager->Storage(0);
 			myShooter->Shoot(0, 0);
 			myRobot->ArcadeDrive(0.0,0.7*(Autotime[kAutoTime_B] / 2.0f) + 0.2);
 			myTipper->Manual(true);
@@ -241,7 +241,7 @@ public:
 		case End:
 			myRobot->Drive(0,0);
 			myManager->FeedToShoot(0);
-			myManager->Storage(false);
+			myManager->Storage(0);
 			myShooter->Shoot(0,0);
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "End");
 			break;
@@ -264,8 +264,9 @@ public:
 			deltaspeed++;
 			globalspeed = false;
 		}
-		if(deltaspeed%2)myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetZ(),2,.5,0,0,1),SignedPowerFunction(gpad->GetY(),2,.5,0,0,1));
-		else myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetZ(),2,1,0,0,1),SignedPowerFunction(gpad->GetY(),2,1,0,0,1));
+		//left_updown = 2 negative, right_leftright = 4
+		if(deltaspeed%2)myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetRawAxis(2),2,.6,0,0,1),SignedPowerFunction(-gpad->GetRawAxis(4),2,.6,0,0,1));
+		else myRobot->ArcadeDrive(SignedPowerFunction(gpad->GetRawAxis(2),2,1,0,0,1),SignedPowerFunction(-gpad->GetRawAxis(4),2,1,0,0,1));
 		ProcessCommon();
 		ds->Clear();
 		
@@ -316,7 +317,7 @@ public:
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Volt: %3.0f", (shootJoy * 100));
 		}
 
-		myManager->Storage(joy->GetTrigger());
+		myManager->Storage((joy->GetTrigger()) ? 1 : ((joy->GetRawButton(2)) ? -1 : 0));
 		
 		static bool globaltip = true;
 		if (!gpad->GetRawButton(6) && !globaltip) globaltip=true;
@@ -329,9 +330,7 @@ public:
 		myTipper->Manual(deltatip%2);
 		
 		if (fire) ds->PrintfLine(DriverStationLCD::kUser_Line2, "FIRE!!! (Uplift Go)");
-		
-		ds->PrintfLine(DriverStationLCD::kUser_Line4, "Y %.2f, Z %.2f", gpad->GetY(), gpad->GetZ());
-		
+				
 		ds->PrintfLine(DriverStationLCD::kUser_Line5, "Ts %.2f; Bs %.2f",
 		myShooter->GetAverageTopSpeed(), myShooter->GetAverageBottomSpeed());
 		ds->PrintfLine(DriverStationLCD::kUser_Line6, "Sonar : %d", distance);
