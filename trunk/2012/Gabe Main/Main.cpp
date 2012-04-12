@@ -62,7 +62,6 @@ class ParadoxBot : public IterativeRobot
 	enum eAutonomousState
 	{
 		AllianceDelay,
-		FeedToBot,
 		RevUp,
 		Shoot,
 		DriveBack,
@@ -112,8 +111,8 @@ public:
 		#endif
 		
 		myRobot		= new RobotDrive(r,l);
-		myManager	= new ParadoxBallManager(4,4);
-		myShooter	= new ParadoxShooter(5,3);
+		myManager	= new ParadoxBallManager(4,2); // 4,4
+		myShooter	= new ParadoxShooter(4,3); // 5,3
 		myTipper	= new ParadoxTipper(1,2,3,4);
 		//myMatrix	= new ParadoxMatrix(2);
 		myPlot		= new ParadoxScatterPlot();
@@ -143,9 +142,6 @@ public:
 		SetPeriod(0.1);
 		deltaspeed= 2;
 		deltatip=2;
-
-		
-
 	};
 
 	~ParadoxBot()
@@ -173,6 +169,14 @@ public:
 		
 		//distance = Sonar->GetVoltage()/0.009766 + 54;
 		distance = Sonar->GetVoltage()/(5.0f/512.0f);		
+	}
+	
+	bool AutoStuff(int feed, int store, float shootTop, float shootBtm, bool spdmode)
+	{
+		myManager->FeedToShoot(feed);
+		myManager->Storage(store);
+		myShooter->SetSpeedMode(spdmode);
+		return (myShooter->Shoot(shootTop, shootBtm));
 	}
 	
 	void AutonomousInit(void)
@@ -208,41 +212,32 @@ public:
 		case AllianceDelay:
 			if (Autotime[kAutoTime_B]<=0) myAuto=RevUp;
 			break;
-		case FeedToBot:
-			
-			break;
 		case RevUp:
 			if (Autotime[kAutoTime_B]<=0) Autotime[kAutoTime_A] = 3.0f;
-			myManager->FeedToShoot(1);
-			myManager->Storage(1);
-			myShooter->SetSpeedMode(false);
-			if (myShooter->Shoot(.21, .21) || (Autotime[kAutoTime_A] <= 0.0f)) myAuto = Shoot;
+			if (AutoStuff(1, 1, .21, .21, false) || (Autotime[kAutoTime_A] <= 0.0f)) myAuto = Shoot;
 			
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "RevUp");
 			break;
 		case Shoot:
 			if (Autotime[kAutoTime_A] == Autotime[kAutoTime_B]) Autotime[kAutoTime_A] = 3.0f;
-			myManager->FeedToShoot(1);
-			myManager->Storage(1);
-			myShooter->Shoot(.21,.21 );
+			AutoStuff(1, 1, .21, .21, false);
 			if (Autotime[kAutoTime_A] <= 0.0f) myAuto = (AutoS->Get() == 1) ? DriveBack : End;
+			
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Shoot");
 			break;
 		case DriveBack:
 			if (Autotime[kAutoTime_A] >= Autotime[kAutoTime_B]) Autotime[kAutoTime_B] = 2.25f;
-			myManager->FeedToShoot(0);
-			myManager->Storage(0);
-			myShooter->Shoot(0, 0);
+			AutoStuff(0, 0, 0.0, 0.0, false);
 			myRobot->ArcadeDrive(0.0,0.7*(Autotime[kAutoTime_B] / 2.0f) + 0.2);
 			myTipper->Manual(true);
 			if (Autotime[kAutoTime_B] <= 0.0f) myAuto = End;
+			
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "DriveBack");
 			break;
 		case End:
 			myRobot->Drive(0,0);
-			myManager->FeedToShoot(0);
-			myManager->Storage(0);
-			myShooter->Shoot(0,0);
+			AutoStuff(0, 0, 0.0, 0.0, false);
+			
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "End");
 			break;
 		default:
