@@ -1,15 +1,15 @@
 #include "WPILib.h"
 #include "ParadoxShooter.h"
 #include "math.h"
-static const double kP = 2.0;
-static const double kI = 0.1;
-static const double kD = 2.0;
+static const double kP = 1.0;
+static const double kI = 0.0;
+static const double kD = 1.0;
 
 ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2)
 {
-	m_bUseSpeedMode = false;
+	m_bUseSpeedMode = true;
 	
-	const CANJaguar::ControlMode controlMode = (m_bUseSpeedMode) ? CANJaguar::kSpeed : CANJaguar::kPercentVbus;
+	const CANJaguar::ControlMode controlMode = (m_bUseSpeedMode) ? CANJaguar::kSpeed : CANJaguar::kVoltage;
 
 	Top	= new CANJaguar(motor1,controlMode);
 	Btm	= new CANJaguar(motor2,controlMode);
@@ -21,11 +21,9 @@ ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2)
 	Top->SetSafetyEnabled(true);
 	Btm->SetSafetyEnabled(true);
 	
-	if (controlMode == CANJaguar::kSpeed)
-	{
-		Top->SetPID(kP, kI, kD);
-		Btm->SetPID(kP, kI, kD);
-	}
+	Top->SetPID(kP, kI, kD);
+	Btm->SetPID(kP, kI, kD);
+		
 	Top->ConfigEncoderCodesPerRev(3);
 	Btm->ConfigEncoderCodesPerRev(3);
 
@@ -53,7 +51,7 @@ bool ParadoxShooter::Shoot(float topWheel,float bottomWheel)
 #else
 	Top->Set(fabs(topWheel));
 	Btm->Set(fabs(bottomWheel));
-	if (m_bUseSpeedMode) return (Top->GetSpeed() >= (topWheel+100));
+	if (m_bUseSpeedMode) return (Top->GetSpeed() >= (topWheel-300));
 	else return false;
 #endif
 }
@@ -189,4 +187,10 @@ void ParadoxShooter::Start(bool on)
 {
 	Top->Set((on) ? 200 : 0);
 	Btm->Set((on) ? 200 : 0);
+}
+
+void ParadoxShooter::Dump(DriverStationLCD* ds)
+{
+        float amps = Top->GetOutputCurrent();
+        ds->Printf(DriverStationLCD::kUser_Line3, 1, "Amps: %f", amps);
 }

@@ -20,6 +20,7 @@ public:
         void SetSpeedMode(const bool bUseSpeedMode);
 		float GetAverageTopSpeed() const;
 		float GetAverageBottomSpeed() const;
+		void Dump(DriverStationLCD* ds);
 
 		enum
 		{
