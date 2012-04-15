@@ -11,5 +11,6 @@
 #include "ParadoxTipper.h"
 #include "ParadoxMatrix.h"
 #include "ParadoxScatterPlot.h"
+#include "ParadoxBang.h"
 
 #endif
