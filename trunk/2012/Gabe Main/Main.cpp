@@ -81,7 +81,6 @@ class ParadoxBot : public IterativeRobot
 	ParadoxShooter			*myShooter;
 	ParadoxTipper			 *myTipper;
 	ParadoxCameraTracking   *myCameraTracking;
-	//ParadoxMatrix			 *myMatrix;
 	ParadoxScatterPlot		   *myPlot;
 	
 	Joystick 					*gpad;
