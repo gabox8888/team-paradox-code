@@ -330,7 +330,7 @@ public:
 				myManager->FeedToShoot(joy->GetTrigger());
 			}
 			
-			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Volt: %3.0f", (shootJoyBlk * 100));
+			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Volt: %.2f", (shootJoyBlk * 12));
 		}
 
 		myManager->Storage((joy->GetTrigger()) ? 1 : ((joy->GetRawButton(2)) ? -1 : 0));
