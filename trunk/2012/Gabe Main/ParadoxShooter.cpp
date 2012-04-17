@@ -1,13 +1,13 @@
 #include "WPILib.h"
 #include "ParadoxShooter.h"
 #include "math.h"
-static const double kP = 1.0;
-static const double kI = 0.0;
-static const double kD = 1.0;
+static const double kP = 0.700;
+static const double kI = 0.005;
+static const double kD = 0.500;
 
 ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2)
 {
-	m_bUseSpeedMode = true;
+	m_bUseSpeedMode = false;
 	
 	const CANJaguar::ControlMode controlMode = (m_bUseSpeedMode) ? CANJaguar::kSpeed : CANJaguar::kVoltage;
 
@@ -21,9 +21,6 @@ ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2)
 	Top->SetSafetyEnabled(true);
 	Btm->SetSafetyEnabled(true);
 	
-	Top->SetPID(kP, kI, kD);
-	Btm->SetPID(kP, kI, kD);
-		
 	Top->ConfigEncoderCodesPerRev(3);
 	Btm->ConfigEncoderCodesPerRev(3);
 
@@ -104,7 +101,7 @@ void ParadoxShooter::SetSpeedMode(const bool bUseSpeedMode)
 {
 	if (m_bUseSpeedMode ^ bUseSpeedMode)
 	{
-		const CANJaguar::ControlMode controlMode = (bUseSpeedMode) ? CANJaguar::kSpeed : CANJaguar::kPercentVbus;
+		const CANJaguar::ControlMode controlMode = (bUseSpeedMode) ? CANJaguar::kSpeed : CANJaguar::kVoltage;
 		if (!bUseSpeedMode)
 		{
 			Top->SetPID(0.0, 0.0, 0.0);
@@ -191,6 +188,7 @@ void ParadoxShooter::Start(bool on)
 
 void ParadoxShooter::Dump(DriverStationLCD* ds)
 {
-        float amps = Top->GetOutputCurrent();
-        ds->Printf(DriverStationLCD::kUser_Line3, 1, "Amps: %f", amps);
+		float ampsBtm = Btm->GetOutputCurrent();
+        float ampsTop = Top->GetOutputCurrent();
+        ds->Printf(DriverStationLCD::kUser_Line3, 1, "Tamp %.2f; Bamp %.2f", ampsTop, ampsBtm);
 }
