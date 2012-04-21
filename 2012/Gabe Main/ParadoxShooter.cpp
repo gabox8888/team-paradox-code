@@ -111,7 +111,7 @@ void ParadoxShooter::SetSpeedMode(const bool bUseSpeedMode)
 		Btm->ChangeControlMode(controlMode);
 		if (bUseSpeedMode)
 		{
-			Top->SetPID(kP, kI, kD);
+			Top->SetPID(.35, kI, kD);
 			Btm->SetPID(kP, kI, kD);
 		}
 		Top->EnableControl();

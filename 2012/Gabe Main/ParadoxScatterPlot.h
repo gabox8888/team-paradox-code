@@ -6,13 +6,14 @@
 class ParadoxScatterPlot
 {
 public:
-	ParadoxScatterPlot();
+	ParadoxScatterPlot(string fn);
 	int PointSlope(int x);
 	void Plot(int x, int y);
 	
 protected:
 	void RebuildCache();
 	FILE	*tabf;
+	string	fname;
 	int		*xcache;
 	int		*ycache;
 	int		idxmax;

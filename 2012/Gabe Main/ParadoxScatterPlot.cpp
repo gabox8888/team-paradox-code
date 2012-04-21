@@ -1,9 +1,11 @@
 #include "ParadoxScatterPlot.h"
 #include "WPILib.h"
 
-ParadoxScatterPlot::ParadoxScatterPlot()
+ParadoxScatterPlot::ParadoxScatterPlot(string fn)
 {
 	in_limbo = false;
+	
+	fname = fn;
 	
 	xcache = new int[2];
 	ycache = new int[2];
@@ -17,7 +19,7 @@ void ParadoxScatterPlot::RebuildCache()
 	delete xcache;
 	delete ycache;
 	
-	tabf = fopen("iotab.txt", "r");
+	tabf = fopen(fname.c_str(), "r");
 	int x, y, l;
 	
 	while (fscanf(tabf, "%d, %d\n", &x, &y) != -1) l++;
@@ -85,7 +87,7 @@ void ParadoxScatterPlot::Plot(int x, int y)
 {
 	if (!in_limbo)
 	{
-		tabf = fopen("iotab.txt", "a+");
+		tabf = fopen(fname.c_str(), "a+");
 		fprintf(tabf, "%d, %d\n", x, y);
 		fclose(tabf);
 		RebuildCache();

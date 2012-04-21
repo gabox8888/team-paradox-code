@@ -81,7 +81,8 @@ class ParadoxBot : public IterativeRobot
 	ParadoxShooter			*myShooter;
 	ParadoxTipper			 *myTipper;
 	ParadoxCameraTracking   *myCameraTracking;
-	ParadoxScatterPlot		   *myPlot;
+	ParadoxScatterPlot		  *topPlot;
+	ParadoxScatterPlot		  *btmPlot;
 	
 	Joystick 					*gpad;
 	Joystick 				   *joy;
@@ -92,7 +93,7 @@ class ParadoxBot : public IterativeRobot
 	AnalogChannel				*Sonar;
 	float					Autotime[kNumAutoTimers];
 	
-	int distance, preset, shootRPM;
+	int distance, preset, shootTop, shootBtm;
 	int deltaspeed;
 	int deltatip;
 	bool rec;
@@ -114,7 +115,8 @@ public:
 		myShooter	= new ParadoxShooter(4,3); // 5,3
 		myTipper	= new ParadoxTipper(1,2,3,4);
 		//myMatrix	= new ParadoxMatrix(2);
-		myPlot		= new ParadoxScatterPlot();
+		topPlot		= new ParadoxScatterPlot("top.txt");
+		btmPlot		= new ParadoxScatterPlot("btm.txt");
 		
 
 		gpad 		= new Joystick(1);	
@@ -297,20 +299,20 @@ public:
 
 			if (quad->GetRawButton(8) || quad->GetRawButton(9))
 			{
-				shootRPM = (usesp) ? myPlot->PointSlope(preset) : (shootJoyBlk * 6400.0f);
+				shootTop = (usesp) ? topPlot->PointSlope(preset) : (shootJoyBlk * 6400.0f);
+				shootBtm = (usesp) ? topPlot->PointSlope(preset) : (shootJoyBlk * 6400.0f);
 				if (on)
 				{
-					if (myShooter->Shoot(shootRPM, shootRPM)) fire = true;
+					if (myShooter->Shoot(shootTop, shootBtm)) fire = true;
 					myManager->FeedToShoot((fire) ? 1 : 0);
 				}
-				if (usesp) ds->PrintfLine(DriverStationLCD::kUser_Line1, "Auto(%d): %d", preset, shootRPM);
-				else ds->PrintfLine(DriverStationLCD::kUser_Line1, "ManBlk: %d", shootRPM);
+				if (usesp) ds->PrintfLine(DriverStationLCD::kUser_Line1, "Auto(%d): %d, %d", preset, shootBtm, shootTop);
+				else ds->PrintfLine(DriverStationLCD::kUser_Line1, "ManBlk: %d", shootTop);
 			}
 			else
 			{
-				rec = false;
-				int shootTop = shootJoyRed * 6400.0f;
-				int shootBtm = shootJoyBlu * 6400.0f;
+				shootTop = (usesp) ? topPlot->PointSlope(preset) : (shootJoyRed * 6400.0f);
+				shootBtm = (usesp) ? btmPlot->PointSlope(preset) : (shootJoyBlu * 6400.0f);
 				if (on)
 				{
 					myShooter->Shoot(shootTop, shootBtm);
@@ -358,21 +360,13 @@ public:
 	void TeleopPeriodic(void)
 	{
 		if (myShooter->IsUsingSpeedMode())
-		{
-			/*
-			if (joy->GetRawButton(9) && rec)
-			{
-				myPlot->Plot(distance, shootRPM);
-				rec = false;
-			}
-			if (!joy->GetRawButton(9) && !rec) rec = true;
-			*/
-			
+		{	
 			for (int i = 1; i <= 4; i++)
 			{
 				if (quad->GetRawButton(i) && rec)
 				{
-					myPlot->Plot(i, shootRPM);
+					topPlot->Plot(i, shootTop);
+					btmPlot->Plot(i, shootBtm);
 					rec = false;
 				}
 				if (!quad->GetRawButton(i) && !rec) rec = true;
