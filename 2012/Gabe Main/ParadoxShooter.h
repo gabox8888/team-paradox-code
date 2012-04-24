@@ -31,7 +31,6 @@ protected:
         
        CANJaguar *Top;
        CANJaguar *Btm;
-
        float m_targetCM_X;
        bool  m_hasTarget;
        bool  m_bAutoTrackingTurret;

@@ -87,9 +87,12 @@ void ParadoxScatterPlot::Plot(int x, int y)
 {
 	if (!in_limbo)
 	{
+		printf("Plotting %d, %d\n", x, y);
 		tabf = fopen(fname.c_str(), "a+");
 		fprintf(tabf, "%d, %d\n", x, y);
 		fclose(tabf);
+		printf("OK, RebuildCache...\n");
 		RebuildCache();
+		printf("Done\n\n");
 	}
 }
