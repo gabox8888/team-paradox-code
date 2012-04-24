@@ -1,6 +1,6 @@
 #include "ParadoxLib.h"
 
-#define USE_CAMERA
+//#define USE_CAMERA
 
 static inline float SignedPowerFunction( const float x, const float gamma, const float scale, const float deadBand, const float clampLower, const float clampUpper )
 {
@@ -62,6 +62,8 @@ class ParadoxBot : public IterativeRobot
 	enum eAutonomousState
 	{
 		AllianceDelay,
+		AllianceFeed,
+		AllianceBurp,
 		RevUp,
 		Shoot,
 		DriveBack,
@@ -80,6 +82,7 @@ class ParadoxBot : public IterativeRobot
 	ParadoxBallManager		*myManager;
 	ParadoxShooter			*myShooter;
 	ParadoxTipper			 *myTipper;
+	//ParadoxBang					*myBang;
 	ParadoxCameraTracking   *myCameraTracking;
 	ParadoxScatterPlot		  *topPlot;
 	ParadoxScatterPlot		  *btmPlot;
@@ -92,11 +95,12 @@ class ParadoxBot : public IterativeRobot
 	Gyro						 *gyro;
 	AnalogChannel				*Sonar;
 	float					Autotime[kNumAutoTimers];
+	float					leftover;
 	
-	int distance, preset, shootTop, shootBtm;
+	int distance, shootTop, shootBtm;
 	int deltaspeed;
 	int deltatip;
-	bool rec;
+	float rectime;
 	
 public:
 
@@ -114,7 +118,7 @@ public:
 		myManager	= new ParadoxBallManager(4,2); // 4,4
 		myShooter	= new ParadoxShooter(4,3); // 5,3
 		myTipper	= new ParadoxTipper(1,2,3,4);
-		//myMatrix	= new ParadoxMatrix(2);
+		//myBang		= new ParadoxBang(13);
 		topPlot		= new ParadoxScatterPlot("top.txt");
 		btmPlot		= new ParadoxScatterPlot("btm.txt");
 		
@@ -173,7 +177,7 @@ public:
 		distance = Sonar->GetVoltage()/(5.0f/512.0f);		
 	}
 	
-	bool AutoStuff(int feed, int store, float shootTop, float shootBtm, bool spdmode)
+	bool AutoStuff(int store, int feed, float shootTop, float shootBtm, bool spdmode)
 	{
 		myManager->FeedToShoot(feed);
 		myManager->Storage(store);
@@ -271,16 +275,19 @@ public:
 		static bool on = false;
 		static bool usesp = false;
 		static bool fire = true;
-		float shootJoyBlk = ((quad->GetX()+1)*.5);
-		float shootJoyBlu = ((quad->GetY()+1)*.5);
-		float shootJoyRed = ((quad->GetZ()+1)*.5);
+		static bool bang = false;
+		bool indivctrl = (!quad->GetRawButton(8) && !quad->GetRawButton(9));
+		float shootJoyBlk = ((quad->GetX()+1)*.5) * (myShooter->IsUsingSpeedMode() ? 6400.0f : 1.0f);
+		float shootJoyBlu = ((quad->GetY()+1)*.5) * (myShooter->IsUsingSpeedMode() ? 6400.0f : 1.0f);
+		float shootJoyRed = ((quad->GetZ()+1)*.5) * (myShooter->IsUsingSpeedMode() ? 6400.0f : 1.0f);
 
 		if(joy->GetRawButton(5)) on = true;
 		if(joy->GetRawButton(6)) on = false;
 		if(joy->GetRawButton(12)) usesp = false;
 		if(joy->GetRawButton(11)) usesp = true;
-		if (usesp) rec = false;
-		
+		if(joy->GetRawButton(3)) bang = false;
+		if(joy->GetRawButton(4)) bang = true;
+
 		myShooter->SetSpeedMode(joy->GetRawAxis(4) > 0.0f);
 		
 		if (!on)
@@ -289,46 +296,50 @@ public:
 			myShooter->Shoot(0.0,0.0);
 			myManager->FeedToShoot(0);
 		}
-		
-		if (myShooter->IsUsingSpeedMode())
+		/*
+		if (!myShooter->IsUsingSpeedMode() && bang) 
 		{
+			ds->PrintfLine(DriverStationLCD::kUser_Line4, "bang");
+			myBang->SetRPM(shootJoyRed);
+			if (on)myShooter->Shoot(myBang->Speed(),myBang->Speed());
+		}
+		*/
+		if (myShooter->IsUsingSpeedMode() && usesp) // Encoder Automatic
+		{
+			rectime = 1.0;
+			int preset = 0;
 			if (quad->GetX() >= -1.0) preset = 1;
 			if (quad->GetX() >= -0.5) preset = 2;
 			if (quad->GetX() >=  0.0) preset = 3;
 			if (quad->GetX() >=  0.5) preset = 4;
-
-			if (quad->GetRawButton(8) || quad->GetRawButton(9))
+			
+			shootTop = topPlot->PointSlope(preset);
+			shootBtm = btmPlot->PointSlope(preset);
+			if (on)
 			{
-				shootTop = (usesp) ? topPlot->PointSlope(preset) : (shootJoyBlk * 6400.0f);
-				shootBtm = (usesp) ? topPlot->PointSlope(preset) : (shootJoyBlk * 6400.0f);
-				if (on)
-				{
-					if (myShooter->Shoot(shootTop, shootBtm)) fire = true;
-					myManager->FeedToShoot((fire) ? 1 : 0);
-				}
-				if (usesp) ds->PrintfLine(DriverStationLCD::kUser_Line1, "Auto(%d): %d, %d", preset, shootBtm, shootTop);
-				else ds->PrintfLine(DriverStationLCD::kUser_Line1, "ManBlk: %d", shootTop);
+				if (myShooter->Shoot(shootTop, shootBtm)) fire = true;
+				myManager->FeedToShoot((fire) ? 1 : 0);
 			}
-			else
-			{
-				shootTop = (usesp) ? topPlot->PointSlope(preset) : (shootJoyRed * 6400.0f);
-				shootBtm = (usesp) ? btmPlot->PointSlope(preset) : (shootJoyBlu * 6400.0f);
-				if (on)
-				{
-					myShooter->Shoot(shootTop, shootBtm);
-					myManager->FeedToShoot((joy->GetTrigger()) ? 1 : 0);
-				}
-				ds->PrintfLine(DriverStationLCD::kUser_Line1, "ManColor: %d, %d", shootBtm, shootTop);
-			}
+			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Auto(%d): %d, %d", preset, shootBtm, shootTop);
 		}
-		else
+		if (myShooter->IsUsingSpeedMode() && !usesp) // Encoder Manual
+		{
+			shootTop = (indivctrl) ? shootJoyRed : shootJoyBlk;
+			shootBtm = (indivctrl) ? shootJoyBlu : shootJoyBlk;
+			if (on)
+			{
+				myShooter->Shoot(shootTop, shootBtm);
+				myManager->FeedToShoot((joy->GetTrigger()) ? 1 : 0);
+			}
+			if (indivctrl) ds->PrintfLine(DriverStationLCD::kUser_Line1, "ManColor: %d, %d", shootBtm, shootTop);
+			else ds->PrintfLine(DriverStationLCD::kUser_Line1, "ManBlk: %d", shootTop);
+		}
+		if (!myShooter->IsUsingSpeedMode()&& !bang) // Voltage
 		{
 			fire = false;
 			if (on)
 			{
-				//if((shootJoyBlk<=10)&&(shootJoyBlk>=1))myShooter->Shoot(6400,6400);
-				//else 
-				myShooter->Shoot(shootJoyBlk*12, shootJoyBlk*12);
+				myShooter->Shoot((usesp) ? 2.25 : shootJoyBlk*12, (usesp) ? 2.25 : shootJoyBlk*12);
 				myManager->FeedToShoot(joy->GetTrigger());
 			}
 			
@@ -359,17 +370,20 @@ public:
 	
 	void TeleopPeriodic(void)
 	{
+		rectime -= GetPeriod();
 		if (myShooter->IsUsingSpeedMode())
 		{	
 			for (int i = 1; i <= 4; i++)
 			{
-				if (quad->GetRawButton(i) && rec)
+				if (quad->GetRawButton(i))
 				{
-					topPlot->Plot(i, shootTop);
-					btmPlot->Plot(i, shootBtm);
-					rec = false;
+					if (rectime <= 0.0)
+					{
+						topPlot->Plot(i, shootTop);
+						btmPlot->Plot(i, shootBtm);
+						rectime = 5.0;
+					}
 				}
-				if (!quad->GetRawButton(i) && !rec) rec = true;
 			}
 		}
 	}

@@ -1,15 +1,19 @@
 #include "WPILib.h"
 #include "ParadoxShooter.h"
 #include "math.h"
-static const double kP = 0.700;
-static const double kI = 0.005;
-static const double kD = 0.500;
+static const double kPtop = 0.700;
+static const double kItop = 0.005;
+static const double kDtop = 0.500;
+static const double kPbtm = 0.350;
+static const double kIbtm = 0.005;
+static const double kDbtm = 0.500;
 
 ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2)
 {
 	m_bUseSpeedMode = false;
+
 	
-	const CANJaguar::ControlMode controlMode = (m_bUseSpeedMode) ? CANJaguar::kSpeed : CANJaguar::kVoltage;
+	const CANJaguar::ControlMode controlMode = (m_bUseSpeedMode) ? CANJaguar::kSpeed : CANJaguar::kPercentVbus;
 
 	Top	= new CANJaguar(motor1,controlMode);
 	Btm	= new CANJaguar(motor2,controlMode);
@@ -48,7 +52,7 @@ bool ParadoxShooter::Shoot(float topWheel,float bottomWheel)
 #else
 	Top->Set(fabs(topWheel));
 	Btm->Set(fabs(bottomWheel));
-	if (m_bUseSpeedMode) return (Top->GetSpeed() >= (topWheel-300));
+	if (m_bUseSpeedMode) return (Top->GetSpeed() >= (topWheel-200)) && (Btm);
 	else return false;
 #endif
 }
@@ -111,8 +115,8 @@ void ParadoxShooter::SetSpeedMode(const bool bUseSpeedMode)
 		Btm->ChangeControlMode(controlMode);
 		if (bUseSpeedMode)
 		{
-			Top->SetPID(.35, kI, kD);
-			Btm->SetPID(kP, kI, kD);
+			Top->SetPID(kPtop, kItop, kDtop);
+			Btm->SetPID(kPbtm, kIbtm, kDbtm);
 		}
 		Top->EnableControl();
 		Btm->EnableControl();
