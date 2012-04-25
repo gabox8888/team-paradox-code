@@ -63,7 +63,6 @@ class ParadoxBot : public IterativeRobot
 	{
 		AllianceDelay,
 		AllianceFeed,
-		AllianceBurp,
 		RevUp,
 		Shoot,
 		DriveBack,
@@ -73,7 +72,9 @@ class ParadoxBot : public IterativeRobot
 	Compressor			     *Compress;
 	Victor							*r;
 	Victor							*l;
-	DigitalInput				*AutoS;
+	DigitalInput				*AutoSW;
+	DigitalInput				*AutoSA;
+	DigitalInput				*AutoSF;
 	#if defined(USE_CAMERA)
 	AxisCamera 				   *camera; 
 	#endif
@@ -82,14 +83,13 @@ class ParadoxBot : public IterativeRobot
 	ParadoxBallManager		*myManager;
 	ParadoxShooter			*myShooter;
 	ParadoxTipper			 *myTipper;
-	//ParadoxBang					*myBang;
 	ParadoxCameraTracking   *myCameraTracking;
 	ParadoxScatterPlot		  *topPlot;
 	ParadoxScatterPlot		  *btmPlot;
 	
-	Joystick 					*gpad;
-	Joystick 				   *joy;
-	Joystick 				   *quad;
+	Joystick 					 *gpad;
+	Joystick 				   	  *joy;
+	Joystick 				   	 *quad;
 	DriverStationLCD			   *ds;
 	eAutonomousState			myAuto;
 	Gyro						 *gyro;
@@ -109,7 +109,9 @@ public:
 		Compress  	= new Compressor(14,1); 
 		r			= new Victor(1);
 		l			= new Victor(2);
-		AutoS		= new DigitalInput(8);
+		AutoSW		= new DigitalInput(8);
+		AutoSA		= new DigitalInput(9);
+		AutoSF		= new DigitalInput(10);
 		#if defined(USE_CAMERA)
 		camera	 	= &AxisCamera::GetInstance("10.21.2.11");
 		#endif
@@ -118,7 +120,6 @@ public:
 		myManager	= new ParadoxBallManager(4,2); // 4,4
 		myShooter	= new ParadoxShooter(4,3); // 5,3
 		myTipper	= new ParadoxTipper(1,2,3,4);
-		//myBang		= new ParadoxBang(13);
 		topPlot		= new ParadoxScatterPlot("top.txt");
 		btmPlot		= new ParadoxScatterPlot("btm.txt");
 		
@@ -187,11 +188,9 @@ public:
 	
 	void AutonomousInit(void)
 	{
-		static double dTime;
-		dTime=5.0;
 		ProcessCommon();
-			Autotime[kAutoTime_A] = dTime+3.0;
-			Autotime[kAutoTime_B] = dTime;
+			Autotime[kAutoTime_A] = 99.0;
+			Autotime[kAutoTime_B] = 99.0;
 			//Autotime[kAutoTime_C] = dTime;
 		myAuto = AllianceDelay;
 		ds->Clear();
@@ -216,34 +215,51 @@ public:
 		switch (myAuto)
 		{
 		case AllianceDelay:
-			if (Autotime[kAutoTime_B]<=0) myAuto=RevUp;
+			Autotime[kAutoTime_B] = 99.0f;
+			if (Autotime[kAutoTime_A] > 90.0f) Autotime[kAutoTime_A] = 5.0f;
+			if (Autotime[kAutoTime_A] <= 0.0f) myAuto = (AutoSA->Get() == 1) ? RevUp : AllianceFeed;
+			break;
+		case AllianceFeed:
+			Autotime[kAutoTime_A] = 99.0f;
+			if (Autotime[kAutoTime_B] > 90.0f) Autotime[kAutoTime_B] = 3.0f;
+			if (Autotime[kAutoTime_B] <= 0.0f) myAuto = End;
+			
+			if (AutoSF->Get() == 1)AutoStuff(-1,0,0,0,false);
+			else AutoStuff(1,1,2.3,2.3,false);
+			ds->PrintfLine(DriverStationLCD::kUser_Line1, "AllianceFeed");
 			break;
 		case RevUp:
-			if (Autotime[kAutoTime_B]<=0) Autotime[kAutoTime_A] = 3.0f;
-			if (AutoStuff(1, 1, .21, .21, false) || (Autotime[kAutoTime_A] <= 0.0f)) myAuto = Shoot;
+			Autotime[kAutoTime_A] = 99.0f;
+			if (Autotime[kAutoTime_B] > 90.0f) Autotime[kAutoTime_B] = 3.0f;
+			if (Autotime[kAutoTime_B] <= 0.0f) myAuto = Shoot;
 			
+			if (AutoStuff(1, 1, 1700, 1700, true)) myAuto = Shoot;
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "RevUp");
 			break;
 		case Shoot:
-			if (Autotime[kAutoTime_A] == Autotime[kAutoTime_B]) Autotime[kAutoTime_A] = 3.0f;
-			AutoStuff(1, 1, .21, .21, false);
-			if (Autotime[kAutoTime_A] <= 0.0f) myAuto = (AutoS->Get() == 1) ? DriveBack : End;
+			Autotime[kAutoTime_B] = 99.0f;
+			if (Autotime[kAutoTime_A] > 90.0f) Autotime[kAutoTime_A] = 3.0f;
+			if (Autotime[kAutoTime_A] <= 0.0f) myAuto = (AutoSW->Get() == 1) ? DriveBack : End;
 			
+			AutoStuff(1, 1, 1700, 1700, true);
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Shoot");
 			break;
 		case DriveBack:
-			if (Autotime[kAutoTime_A] >= Autotime[kAutoTime_B]) Autotime[kAutoTime_B] = 2.25f;
+			Autotime[kAutoTime_A] = 99.0f;
+			if (Autotime[kAutoTime_B] > 2.25f) Autotime[kAutoTime_B] = 2.25f;
+			if (Autotime[kAutoTime_B] <= 0.0f) myAuto = End;
+			
 			AutoStuff(0, 0, 0.0, 0.0, false);
 			myRobot->ArcadeDrive(0.0,0.7*(Autotime[kAutoTime_B] / 2.0f) + 0.2);
 			myTipper->Manual(true);
-			if (Autotime[kAutoTime_B] <= 0.0f) myAuto = End;
-			
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "DriveBack");
 			break;
 		case End:
+			Autotime[kAutoTime_A] = 0.0f;
+			Autotime[kAutoTime_B] = 0.0f;
+			
 			myRobot->Drive(0,0);
 			AutoStuff(0, 0, 0.0, 0.0, false);
-			
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "End");
 			break;
 		default:
@@ -275,7 +291,6 @@ public:
 		static bool on = false;
 		static bool usesp = false;
 		static bool fire = true;
-		static bool bang = false;
 		bool indivctrl = (!quad->GetRawButton(8) && !quad->GetRawButton(9));
 		float shootJoyBlk = ((quad->GetX()+1)*.5) * (myShooter->IsUsingSpeedMode() ? 6400.0f : 1.0f);
 		float shootJoyBlu = ((quad->GetY()+1)*.5) * (myShooter->IsUsingSpeedMode() ? 6400.0f : 1.0f);
@@ -285,8 +300,6 @@ public:
 		if(joy->GetRawButton(6)) on = false;
 		if(joy->GetRawButton(12)) usesp = false;
 		if(joy->GetRawButton(11)) usesp = true;
-		if(joy->GetRawButton(3)) bang = false;
-		if(joy->GetRawButton(4)) bang = true;
 
 		myShooter->SetSpeedMode(joy->GetRawAxis(4) > 0.0f);
 		
@@ -296,14 +309,7 @@ public:
 			myShooter->Shoot(0.0,0.0);
 			myManager->FeedToShoot(0);
 		}
-		/*
-		if (!myShooter->IsUsingSpeedMode() && bang) 
-		{
-			ds->PrintfLine(DriverStationLCD::kUser_Line4, "bang");
-			myBang->SetRPM(shootJoyRed);
-			if (on)myShooter->Shoot(myBang->Speed(),myBang->Speed());
-		}
-		*/
+
 		if (myShooter->IsUsingSpeedMode() && usesp) // Encoder Automatic
 		{
 			rectime = 1.0;
@@ -334,16 +340,16 @@ public:
 			if (indivctrl) ds->PrintfLine(DriverStationLCD::kUser_Line1, "ManColor: %d, %d", shootBtm, shootTop);
 			else ds->PrintfLine(DriverStationLCD::kUser_Line1, "ManBlk: %d", shootTop);
 		}
-		if (!myShooter->IsUsingSpeedMode()&& !bang) // Voltage
+		if (!myShooter->IsUsingSpeedMode()) // Voltage
 		{
 			fire = false;
 			if (on)
 			{
-				myShooter->Shoot((usesp) ? 2.25 : shootJoyBlk*12, (usesp) ? 2.25 : shootJoyBlk*12);
+				myShooter->Shoot((usesp) ? 2.3 : shootJoyBlk*12, (usesp) ? 2.3 : shootJoyBlk*12);
 				myManager->FeedToShoot(joy->GetTrigger());
 			}
 			
-			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Volt: %.2f", (shootJoyBlk * 12));
+			ds->PrintfLine(DriverStationLCD::kUser_Line1, "Volt: %.2f", (usesp) ? 2.3 : (shootJoyBlk * 12));
 		}
 
 		myManager->Storage((joy->GetTrigger()) ? 1 : ((joy->GetRawButton(2)) ? -1 : 0));
@@ -386,6 +392,13 @@ public:
 				}
 			}
 		}
+	}
+	
+	void DisabledPeriodic(void)
+	{
+		ds->Clear();
+		ds->PrintfLine(DriverStationLCD::kUser_Line1, "SW %d, SA %d, SF %d", AutoSW->Get(), AutoSA->Get(), AutoSF->Get());
+		ds->UpdateLCD();
 	}
 };
 

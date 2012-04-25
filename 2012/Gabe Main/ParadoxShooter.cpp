@@ -13,7 +13,7 @@ ParadoxShooter::ParadoxShooter (UINT32 motor1, UINT32 motor2)
 	m_bUseSpeedMode = false;
 
 	
-	const CANJaguar::ControlMode controlMode = (m_bUseSpeedMode) ? CANJaguar::kSpeed : CANJaguar::kPercentVbus;
+	const CANJaguar::ControlMode controlMode = (m_bUseSpeedMode) ? CANJaguar::kSpeed : CANJaguar::kVoltage;
 
 	Top	= new CANJaguar(motor1,controlMode);
 	Btm	= new CANJaguar(motor2,controlMode);
@@ -52,7 +52,7 @@ bool ParadoxShooter::Shoot(float topWheel,float bottomWheel)
 #else
 	Top->Set(fabs(topWheel));
 	Btm->Set(fabs(bottomWheel));
-	if (m_bUseSpeedMode) return (Top->GetSpeed() >= (topWheel-200)) && (Btm);
+	if (m_bUseSpeedMode) return (Top->GetSpeed() >= (topWheel-200)) && (Btm->GetSpeed() >= (bottomWheel-200));
 	else return false;
 #endif
 }
