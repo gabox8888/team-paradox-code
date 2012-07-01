@@ -66,10 +66,9 @@ int main(int argc, char** argv) {
             if(joystickx>0 && joysticky<0 ){
                 wheel1= joystickangle + 270;
             }
-                    
+                   wheel2= wheel1+ 90;
+				   
            //i would turn wheel 1 and 2 on here
-            
-               wheel2= wheel1+ 90;
             
             while( wheelencoder1 < wheel1){
                 cout<< "input how many stripes wheel encoder has passed";
@@ -98,14 +97,16 @@ int main(int argc, char** argv) {
             } //bracket for direction wheel turning
        //i would turn wheels off here     
             
+               //get joystickx
+			   //get joysticky
                
-               
-               while(vectormagnitude>0){
+               while(joystickx > 0 || joysticky > 0){
                   
                    //get joysticky
                    //get joystickx
                    
                    speedplcholder = joystickx * joystickx + joysticky * joysticky;
+				   
                
               // vectormagnitude = square root of speedplcholder;
                    
@@ -137,9 +138,10 @@ int main(int argc, char** argv) {
         
         else{
             
-            cin>> joystickz;
             
+            //get joystickz
             while(joystickz>0 || joystickz<0){
+			//get joystickz
                 //set motors to spin at joystickz
             }
         }
