@@ -5,5 +5,6 @@
 #include "math.h"
 
 #include "ParadoxMath.h"
+#include "ParadoxModule.h"
 
 #endif
