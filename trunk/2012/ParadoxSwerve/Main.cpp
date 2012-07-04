@@ -6,7 +6,6 @@ class ParadoxBot : public IterativeRobot
 	ParadoxModule 	*TopL;
 	ParadoxModule 	*BotR;
 	ParadoxModule 	*BotL;
-	ParadoxMath		*Math;
 	
 	AnalogChannel	*Test;
 	
@@ -21,6 +20,7 @@ public:
 
 	ParadoxBot()
 	{
+		printf("DEBUG: Top of ctor\n");
 		TopR	= new ParadoxModule(3,2,2);		
 		TopL	= new ParadoxModule(4,5,3);
 		BotR	= new ParadoxModule(6,7,4);
@@ -31,6 +31,7 @@ public:
 		Joy		= new Joystick(1);
 		ds			= DriverStationLCD::GetInstance();
 		
+		printf("DEBUG: exit ctor\n");
 	};
 
 	~ParadoxBot()
@@ -64,19 +65,22 @@ public:
 	
 	void TeleopPeriodic(void)
 	{
-		Speed = Math->CalculateMag(Joy);
-		Angle = Math->CalculateMag(Joy);
-		TopR->SetSpeed(Speed);
-		TopL->SetSpeed(Speed);
-		BotR->SetSpeed(Speed);
-		BotL->SetSpeed(Speed);
-		TopR->SetAngle(Angle);
+printf("DEBUG: Top of TeleopPeriodic\n");
+		Speed = ParadoxMath::CalculateMag(Joy);
+		Angle = ParadoxMath::CalculateAngle(Joy);
+		//TopR->SetSpeed(Speed);
+		//TopL->SetSpeed(Speed);
+		//BotR->SetSpeed(Speed);
+		//BotL->SetSpeed(Speed);
+		//TopR->SetAngle(Angle);
 		TopL->SetAngle(Angle);
-		BotR->SetAngle(Angle);
-		BotL->SetAngle(Angle);
+		//BotR->SetAngle(Angle);
+		//BotL->SetAngle(Angle);
 		
 		ds->PrintfLine(DriverStationLCD::kUser_Line1, "Test : %f", Test->GetVoltage());
+		ds->PrintfLine(DriverStationLCD::kUser_Line2, "AngSet : %f", Angle);
 		ds->UpdateLCD();
+printf("DEBUG: Bottom of TeleopPeriodic\n");
 
 	}
 	
