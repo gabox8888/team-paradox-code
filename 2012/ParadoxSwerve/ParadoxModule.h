@@ -29,6 +29,8 @@ public:
         void SetAngle(float s_angle);
         void SetSpeed(float s_speed);
         
+        float ReadPot();				//Returns volatage from a potentiometer
+        
 public:
         PIDController	*PID;
         
