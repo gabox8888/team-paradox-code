@@ -2,9 +2,9 @@
 #include "ParadoxModule.h"
 #include "math.h"
 
-const float kAngle_P = 2.0f;
-const float kAngle_I = 1.0f;
-const float kAngle_D = 1.0f;
+const float kAngle_P = 1.0f;
+const float kAngle_I = 0.75f;
+const float kAngle_D = 0.5f;
 
 
 ParadoxModule::ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc)
@@ -43,4 +43,10 @@ void ParadoxModule::SetAngle(float s_angle)
 void ParadoxModule::SetSpeed(float s_speed)
 {
 	Speed->Set(s_speed);
+}
+
+float ParadoxModule::ReadPot()
+{
+	float x = POT->GetVoltage();
+	return x;
 }

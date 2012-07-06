@@ -23,7 +23,7 @@ static inline float SignedPowerFunction( const float x, const float gamma, const
 }
 float ParadoxMath::CalculateAngle(Joystick *joy)
 {
-	float angle = atan2(joy->GetY(), joy->GetX());
+	float angle = atan2(-1 * joy->GetY(), joy->GetX());
 	float t = angle / (2.0*kPI) + 0.5f;
 	return t * 5.0f;
 }

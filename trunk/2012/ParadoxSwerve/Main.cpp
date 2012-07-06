@@ -2,10 +2,15 @@
 
 class ParadoxBot : public IterativeRobot
 {
-	ParadoxModule 	*TopR;
-	ParadoxModule 	*TopL;
-	ParadoxModule 	*BotR;
-	ParadoxModule 	*BotL;
+	ParadoxModule 	*BlackOut;         //Changed module names because orientation for 'top' and 'right' was unclear
+	ParadoxModule 	*BlackIn;          //Black and Grey designate Jaguar colors
+	ParadoxModule 	*GreyOut;          //Out and In designate jaguar location, the inside or outside pair in a group
+	ParadoxModule 	*GreyIn;
+	
+	AnalogChannel	*Pot1;
+	AnalogChannel	*Pot2;
+	AnalogChannel	*Pot3;
+	AnalogChannel	*Pot4;
 	
 	AnalogChannel	*Test;
 	
@@ -21,14 +26,14 @@ public:
 	ParadoxBot()
 	{
 		printf("DEBUG: Top of ctor\n");
-		TopR	= new ParadoxModule(3,2,2);		
-		TopL	= new ParadoxModule(4,5,3);
-		BotR	= new ParadoxModule(6,7,4);
-		BotL	= new ParadoxModule(8,9,5);
+		BlackOut	= new ParadoxModule(12,11,2);		
+		BlackIn 	= new ParadoxModule(22,21,3);
+		GreyOut  	= new ParadoxModule(32,31,4);
+		GreyIn 	    = new ParadoxModule(42,41,5);
 		
-		Test	= new AnalogChannel(1);
+		Test	    = new AnalogChannel(1);
 		
-		Joy		= new Joystick(1);
+		Joy		    = new Joystick(1);
 		ds			= DriverStationLCD::GetInstance();
 		
 		printf("DEBUG: exit ctor\n");
@@ -68,28 +73,34 @@ public:
 printf("DEBUG: Top of TeleopPeriodic\n");
 		Speed = ParadoxMath::CalculateMag(Joy);
 		Angle = ParadoxMath::CalculateAngle(Joy);
-		//TopR->SetSpeed(Speed);
-		//TopL->SetSpeed(Speed);
-		//BotR->SetSpeed(Speed);
-		//BotL->SetSpeed(Speed);
-		//TopR->SetAngle(Angle);
-		TopL->SetAngle(Angle);
-		//BotR->SetAngle(Angle);
-		//BotL->SetAngle(Angle);
-		
+		//BlackOut->SetSpeed(Speed);
+		//BlackIn->SetSpeed(Speed);
+		//GreyOut->SetSpeed(Speed);
+		//GreyIn->SetSpeed(Speed);
+		//BlackOut->SetAngle(Angle);
+		BlackIn->SetAngle(Angle);
+		GreyOut->SetAngle(Angle);
+		//GreyIn->SetAngle(Angle);
+				
 		ds->PrintfLine(DriverStationLCD::kUser_Line1, "Test : %f", Test->GetVoltage());
 		ds->PrintfLine(DriverStationLCD::kUser_Line2, "AngSet : %f", Angle);
+		//ds->PrintfLine(DriverStationLCD::kUser_Line3, "MagSet : %f", Speed);
+		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Pot1 : %f", BlackOut->ReadPot());
+		//ds->PrintfLine(DriverStationLCD::kUser_Line4, "Pot2 : %f", Pot2->GetVoltage());
+		//ds->PrintfLine(DriverStationLCD::kUser_Line5, "Pot3 : %f", Pot3->GetVoltage());
+		//ds->PrintfLine(DriverStationLCD::kUser_Line6, "Pot4 : %f", Pot4->GetVoltage());
+		ds->PrintfLine(DriverStationLCD::kUser_Line4, "Y : %f", Joy->GetY());
+		ds->PrintfLine(DriverStationLCD::kUser_Line5, "X : %f", Joy->GetX());
 		ds->UpdateLCD();
 printf("DEBUG: Bottom of TeleopPeriodic\n");
-
 	}
 	
 	void DisabledPeriodic(void)
 	{
-		TopR->ClearPIDVars();
-		TopL->ClearPIDVars();
-		BotR->ClearPIDVars();
-		BotL->ClearPIDVars();	
+		//BlackOut->ClearPIDVars();
+		BlackIn->ClearPIDVars();
+		GreyOut->ClearPIDVars();
+        //GreyIn->ClearPIDVars();	
 	}
 };
 
