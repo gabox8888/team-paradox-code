@@ -72,20 +72,25 @@ public:
 	{
 printf("DEBUG: Top of TeleopPeriodic\n");
 		Speed = ParadoxMath::CalculateMag(Joy);
-		Angle = ParadoxMath::CalculateAngle(Joy);
+		if ((fabs(Joy->GetX()) > 0.5) || (fabs(Joy->GetY()) > 0.5)) Angle = ParadoxMath::CalculateAngle(Joy);
 		//BlackOut->SetSpeed(Speed);
 		//BlackIn->SetSpeed(Speed);
 		//GreyOut->SetSpeed(Speed);
 		//GreyIn->SetSpeed(Speed);
 		//BlackOut->SetAngle(Angle);
+		
+		//BlackIn->SetAngle((fabs(Angle - BlackIn->ReadPot()) > 4) ? InvAngle : Angle);
+		//GreyOut->SetAngle((fabs(Angle - GreyOut->ReadPot()) > 4) ? InvAngle : Angle);
+		
 		BlackIn->SetAngle(Angle);
 		GreyOut->SetAngle(Angle);
+		
 		//GreyIn->SetAngle(Angle);
 				
 		ds->PrintfLine(DriverStationLCD::kUser_Line1, "Test : %f", Test->GetVoltage());
 		ds->PrintfLine(DriverStationLCD::kUser_Line2, "AngSet : %f", Angle);
 		//ds->PrintfLine(DriverStationLCD::kUser_Line3, "MagSet : %f", Speed);
-		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Pot1 : %f", BlackOut->ReadPot());
+		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Pot1 : %f", BlackIn->ReadPot());
 		//ds->PrintfLine(DriverStationLCD::kUser_Line4, "Pot2 : %f", Pot2->GetVoltage());
 		//ds->PrintfLine(DriverStationLCD::kUser_Line5, "Pot3 : %f", Pot3->GetVoltage());
 		//ds->PrintfLine(DriverStationLCD::kUser_Line6, "Pot4 : %f", Pot4->GetVoltage());
