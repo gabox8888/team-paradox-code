@@ -16,14 +16,13 @@ ParadoxModule::ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc)
 	PID		= new PIDController(0.0f,0.0f,0.0f,POT,this);
 	PID->Enable();
 	PID->SetInputRange(kAngle_Min,kAngle_Max);
+	PID->SetContinuous(true);
 		
 	Speed->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
 	Speed->EnableControl();
 	Speed->SetSafetyEnabled(false);
 	Speed->ConfigEncoderCodesPerRev(72);
 	Speed->SetPID(1,1,1);
-	
-	
 }
 void ParadoxModule::PIDWrite(float output)
 {
