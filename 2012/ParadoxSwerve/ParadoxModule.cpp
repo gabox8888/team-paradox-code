@@ -10,19 +10,19 @@ const float kAngle_D = 0.5f;
 ParadoxModule::ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc)
 {
 	Angle	= new CANJaguar(angle_w);
-	Speed	= new CANJaguar(speed_w);
+	Speed	= new CANJaguar(speed_w, CANJaguar::kSpeed);
 	POT		= new ParadoxAnalogChannel(absenc);
 	
-	PID		= new PIDController(0.0f,0.0f,0.0f,POT,this);
-	PID->Enable();
-	PID->SetInputRange(kAngle_Min,kAngle_Max);
-	PID->SetContinuous(true);
-		
+	AngPID	= new PIDController(0.0f,0.0f,0.0f,POT,Angle);
+	AngPID->Enable();
+	AngPID->SetInputRange(kAngle_Min,kAngle_Max);
+	AngPID->SetContinuous(true);
+	
 	Speed->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
 	Speed->EnableControl();
 	Speed->SetSafetyEnabled(false);
-	Speed->ConfigEncoderCodesPerRev(72);
-	Speed->SetPID(1,1,1);
+	Speed->ConfigEncoderCodesPerRev(36);
+	Speed->SetPID(.7,.005,.5);
 }
 void ParadoxModule::PIDWrite(float output)
 {
@@ -30,22 +30,23 @@ void ParadoxModule::PIDWrite(float output)
 }
 void ParadoxModule::ClearPIDVars()
 {
-	PID->Reset();
-	PID->Enable();
+	AngPID->Reset();
+	AngPID->Enable();
 }
 void ParadoxModule::SetAngle(float s_angle)
 {	
 	//s_angle = s_angle *(kAngle_Max-kAngle_Min)+kAngle_Max;
-	PID->SetPID(kAngle_P,kAngle_I,kAngle_D);
-	PID->SetSetpoint(s_angle);
+	AngPID->SetPID(kAngle_P,kAngle_I,kAngle_D);
+	AngPID->SetSetpoint(s_angle);
 }
 void ParadoxModule::SetSpeed(float s_speed)
 {
 	Speed->Set(s_speed);
 }
 
-float ParadoxModule::ReadPot()
+float ParadoxModule::GetValue(ModuleValue mv)
 {
-	float x = POT->GetVoltage();
-	return x;
+	if (mv == kSpeed) return Speed->GetSpeed();
+	else if (mv == kPot) return POT->GetVoltage();
+	else return 0;
 }

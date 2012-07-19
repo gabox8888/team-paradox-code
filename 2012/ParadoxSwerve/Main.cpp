@@ -2,21 +2,13 @@
 
 class ParadoxBot : public IterativeRobot
 {
-	ParadoxModule 	*BlackOut;         //Changed module names because orientation for 'top' and 'right' was unclear
-	ParadoxModule 	*BlackIn;          //Black and Grey designate Jaguar colors
-	ParadoxModule 	*GreyOut;          //Out and In designate jaguar location, the inside or outside pair in a group
-	ParadoxModule 	*GreyIn;
-	
-	AnalogChannel	*Pot1;
-	AnalogChannel	*Pot2;
-	AnalogChannel	*Pot3;
-	AnalogChannel	*Pot4;
-	
-	AnalogChannel	*Test;
-	
+	ParadoxModule 	*WhtOne;        
+	ParadoxModule 	*WhtTwo;		 
+	ParadoxModule 	*BluOne;
+	ParadoxModule 	*BluTwo;
+
 	Joystick		 *Joy;
 	DriverStationLCD  *ds;
-
 	
 	float Speed;
 	float Angle;
@@ -26,12 +18,10 @@ public:
 	ParadoxBot()
 	{
 		printf("DEBUG: Top of ctor\n");
-		BlackOut	= new ParadoxModule(12,11,2);		
-		BlackIn 	= new ParadoxModule(22,21,3);
-		GreyOut  	= new ParadoxModule(32,31,4);
-		GreyIn 	    = new ParadoxModule(42,41,5);
-		
-		Test	    = new AnalogChannel(1);
+		WhtOne		= new ParadoxModule(12,11,1);		
+		WhtTwo		= new ParadoxModule(22,21,2);
+		BluOne  	= new ParadoxModule(32,31,3);
+		BluTwo 	    = new ParadoxModule(42,41,4);
 		
 		Joy		    = new Joystick(1);
 		ds			= DriverStationLCD::GetInstance();
@@ -47,16 +37,6 @@ public:
 	{
 		GetWatchdog().Feed();		
 	}
-	
-	void AutonomousInit(void)
-	{
-		
-	}
-
-	void AutonomousPeriodic(void)
-	{
-		
-	}
 	void AutonomousContinuous(void)
 	{
 		ProcessCommon();
@@ -71,41 +51,41 @@ public:
 	void TeleopPeriodic(void)
 	{
 printf("DEBUG: Top of TeleopPeriodic\n");
-		Speed = ParadoxMath::CalculateMag(Joy);
-		if ((fabs(Joy->GetX()) > 0.5) || (fabs(Joy->GetY()) > 0.5)) Angle = ParadoxMath::CalculateAngle(Joy);
-		//BlackOut->SetSpeed(Speed);
-		//BlackIn->SetSpeed(Speed);
-		//GreyOut->SetSpeed(Speed);
-		//GreyIn->SetSpeed(Speed);
-		//BlackOut->SetAngle(Angle);
+
+		if (Joy->GetMagnitude() > 0.1)
+		{
+			Angle = ((Joy->GetDirectionDegrees() + 180) / 72);
+			Speed = Joy->GetMagnitude();
+			if (Speed > 1.0) Speed = 1.0;
+			Speed *= 600;
+		}
+		else Speed = 0;
+
+		WhtOne->SetSpeed(Speed);
+		WhtTwo->SetSpeed(Speed);
+		BluOne->SetSpeed(Speed);
+		BluTwo->SetSpeed(Speed);
 		
-		//BlackIn->SetAngle((fabs(Angle - BlackIn->ReadPot()) > 4) ? InvAngle : Angle);
-		//GreyOut->SetAngle((fabs(Angle - GreyOut->ReadPot()) > 4) ? InvAngle : Angle);
+		WhtOne->SetAngle(Angle);
+		WhtTwo->SetAngle(Angle);
+		BluOne->SetAngle(Angle);
+		BluTwo->SetAngle(Angle);
 		
-		BlackIn->SetAngle(Angle);
-		GreyOut->SetAngle(Angle);
-		
-		//GreyIn->SetAngle(Angle);
-				
-		ds->PrintfLine(DriverStationLCD::kUser_Line1, "Test : %f", Test->GetVoltage());
-		ds->PrintfLine(DriverStationLCD::kUser_Line2, "AngSet : %f", Angle);
-		//ds->PrintfLine(DriverStationLCD::kUser_Line3, "MagSet : %f", Speed);
-		ds->PrintfLine(DriverStationLCD::kUser_Line3, "Pot1 : %f", BlackIn->ReadPot());
-		//ds->PrintfLine(DriverStationLCD::kUser_Line4, "Pot2 : %f", Pot2->GetVoltage());
-		//ds->PrintfLine(DriverStationLCD::kUser_Line5, "Pot3 : %f", Pot3->GetVoltage());
-		//ds->PrintfLine(DriverStationLCD::kUser_Line6, "Pot4 : %f", Pot4->GetVoltage());
-		ds->PrintfLine(DriverStationLCD::kUser_Line4, "Y : %f", Joy->GetY());
-		ds->PrintfLine(DriverStationLCD::kUser_Line5, "X : %f", Joy->GetX());
+		ds->PrintfLine(DriverStationLCD::kUser_Line2, "AngSet : %1.1f", Angle);
+		ds->PrintfLine(DriverStationLCD::kUser_Line3, "MagSet : %.0f", Speed);
+		ds->PrintfLine(DriverStationLCD::kUser_Line4, "%.1f %.1f", WhtOne->GetValue(ParadoxModule::kPot), WhtTwo->GetValue(ParadoxModule::kPot));
+		ds->PrintfLine(DriverStationLCD::kUser_Line5, "%.1f %.1f", BluTwo->GetValue(ParadoxModule::kPot), BluOne->GetValue(ParadoxModule::kPot));
+		ds->PrintfLine(DriverStationLCD::kUser_Line6, "Joy: %1.0f", Joy->GetDirectionDegrees());
 		ds->UpdateLCD();
 printf("DEBUG: Bottom of TeleopPeriodic\n");
 	}
 	
-	void DisabledPeriodic(void)
+	void DisabledInit(void)
 	{
-		//BlackOut->ClearPIDVars();
-		BlackIn->ClearPIDVars();
-		GreyOut->ClearPIDVars();
-        //GreyIn->ClearPIDVars();	
+		WhtOne->ClearPIDVars();
+		WhtTwo->ClearPIDVars();
+		BluOne->ClearPIDVars();
+        BluTwo->ClearPIDVars();	
 	}
 };
 

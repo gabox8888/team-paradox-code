@@ -20,19 +20,20 @@ public:
 class ParadoxModule: public PIDOutput
 {
 public:
+		typedef enum {kSpeed, kPot} ModuleValue;
+		
         ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc);
         virtual ~ParadoxModule() {}
         
         void PIDWrite(float output);
         void ClearPIDVars();
-        ParadoxAnalogChannel* GetPot() const { return POT; }
         void SetAngle(float s_angle);
         void SetSpeed(float s_speed);
         
-        float ReadPot();				//Returns volatage from a potentiometer
+        float GetValue(ModuleValue mv);				//Returns volatage from a potentiometer
         
 public:
-        PIDController	*PID;
+        PIDController	*AngPID;
         
 protected:
         float 			angle;
