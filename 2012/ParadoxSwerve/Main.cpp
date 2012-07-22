@@ -52,7 +52,7 @@ public:
 	{
 printf("DEBUG: Top of TeleopPeriodic\n");
 
-		if (Joy->GetMagnitude() > 0.1)
+		if (Joy->GetMagnitude() > 0.2)
 		{
 			Angle = ((Joy->GetDirectionDegrees() + 180) / 72);
 			Speed = Joy->GetMagnitude();
@@ -61,20 +61,25 @@ printf("DEBUG: Top of TeleopPeriodic\n");
 		}
 		else Speed = 0;
 
-		WhtOne->SetSpeed(Speed);
-		WhtTwo->SetSpeed(Speed);
-		BluOne->SetSpeed(Speed);
-		BluTwo->SetSpeed(Speed);
-		
 		WhtOne->SetAngle(Angle);
 		WhtTwo->SetAngle(Angle);
 		BluOne->SetAngle(Angle);
 		BluTwo->SetAngle(Angle);
 		
-		ds->PrintfLine(DriverStationLCD::kUser_Line2, "AngSet : %1.1f", Angle);
-		ds->PrintfLine(DriverStationLCD::kUser_Line3, "MagSet : %.0f", Speed);
-		ds->PrintfLine(DriverStationLCD::kUser_Line4, "%.1f %.1f", WhtOne->GetValue(ParadoxModule::kPot), WhtTwo->GetValue(ParadoxModule::kPot));
-		ds->PrintfLine(DriverStationLCD::kUser_Line5, "%.1f %.1f", BluTwo->GetValue(ParadoxModule::kPot), BluOne->GetValue(ParadoxModule::kPot));
+		WhtOne->SetSpeed(Speed);
+		WhtTwo->SetSpeed(Speed);
+		BluOne->SetSpeed(Speed);
+		BluTwo->SetSpeed(Speed);
+		
+
+		
+		ds->PrintfLine(DriverStationLCD::kUser_Line1, "AngSet : %1.1f", Angle);
+		ds->PrintfLine(DriverStationLCD::kUser_Line2, "MagSet : %.0f", Speed);
+		ds->PrintfLine(DriverStationLCD::kUser_Line3, "W1   W2   B1   B2");
+		ds->PrintfLine(DriverStationLCD::kUser_Line4, "%.1f %.1f %.1f %.1f",
+				WhtOne->GetValue(ParadoxModule::kSpeed), WhtTwo->GetValue(ParadoxModule::kSpeed), BluOne->GetValue(ParadoxModule::kSpeed), BluTwo->GetValue(ParadoxModule::kSpeed));
+		ds->PrintfLine(DriverStationLCD::kUser_Line5, "%.0f %.0f %.0f %.0f",
+				WhtOne->GetValue(ParadoxModule::kPot), WhtTwo->GetValue(ParadoxModule::kPot), BluOne->GetValue(ParadoxModule::kPot), BluTwo->GetValue(ParadoxModule::kPot));
 		ds->PrintfLine(DriverStationLCD::kUser_Line6, "Joy: %1.0f", Joy->GetDirectionDegrees());
 		ds->UpdateLCD();
 printf("DEBUG: Bottom of TeleopPeriodic\n");
