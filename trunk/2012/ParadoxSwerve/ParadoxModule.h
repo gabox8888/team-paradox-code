@@ -20,27 +20,30 @@ public:
 class ParadoxModule: public PIDOutput
 {
 public:
-		typedef enum {kSpeed, kPot} ModuleValue;
-		
-        ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc);
+	typedef enum {kSpeed, kPot} ModuleValue;
+	
+        ParadoxModule(UINT32 angle_w, UINT32 speed_w, UINT32 absenc, UINT32 quadrant);
         virtual ~ParadoxModule() {}
         
         void PIDWrite(float output);
         void ClearPIDVars();
         void SetAngle(float s_angle);
         void SetSpeed(float s_speed);
-        
-        float GetValue(ModuleValue mv);				//Returns volatage from a potentiometer
+        float SetPropose(Joystick *joy);
+        void SetCommit(float max);
+        float GetValue(ModuleValue mv);
         
 public:
         PIDController	*AngPID;
         
 protected:
-        float 			angle;
-        float 		magnitude;
+	int mod_x;
+	int mod_y;
+        float ang_proposal;
+        float spd_proposal;
         ParadoxAnalogChannel *POT;
-        CANJaguar 	   *Angle;
-        CANJaguar 	   *Speed;
+        CANJaguar *Angle;
+        CANJaguar *Speed;
         
 private:
         DISALLOW_COPY_AND_ASSIGN(ParadoxModule);
