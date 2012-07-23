@@ -44,13 +44,13 @@ void ParadoxModule::ClearPIDVars()
 float ParadoxModule::SetPropose(Joystick *joy)
 {
 	float s_ang = joy->GetDirectionRadians();
-	float s_ang-math = (s_ang < (0.5*kPi)) ? ((0.5*kPi) - s_ang) : ((2.5*kPi) - s_ang)
+	float s_ang_math = (s_ang < (0.5*kPi)) ? ((0.5*kPi) - s_ang) : ((2.5*kPi) - s_ang);
 	
 	float s_spd = joy->GetMagnitude();
 	bool xy_dz = (s_spd < 0.2);
 	if (s_spd > 1.0f) s_spd = 1.0f;
 	
-	float s_rot = joy->GetTwist();
+	float s_rot = joy->GetTwist()*-1.0f;
 	bool rot_dz = (fabs(s_rot) < 0.2);
 	
 	if (rot_dz)
@@ -58,7 +58,7 @@ float ParadoxModule::SetPropose(Joystick *joy)
 		/* Just crab drive. */
 		if (!xy_dz)
 		{
-			ang_proposal = s_ang-math;
+			ang_proposal = s_ang_math;
 			spd_proposal = s_spd;
 		}
 	}
@@ -74,19 +74,19 @@ float ParadoxModule::SetPropose(Joystick *joy)
 		 * away the robot center is from the COR.
 		 * My head hurts. -Chris
 		 */
-		 
+
+		s_ang_math += (s_rot > 0) ? (0.5*kPi) : (-0.5*kPi);
 		float r = fabs(s_spd / s_rot);
-		float cor_x = r*cos(s_ang-math);
-		float cor_y = r*sin(s_ang-math);
+		float cor_x = r*cos(s_ang_math);
+		float cor_y = r*sin(s_ang_math);
 		
 		float b = cor_x - mod_x;
 		float h = cor_y - mod_y;
-		float c = sqrt(b^2 + h^2);
+		float c = sqrt(b*b + h*h);
 		
-		float ang = atan(fabs(b/h));
-		float ang-tangent = ((b*h > 0) ? 1.0 : -1.0)*ang + ((h > 0) ? 0.5*kPi : 1.5*kPi);
+		float ang = atan(h/b) + ((b > 0) ? 0.5 : -0.5)*kPi;
 
-		ang_proposal = ang-tangent;
+		ang_proposal = ang;
 		spd_proposal = c / r;
 	}
 	
