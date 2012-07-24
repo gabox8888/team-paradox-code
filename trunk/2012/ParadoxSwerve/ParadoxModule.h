@@ -13,7 +13,7 @@ public:
 
         virtual double PIDGet()
         {
-                return GetVoltage();
+                return (kAngle_Max - GetVoltage());
         }
 };
 
@@ -22,28 +22,27 @@ class ParadoxModule: public PIDOutput
 public:
 	typedef enum {kSpeed, kPot} ModuleValue;
 	
-        ParadoxModule(UINT32 angle_w, UINT32 speed_w, UINT32 absenc, UINT32 quadrant);
-        virtual ~ParadoxModule() {}
+	ParadoxModule(UINT32 angle_w, UINT32 speed_w, UINT32 absenc, UINT32 quadrant);
+	virtual ~ParadoxModule() {}
         
-        void PIDWrite(float output);
-        void ClearPIDVars();
-        void SetAngle(float s_angle);
-        void SetSpeed(float s_speed);
-        float SetPropose(Joystick *joy);
-        void SetCommit(float max);
-        float GetValue(ModuleValue mv);
+	void PIDWrite(float output);
+	void ClearPIDVars();
+	void SetAngle(float s_angle);
+	void SetSpeed(float s_speed);
+	float SetPropose(Joystick *joy);
+	void SetCommit(float max);
+	float GetValue(ModuleValue mv);
         
 public:
-        PIDController	*AngPID;
+	PIDController	*AngPID;
+	float ang_proposal;
+	float spd_proposal;
         
 protected:
-	int mod_x;
-	int mod_y;
-        float ang_proposal;
-        float spd_proposal;
-        ParadoxAnalogChannel *POT;
-        CANJaguar *Angle;
-        CANJaguar *Speed;
+	int Q;
+	ParadoxAnalogChannel *POT;
+	CANJaguar *Angle;
+	CANJaguar *Speed;
         
 private:
         DISALLOW_COPY_AND_ASSIGN(ParadoxModule);

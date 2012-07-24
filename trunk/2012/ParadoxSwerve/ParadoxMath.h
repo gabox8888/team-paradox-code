@@ -10,13 +10,27 @@ public:
         ParadoxMath();
         virtual ~ParadoxMath() {}
        
-        static inline float SignedPowerFunction( const float x, const float gamma, const float scale, const float deadBand, const float clampLower, const float clampUpper );
-        static float CalculateAngle(Joystick *joy);
-        static float CalculateMag(Joystick *joy);
+        float FirstPeriod(float rad);
 
              
 private:
         DISALLOW_COPY_AND_ASSIGN(ParadoxMath);
+};
+
+class ParadoxVector
+{
+public:
+	ParadoxVector(float magnitude, float direction);
+	ParadoxVector(ParadoxVector *vec_a, ParadoxVector *vec_b);
+	virtual ~ParadoxVector() {}
+	
+	float X;
+	float Y;
+	float Mag;
+	float Dir;
+
+private:
+	DISALLOW_COPY_AND_ASSIGN(ParadoxVector);
 };
 
 #endif

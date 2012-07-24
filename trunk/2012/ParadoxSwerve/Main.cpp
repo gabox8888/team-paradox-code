@@ -16,7 +16,7 @@ class ParadoxBot : public IterativeRobot
 public:
 	ParadoxBot()
 	{
-		WhtOne	= new ParadoxModule(12, 11, 1, 4);		
+		WhtOne	= new ParadoxModule(12, 11, 1, 4);
 		WhtTwo	= new ParadoxModule(22, 21, 2, 1);
 		BluOne	= new ParadoxModule(32, 31, 3, 2);
 		BluTwo	= new ParadoxModule(42, 41, 4, 3);
@@ -66,14 +66,20 @@ public:
 		BluOne->SetCommit(highest);
 		BluTwo->SetCommit(highest);
 		
-		ds->PrintfLine(DriverStationLCD::kUser_Line1, "AngSet : %1.1f", Angle);
-		ds->PrintfLine(DriverStationLCD::kUser_Line2, "SpdSet : %.0f", Speed);
-		ds->PrintfLine(DriverStationLCD::kUser_Line3, "W1   W2   B1   B2");
-		ds->PrintfLine(DriverStationLCD::kUser_Line4, "%.1f %.1f %.1f %.1f",
-				WhtOne->GetValue(ParadoxModule::kSpeed), WhtTwo->GetValue(ParadoxModule::kSpeed), BluOne->GetValue(ParadoxModule::kSpeed), BluTwo->GetValue(ParadoxModule::kSpeed));
-		ds->PrintfLine(DriverStationLCD::kUser_Line5, "%.0f %.0f %.0f %.0f",
-				WhtOne->GetValue(ParadoxModule::kPot), WhtTwo->GetValue(ParadoxModule::kPot), BluOne->GetValue(ParadoxModule::kPot), BluTwo->GetValue(ParadoxModule::kPot));
-		ds->PrintfLine(DriverStationLCD::kUser_Line6, "Joy: %1.0f", Joy->GetDirectionDegrees());
+		ds->PrintfLine(DriverStationLCD::kUser_Line1, "FRONT (set angle)");
+		ds->PrintfLine(DriverStationLCD::kUser_Line2, "%.2f %.2f",
+				(180/3.1415926)*BluOne->ang_proposal,
+				(180/3.1415926)*WhtTwo->ang_proposal);
+		ds->PrintfLine(DriverStationLCD::kUser_Line3, "%.2f %.2f",
+				(180/3.1415926)*BluTwo->ang_proposal,
+				(180/3.1415926)*WhtOne->ang_proposal);
+		ds->PrintfLine(DriverStationLCD::kUser_Line4, "FRONT (set speed)");
+		ds->PrintfLine(DriverStationLCD::kUser_Line5, "%.2f %.2f",
+				(180/3.1415926)*BluOne->spd_proposal,
+				(180/3.1415926)*WhtTwo->spd_proposal);
+		ds->PrintfLine(DriverStationLCD::kUser_Line6, "%.2f %.2f",
+				(180/3.1415926)*BluTwo->spd_proposal,
+				(180/3.1415926)*WhtOne->spd_proposal);
 		ds->UpdateLCD();
 	}
 	

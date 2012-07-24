@@ -2,33 +2,27 @@
 #include "ParadoxMath.h"
 #include "math.h"
 
-static inline float SignedPowerFunction( const float x, const float gamma, const float scale, const float deadBand, const float clampLower, const float clampUpper )
-{
-	const bool bSign = ( x < 0.0f );
-	float y = scale * pow(fabs(x), gamma);
-	if ( y < deadBand )
-	{
-		y = 0.0f;
-	}
-	else if ( y < clampLower )
-	{
-		y = clampLower;
-	}
-	else if ( y > clampUpper )
-	{
-		y = clampUpper;
-	}
+const float kPi = 4*atan(1);
 
-	return ( bSign ) ? -y : y;	
-}
-float ParadoxMath::CalculateAngle(Joystick *joy)
+ParadoxVector::ParadoxVector(float magnitude, float direction)
 {
-	float angle = atan2(-1 * joy->GetY(), joy->GetX());
-	float t = angle / (2.0*kPI) + 0.5f;
-	return t * 5.0f;
+	X = magnitude*cos(direction);
+	Y = magnitude*sin(direction);
+	Mag = magnitude;
+	Dir = direction;
 }
-float ParadoxMath::CalculateMag(Joystick* joy)
+
+ParadoxVector::ParadoxVector(ParadoxVector *vec_a, ParadoxVector *vec_b)
 {
-	float magnitude=sqrt((joy->GetX()*joy->GetX())+(joy->GetY()*joy->GetY()));
-	return magnitude*1000;
+	X = vec_a->X + vec_b->X;
+	Y = vec_a->Y + vec_b->Y;
+	Mag = sqrt(X*X + Y*Y);
+	float CalcDir = atan(Y/X);
+	while (CalcDir > 0.5*kPi) CalcDir -= 0.5*kPi;
+	while (CalcDir < 0) CalcDir += 0.5*kPi;
+	int q;
+	if (X > 0) q = (Y > 0) ? 1 : 4;
+	else q = (Y > 0) ? 2 : 3;
+	for (int i = 0; i <= q; i++) CalcDir += 0.5*kPi;
+	Dir = CalcDir;
 }
