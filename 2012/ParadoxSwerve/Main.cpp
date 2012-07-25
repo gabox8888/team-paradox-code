@@ -55,7 +55,7 @@ public:
 		BluOne->SetPropose(Joy),
 		BluTwo->SetPropose(Joy)};
 		
-		float highest = 1.0;
+		float highest = 1;
 		for (int i = 0; i < 4; i++)
 		{
 			if (proposals[i] > highest) highest = proposals[i];

@@ -8,21 +8,22 @@ ParadoxVector::ParadoxVector(float magnitude, float direction)
 {
 	X = magnitude*cos(direction);
 	Y = magnitude*sin(direction);
-	Mag = magnitude;
-	Dir = direction;
 }
 
 ParadoxVector::ParadoxVector(ParadoxVector *vec_a, ParadoxVector *vec_b)
 {
 	X = vec_a->X + vec_b->X;
 	Y = vec_a->Y + vec_b->Y;
-	Mag = sqrt(X*X + Y*Y);
-	float CalcDir = atan(Y/X);
-	while (CalcDir > 0.5*kPi) CalcDir -= 0.5*kPi;
-	while (CalcDir < 0) CalcDir += 0.5*kPi;
-	int q;
-	if (X > 0) q = (Y > 0) ? 1 : 4;
-	else q = (Y > 0) ? 2 : 3;
-	for (int i = 0; i <= q; i++) CalcDir += 0.5*kPi;
-	Dir = CalcDir;
+}
+
+float ParadoxVector::GetMagnitude()
+{
+	return sqrt(X*X + Y*Y);
+}
+
+float ParadoxVector::GetDirection()
+{
+	float A = atan2(Y, X);
+	if (A < 0) A += 2.0*kPi;
+	return A;
 }

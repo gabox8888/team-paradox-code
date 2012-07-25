@@ -10,9 +10,6 @@ public:
         ParadoxMath();
         virtual ~ParadoxMath() {}
        
-        float FirstPeriod(float rad);
-
-             
 private:
         DISALLOW_COPY_AND_ASSIGN(ParadoxMath);
 };
@@ -24,10 +21,11 @@ public:
 	ParadoxVector(ParadoxVector *vec_a, ParadoxVector *vec_b);
 	virtual ~ParadoxVector() {}
 	
+	float GetMagnitude();
+	float GetDirection();
+	
 	float X;
 	float Y;
-	float Mag;
-	float Dir;
 
 private:
 	DISALLOW_COPY_AND_ASSIGN(ParadoxVector);
