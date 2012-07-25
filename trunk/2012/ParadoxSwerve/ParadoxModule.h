@@ -13,7 +13,7 @@ public:
 
         virtual double PIDGet()
         {
-                return (kAngle_Max - GetVoltage());
+                return kAngle_Max - GetVoltage();
         }
 };
 
@@ -39,7 +39,7 @@ public:
 	float spd_proposal;
         
 protected:
-	int Q;
+	float Wdir;
 	ParadoxAnalogChannel *POT;
 	CANJaguar *Angle;
 	CANJaguar *Speed;
