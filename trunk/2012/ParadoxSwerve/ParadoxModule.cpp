@@ -3,11 +3,16 @@
 #include "ParadoxMath.h"
 #include "math.h"
 
-const float kAngle_P = 1.0f;
-const float kAngle_I = 0.75f;
-const float kAngle_D = 0.5f;
+const float kSpeed_P = 0.7f;
+const float kSpeed_I = 0.005f;
+const float kSpeed_D = 0.5f;
+const UINT32 kSpeed_CPR = 36;
 
-const float kTopSpeed = 600.0f;
+const float kAngle_P = 0.0f;
+const float kAngle_I = 0.0f;//0.75f;
+const float kAngle_D = 0.0f;
+
+const float kCalibrateVoltage = 11.5f;
 const float kDeadZone = 0.15f;
 
 const float kPi = 4*atan(1);
@@ -18,7 +23,7 @@ ParadoxModule::ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc, UINT3
 	Speed	= new CANJaguar(speed_w, CANJaguar::kSpeed);
 	POT		= new ParadoxAnalogChannel(absenc);
 	
-	AngPID	= new PIDController(0.0f,0.0f,0.0f,POT,Angle);
+	AngPID	= new PIDController(kAngle_P, kAngle_I, kAngle_D, POT, Angle);
 	AngPID->Enable();
 	AngPID->SetInputRange(kAngle_Min,kAngle_Max);
 	AngPID->SetContinuous(true);
@@ -26,22 +31,16 @@ ParadoxModule::ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc, UINT3
 	Speed->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
 	Speed->EnableControl();
 	Speed->SetSafetyEnabled(false);
-	Speed->ConfigEncoderCodesPerRev(36);
-	Speed->SetPID(.7,.005,.5);
+	Speed->ConfigEncoderCodesPerRev(kSpeed_CPR);
+	Speed->SetPID(kSpeed_P, kSpeed_I, kSpeed_D);
 	
-	if (quadrant == 1) Wdir = 0.75*kPi;
-	if (quadrant == 2) Wdir = 1.25*kPi;
-	if (quadrant == 3) Wdir = 1.75*kPi;
-	if (quadrant == 4) Wdir = 0.25*kPi;
+	Wdir = (-0.25 + (quadrant + 1)*0.5)*kPi;
+	IsCalibrating = false;
 }
+
 void ParadoxModule::PIDWrite(float output)
 {
 	Angle->PIDWrite(output);
-}
-void ParadoxModule::ClearPIDVars()
-{
-	AngPID->Reset();
-	AngPID->Enable();
 }
 
 float ParadoxModule::SetPropose(Joystick *joy)
@@ -69,12 +68,11 @@ float ParadoxModule::SetPropose(Joystick *joy)
 
 void ParadoxModule::SetCommit(float max)
 {
-	if (spd_proposal != 0)
+	if (!IsCalibrating)
 	{
-		AngPID->SetPID(kAngle_P, kAngle_I, kAngle_D);
-		AngPID->SetSetpoint((5/(2*kPi))*ang_proposal);
+		if (spd_proposal != 0) AngPID->SetSetpoint((5/(2*kPi))*ang_proposal);
+		Speed->Set((spd_proposal / max)*TopSpeed);
 	}
-	Speed->Set((spd_proposal / max)*kTopSpeed);
 }
 
 float ParadoxModule::GetValue(ModuleValue mv)
@@ -82,4 +80,31 @@ float ParadoxModule::GetValue(ModuleValue mv)
 	if (mv == kSpeed) return Speed->GetSpeed();
 	else if (mv == kPot) return POT->GetVoltage();
 	else return 0;
+}
+
+void ParadoxModule::CalibrationMode(bool cal)
+{
+	if (cal && !IsCalibrating)
+	{
+		Speed->Set(0);
+		Speed->ChangeControlMode(CANJaguar::kVoltage);
+		Speed->EnableControl();
+		IsCalibrating = true;
+	}
+	if (cal && IsCalibrating)
+	{
+		Speed->Set(kCalibrateVoltage);
+	}
+	if (!cal && IsCalibrating)
+	{
+		Speed->Set(0);
+		Speed->ChangeControlMode(CANJaguar::kSpeed);
+		Speed->EnableControl();
+		IsCalibrating = false;
+	}
+}
+
+void ParadoxModule::SetTopSpeed(float topspd)
+{
+	TopSpeed = topspd;
 }

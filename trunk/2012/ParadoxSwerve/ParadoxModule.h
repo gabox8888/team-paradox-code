@@ -24,14 +24,13 @@ public:
 	
 	ParadoxModule(UINT32 angle_w, UINT32 speed_w, UINT32 absenc, UINT32 quadrant);
 	virtual ~ParadoxModule() {}
-        
+	
 	void PIDWrite(float output);
-	void ClearPIDVars();
-	void SetAngle(float s_angle);
-	void SetSpeed(float s_speed);
 	float SetPropose(Joystick *joy);
 	void SetCommit(float max);
 	float GetValue(ModuleValue mv);
+	void CalibrationMode(bool cal);
+	void SetTopSpeed(float topspd);
         
 public:
 	PIDController	*AngPID;
@@ -39,7 +38,9 @@ public:
 	float spd_proposal;
         
 protected:
+	float TopSpeed;
 	float Wdir;
+	bool IsCalibrating;
 	ParadoxAnalogChannel *POT;
 	CANJaguar *Angle;
 	CANJaguar *Speed;
