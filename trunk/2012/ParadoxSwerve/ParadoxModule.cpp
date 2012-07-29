@@ -8,9 +8,9 @@ const float kSpeed_I = 0.005f;
 const float kSpeed_D = 0.5f;
 const UINT32 kSpeed_CPR = 36;
 
-const float kAngle_P = 0.0f;
+const float kAngle_P = 1.0f;
 const float kAngle_I = 0.0f;//0.75f;
-const float kAngle_D = 0.0f;
+const float kAngle_D = 0.5f;
 
 const float kCalibrateVoltage = 11.5f;
 const float kDeadZone = 0.15f;
