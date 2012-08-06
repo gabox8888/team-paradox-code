@@ -28,22 +28,19 @@ public:
 	void PIDWrite(float output);
 	float SetPropose(Joystick *joy);
 	void SetCommit(float max);
+	void Calibrate(bool ang_mode);
 	float GetValue(ModuleValue mv);
-	void CalibrationMode(bool cal);
-	void SetTopSpeed(float topspd);
-	void SetOffset(float os);
-	float GetOffset();
+	float TopSpeed;
+	float Offset;
         
 public:
 	PIDController	*AngPID;
-	float ang_proposal;
-	float spd_proposal;
         
 protected:
-	float TopSpeed;
-	float Offset;
+	float ang_proposal;
+	float spd_proposal;
 	float Wdir;
-	bool IsCalibrating;
+	bool WasCalibrating;
 	ParadoxAnalogChannel *POT;
 	CANJaguar *Angle;
 	CANJaguar *Speed;

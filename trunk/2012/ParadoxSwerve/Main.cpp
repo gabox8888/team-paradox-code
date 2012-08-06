@@ -9,7 +9,7 @@ class ParadoxBot : public IterativeRobot
 	FILE *calfile;
 	
 	float lowest;
-	UINT32 calidx;
+	int calidx;
 	bool edge[2];
 	
 public:
@@ -35,8 +35,8 @@ public:
 		fscanf(calfile, "%f\n%f\n%f\n%f\n%f\n", &ts, &offset[0], &offset[1], &offset[2], &offset[3]);
 		for (int i = 0; i < 4; i++)
 		{
-			Modules[i]->SetTopSpeed(ts);
-			Modules[i]->SetOffset(offset[i]);
+			Modules[i]->TopSpeed = ts;;
+			Modules[i]->Offset = offset[i];
 		}
 		fclose(calfile);
 	}
@@ -44,26 +44,36 @@ public:
 	void TeleopPeriodic(void)
 	{
 		bool CalKeyCombo = Joy->GetRawButton(1) && Joy->GetRawButton(11) && Joy->GetRawButton(9);
-		for (int i = 0; i < 4; i++) Modules[i]->CalibrationMode(CalKeyCombo);
 		
 		if (CalKeyCombo)
 		{
+			if (calfile == NULL) calfile = fopen("calibrate.txt", "w");
+                        
 			edge[0] = edge[1];
 			edge[1] = Joy->GetRawButton(2);
 			if (!edge[0] && edge[1]) calidx++;
-			lowest = 1000;
-			
-			if (calfile == NULL) calfile = fopen("calibrate.txt", "w");
-			for (int i = 0; i < 4; i++)
-			{
-				float gv = Modules[i]->GetValue(ParadoxModule::kSpeed);
-				if ((gv < lowest) && (gv > 10)) lowest = gv;
-				
-			}
+                        if (calidx > 3) calidx = -1;
 			
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "##### CALIBRATING #####");
-			ds->PrintfLine(DriverStationLCD::kUser_Line2, "lowest %.2f", lowest);
-			ds->UpdateLCD();
+                        for (int i = 0; i < 4; i++) Modules[i]->Calibrate((calidx == i));
+                        if (calidx >= 0)
+                        {
+                                ds->PrintfLine(DriverStationLCD::kUser_Line2, "ANGLE ADJUST");
+                                Modules[calidx]->Offset += -0.5*Joy->GetDirectionRadians();
+                                ds->PrintfLine(DriverStationLCD::kUser_Line3, "selected wheel %d", calidx);
+                                ds->PrintfLine(DriverStationLCD::kUser_LIne4, "offset %f", Modules[calidx]->Offset);
+                        }
+                        else
+                        {
+                                ds->PrintfLine(DriverStationLCD::kUser_Line2, "TOP SPEED");
+                                lowest = 1000;
+                                for (int i = 0; i < 4; i++)
+                                {
+                                        float gv = Modules[i]->GetValue(ParadoxModule::kSpeed);
+                                        if ((gv < lowest) && (gv > 10)) lowest = gv;
+                                }
+                                ds->PrintfLine(DriverStationLCD::kUser_Line2, "lowest %.2f", lowest);
+                        }
 		}
 		else
 		{
@@ -73,11 +83,11 @@ public:
 				for (int i = 0; i < 4; i++) fprintf(calfile, "%f\n", Modules[i]->GetOffset());
 				fclose(calfile);
 				UpdateModuleCalibration();
+                                lowest = 1000;
+                                calidx = -1;
+                                edge[0] = false;
+                                edge[1] = false;
 			}
-			lowest = 1000;
-			calidx = 0;
-			edge[0] = false;
-			edge[1] = false;
 			
 			float highest = 1;
 			for (int i = 0; i < 4; i++)
@@ -93,8 +103,8 @@ public:
 					Modules[1]->GetValue(ParadoxModule::kPot), Modules[0]->GetValue(ParadoxModule::kPot));
 			ds->PrintfLine(DriverStationLCD::kUser_Line3, "%.2f %.2f",
 					Modules[2]->GetValue(ParadoxModule::kPot), Modules[3]->GetValue(ParadoxModule::kPot));
-			ds->UpdateLCD();
 		}
+                ds->UpdateLCD();
 	}
 };
 

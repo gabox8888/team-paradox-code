@@ -35,7 +35,7 @@ ParadoxModule::ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc, UINT3
 	Speed->SetPID(kSpeed_P, kSpeed_I, kSpeed_D);
 	
 	Wdir = (-0.25 + (quadrant + 1)*0.5)*kPi;
-	IsCalibrating = false;
+	WasCalibrating = false;
 }
 
 void ParadoxModule::PIDWrite(float output)
@@ -68,14 +68,31 @@ float ParadoxModule::SetPropose(Joystick *joy)
 
 void ParadoxModule::SetCommit(float max)
 {
-	if (!IsCalibrating)
+	if (WasCalibrating)
+        {
+                Speed->Set(0);
+		Speed->ChangeControlMode(CANJaguar::kSpeed);
+		Speed->EnableControl();
+		WasCalibrating = false;
+        }
+	ang_proposal += Offset;
+	while (ang_proposal > 2*kPi) ang_proposal -= 2*kPi;
+	while (ang_proposal < 0) ang_proposal += 2*kPi;
+	if (spd_proposal != 0) AngPID->SetSetpoint((5/(2*kPi))*ang_proposal);
+	Speed->Set((spd_proposal / max)*TopSpeed);
+}
+
+void ParadoxModule::Calibrate(bool ang_mode);
+{
+	if (!WasCalibrating)
 	{
-		ang_proposal += Offset;
-		while (ang_proposal > 2*kPi) ang_proposal -= 2*kPi;
-		while (ang_proposal < 0) ang_proposal += 2*kPi;
-		if (spd_proposal != 0) AngPID->SetSetpoint((5/(2*kPi))*ang_proposal);
-		Speed->Set((spd_proposal / max)*TopSpeed);
-	}
+		Speed->Set(0);
+		Speed->ChangeControlMode(CANJaguar::kVoltage);
+		Speed->EnableControl();
+		WasCalibrating = true;
+        }
+	Speed->Set(ang_mode ? 4 : kCalibrateVoltage);
+	AngPID->SetSetpoint((5/(2*kPi))*(Wdir += Offset));
 }
 
 float ParadoxModule::GetValue(ModuleValue mv)
@@ -85,40 +102,3 @@ float ParadoxModule::GetValue(ModuleValue mv)
 	else return 0;
 }
 
-void ParadoxModule::CalibrationMode(bool cal)
-{
-	if (cal && !IsCalibrating)
-	{
-		Speed->Set(0);
-		Speed->ChangeControlMode(CANJaguar::kVoltage);
-		Speed->EnableControl();
-		IsCalibrating = true;
-	}
-	if (cal && IsCalibrating)
-	{
-		Speed->Set(kCalibrateVoltage);
-		AngPID->SetSetpoint((5/(2*kPi))*(Wdir += Offset));
-	}
-	if (!cal && IsCalibrating)
-	{
-		Speed->Set(0);
-		Speed->ChangeControlMode(CANJaguar::kSpeed);
-		Speed->EnableControl();
-		IsCalibrating = false;
-	}
-}
-
-void ParadoxModule::SetTopSpeed(float topspd)
-{
-	TopSpeed = topspd;
-}
-
-void ParadoxModule::SetOffset(float os)
-{
-	Offset = os;
-}
-
-float ParadoxModule::GetOffset()
-{
-	return Offset;
-}
