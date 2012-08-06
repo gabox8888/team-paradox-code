@@ -31,6 +31,8 @@ public:
 	float GetValue(ModuleValue mv);
 	void CalibrationMode(bool cal);
 	void SetTopSpeed(float topspd);
+	void SetOffset(float os);
+	float GetOffset();
         
 public:
 	PIDController	*AngPID;
@@ -39,6 +41,7 @@ public:
         
 protected:
 	float TopSpeed;
+	float Offset;
 	float Wdir;
 	bool IsCalibrating;
 	ParadoxAnalogChannel *POT;

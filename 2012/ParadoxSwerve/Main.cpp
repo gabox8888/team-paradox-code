@@ -9,6 +9,8 @@ class ParadoxBot : public IterativeRobot
 	FILE *calfile;
 	
 	float lowest;
+	UINT32 calidx;
+	bool edge[2];
 	
 public:
 	ParadoxBot()
@@ -29,9 +31,13 @@ public:
 	void UpdateModuleCalibration(void)
 	{
 		calfile = fopen("calibrate.txt", "r");
-		float ts;
-		fscanf(calfile, "%f\n", &ts);
-		for (int i = 0; i < 4; i++) Modules[i]->SetTopSpeed(ts);
+		float ts, offset[4];
+		fscanf(calfile, "%f\n%f\n%f\n%f\n%f\n", &ts, &offset[0], &offset[1], &offset[2], &offset[3]);
+		for (int i = 0; i < 4; i++)
+		{
+			Modules[i]->SetTopSpeed(ts);
+			Modules[i]->SetOffset(offset[i]);
+		}
 		fclose(calfile);
 	}
 	
@@ -42,13 +48,17 @@ public:
 		
 		if (CalKeyCombo)
 		{
+			edge[0] = edge[1];
+			edge[1] = Joy->GetRawButton(2);
+			if (!edge[0] && edge[1]) calidx++;
 			lowest = 1000;
-			if (calfile != NULL) fclose(calfile);
-			calfile = fopen("calibrate.txt", "w");
+			
+			if (calfile == NULL) calfile = fopen("calibrate.txt", "w");
 			for (int i = 0; i < 4; i++)
 			{
 				float gv = Modules[i]->GetValue(ParadoxModule::kSpeed);
 				if ((gv < lowest) && (gv > 10)) lowest = gv;
+				
 			}
 			
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "##### CALIBRATING #####");
@@ -60,10 +70,14 @@ public:
 			if (calfile != NULL)
 			{
 				fprintf(calfile, "%f\n", lowest);
+				for (int i = 0; i < 4; i++) fprintf(calfile, "%f\n", Modules[i]->GetOffset());
 				fclose(calfile);
 				UpdateModuleCalibration();
 			}
 			lowest = 1000;
+			calidx = 0;
+			edge[0] = false;
+			edge[1] = false;
 			
 			float highest = 1;
 			for (int i = 0; i < 4; i++)

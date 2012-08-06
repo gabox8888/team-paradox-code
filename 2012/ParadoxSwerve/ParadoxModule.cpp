@@ -70,6 +70,9 @@ void ParadoxModule::SetCommit(float max)
 {
 	if (!IsCalibrating)
 	{
+		ang_proposal += Offset;
+		while (ang_proposal > 2*kPi) ang_proposal -= 2*kPi;
+		while (ang_proposal < 0) ang_proposal += 2*kPi;
 		if (spd_proposal != 0) AngPID->SetSetpoint((5/(2*kPi))*ang_proposal);
 		Speed->Set((spd_proposal / max)*TopSpeed);
 	}
@@ -94,6 +97,7 @@ void ParadoxModule::CalibrationMode(bool cal)
 	if (cal && IsCalibrating)
 	{
 		Speed->Set(kCalibrateVoltage);
+		AngPID->SetSetpoint((5/(2*kPi))*(Wdir += Offset));
 	}
 	if (!cal && IsCalibrating)
 	{
@@ -107,4 +111,14 @@ void ParadoxModule::CalibrationMode(bool cal)
 void ParadoxModule::SetTopSpeed(float topspd)
 {
 	TopSpeed = topspd;
+}
+
+void ParadoxModule::SetOffset(float os)
+{
+	Offset = os;
+}
+
+float ParadoxModule::GetOffset()
+{
+	return Offset;
 }
