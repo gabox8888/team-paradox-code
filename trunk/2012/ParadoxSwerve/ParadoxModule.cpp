@@ -82,7 +82,7 @@ void ParadoxModule::SetCommit(float max)
 	Speed->Set((spd_proposal / max)*TopSpeed);
 }
 
-void ParadoxModule::Calibrate(bool ang_mode);
+void ParadoxModule::Calibrate(bool ang_mode)
 {
 	if (!WasCalibrating)
 	{
@@ -90,7 +90,7 @@ void ParadoxModule::Calibrate(bool ang_mode);
 		Speed->ChangeControlMode(CANJaguar::kVoltage);
 		Speed->EnableControl();
 		WasCalibrating = true;
-        }
+    }
 	Speed->Set(ang_mode ? 4 : kCalibrateVoltage);
 	AngPID->SetSetpoint((5/(2*kPi))*(Wdir += Offset));
 }
