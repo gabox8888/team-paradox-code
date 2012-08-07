@@ -10,6 +10,7 @@ class ParadoxBot : public IterativeRobot
 	float lowest;
 	int calidx;
 	bool edge[2];
+        bool IsCalibrating;
 	
 public:
 	ParadoxBot()
@@ -39,7 +40,8 @@ public:
 		bool CalKeyCombo = Joy->GetRawButton(1) && Joy->GetRawButton(11) && Joy->GetRawButton(9);
 		
 		if (CalKeyCombo)
-		{               
+		{
+                        IsCalibrating = true;
 			edge[0] = edge[1];
 			edge[1] = Joy->GetRawButton(2);
 			if (!edge[0] && edge[1]) calidx++;
@@ -58,7 +60,7 @@ public:
 			}
 			else
 			{
-				lowest = 1000;
+				lowest = 9999;
 				for (int i = 0; i < 4; i++)
 				{
 					float gv = Modules[i]->GetValue(ParadoxModule::kSpeed);
@@ -72,6 +74,13 @@ public:
 		}
 		else
 		{
+                        if (IsCalibrating)
+                        {
+                                float values[5];
+                                values[0] = lowest;
+                                for (int i = 0; i < 4; i++) values[i + 1] = Modules[i]->Offset;
+                                CalFile->Write(values);    
+                        }
 			calidx = -1;
 			edge[0] = false;
 			edge[1] = false;
@@ -87,19 +96,11 @@ public:
 			
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "FRONT (get angle)");
 			ds->PrintfLine(DriverStationLCD::kUser_Line2, "%.2f %.2f",
-					Modules[1]->GetValue(ParadoxModule::kPot), Modules[0]->GetValue(ParadoxModule::kPot));
+                                       Modules[1]->GetValue(ParadoxModule::kPot), Modules[0]->GetValue(ParadoxModule::kPot));
 			ds->PrintfLine(DriverStationLCD::kUser_Line3, "%.2f %.2f",
-					Modules[2]->GetValue(ParadoxModule::kPot), Modules[3]->GetValue(ParadoxModule::kPot));
+                                       Modules[2]->GetValue(ParadoxModule::kPot), Modules[3]->GetValue(ParadoxModule::kPot));
 		}
 		ds->UpdateLCD();
-	}
-	
-	void DisabledInit(void)
-	{
-		float values[5];
-		values[0] = lowest;
-		for (int i = 0; i < 4; i++) values[i + 1] = Modules[i]->Offset;
-		CalFile->Write(values);
 	}
 };
 

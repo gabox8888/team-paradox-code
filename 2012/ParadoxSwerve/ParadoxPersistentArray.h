@@ -8,7 +8,7 @@ class ParadoxPersistentArray
 public:
 	ParadoxPersistentArray(string fn, int array_cnt);
 	virtual ~ParadoxPersistentArray() {}
-	void Write(float *varray);
+	void Write(float varray[]);
 	float Read(int idx);
 	
 protected:
