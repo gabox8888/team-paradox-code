@@ -79,7 +79,8 @@ public:
                                 float values[5];
                                 values[0] = lowest;
                                 for (int i = 0; i < 4; i++) values[i + 1] = Modules[i]->Offset;
-                                CalFile->Write(values);    
+                                CalFile->Write(values);
+                                IsCalibrating = false;
                         }
 			calidx = -1;
 			edge[0] = false;
