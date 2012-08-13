@@ -1,12 +1,12 @@
 #include "ParadoxPersistentArray.h"
-#include <iostream.h>
+#include "WPILib.h"
 
 ParadoxPersistentArray::ParadoxPersistentArray(string fn, int array_cnt)
 {
 	fname = fn;
-	values = new float[acnt];
+	values = new float[array_cnt];
 	acnt = array_cnt;
-	
+
 	UpdateArray();
 }
 

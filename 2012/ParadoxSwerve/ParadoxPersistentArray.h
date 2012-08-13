@@ -1,7 +1,7 @@
 #ifndef PARADOXPERSISTENTARRAY_H_
 #define PARADOXPERSISTENTARRAY_H_
 
-#include <iostream.h>
+#include "WPILib.h"
 
 class ParadoxPersistentArray
 {
@@ -10,7 +10,7 @@ public:
 	virtual ~ParadoxPersistentArray() {}
 	void Write(float varray[]);
 	float Read(int idx);
-	
+
 protected:
 	void UpdateArray();
 	bool HasChanged;

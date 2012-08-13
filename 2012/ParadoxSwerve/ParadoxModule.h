@@ -20,7 +20,7 @@ public:
 class ParadoxModule: public PIDOutput
 {
 public:
-	typedef enum {kSpeed, kPot} ModuleValue;
+	typedef enum {kSpeed, kPot, kAmps} ModuleValue;
 	
 	ParadoxModule(UINT32 angle_w, UINT32 speed_w, UINT32 absenc, UINT32 quadrant);
 	virtual ~ParadoxModule() {}
@@ -28,10 +28,12 @@ public:
 	void PIDWrite(float output);
 	float SetPropose(Joystick *joy);
 	void SetCommit(float max);
-	void Calibrate(bool ang_mode);
+	void Calibrate(bool run_speed);
 	float GetValue(ModuleValue mv);
-	float TopSpeed;
-	float Offset;
+	void SetTopSpeed(float ts);
+	float GetOffset() {return Offset;}
+	void SetOffset(float os, bool add_current);
+	void AllStop();
         
 public:
 	PIDController	*AngPID;
@@ -40,6 +42,8 @@ protected:
 	float ang_proposal;
 	float spd_proposal;
 	float Wdir;
+	float TopSpeed;
+	float Offset;
 	bool WasCalibrating;
 	ParadoxAnalogChannel *POT;
 	CANJaguar *Angle;
