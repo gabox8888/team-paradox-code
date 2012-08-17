@@ -26,7 +26,7 @@ public:
 	virtual ~ParadoxModule() {}
 	
 	void PIDWrite(float output);
-	float SetPropose(Joystick *joy);
+	float SetPropose(float mag, float dir, float w, float heading);
 	void SetCommit(float max);
 	void Calibrate(bool run_speed);
 	float GetValue(ModuleValue mv);

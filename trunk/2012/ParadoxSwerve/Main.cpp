@@ -3,12 +3,15 @@
 const float kStallCurrent = 25;
 const float kStallTimeLimit = 0.5;
 
+const float kPi = 4*atan(1);
+
 class ParadoxBot : public IterativeRobot
 {
 	ParadoxModule *Modules[4];
 	Joystick *Joy;
 	DriverStationLCD *ds;
 	ParadoxPersistentArray *CalFile;
+	Gyro *gyro;
 
 	float lowest;
 	int calidx;
@@ -20,12 +23,13 @@ class ParadoxBot : public IterativeRobot
 public:
 	ParadoxBot()
 	{
-		Modules[0] = new ParadoxModule(22, 21, 2, 1); //White Two
-		Modules[1] = new ParadoxModule(32, 31, 3, 2); //Blue One
-		Modules[2] = new ParadoxModule(42, 41, 4, 3); //Blue Two
-		Modules[3] = new ParadoxModule(12, 11, 1, 4); //White One
+		Modules[0] = new ParadoxModule(22, 21, 3, 1); //White Two
+		Modules[1] = new ParadoxModule(32, 31, 4, 2); //Blue One
+		Modules[2] = new ParadoxModule(42, 41, 5, 3); //Blue Two
+		Modules[3] = new ParadoxModule(12, 11, 2, 4); //White One
 
 		CalFile = new ParadoxPersistentArray("calibrate.txt", 5);
+		gyro = new Gyro(1);
 
 		for (int i = 0; i < 4; i++)
 		{
@@ -37,6 +41,7 @@ public:
 		ds	= DriverStationLCD::GetInstance();
 
 		SetPeriod(0.05);
+		StallLock = false;
 	};
 
 	~ParadoxBot(){}
@@ -110,17 +115,18 @@ public:
 				float highest = 1;
 				for (int i = 0; i < 4; i++)
 				{
-					float sp = Modules[i]->SetPropose(Joy);
+					float sp = Modules[i]->SetPropose(Joy->GetMagnitude(), Joy->GetDirectionRadians(), Joy->GetZ(), (kPi / 180) * gyro->GetAngle());
 					if (sp > highest) highest = sp;
 				}
 	
 				for (int i = 0; i < 4; i++) Modules[i]->SetCommit(highest);
 	
-				ds->PrintfLine(DriverStationLCD::kUser_Line1, "FRONT (get amps)");
-				ds->PrintfLine(DriverStationLCD::kUser_Line2, "%.2f %.2f",
-						Modules[1]->GetValue(ParadoxModule::kAmps), Modules[0]->GetValue(ParadoxModule::kAmps));
-				ds->PrintfLine(DriverStationLCD::kUser_Line3, "%.2f %.2f",
-						Modules[2]->GetValue(ParadoxModule::kAmps), Modules[3]->GetValue(ParadoxModule::kAmps));
+				ds->PrintfLine(DriverStationLCD::kUser_Line1, "FRONT (get spd)");
+				ds->PrintfLine(DriverStationLCD::kUser_Line2, "%.0f %.0f",
+						Modules[1]->GetValue(ParadoxModule::kSpeed), Modules[0]->GetValue(ParadoxModule::kSpeed));
+				ds->PrintfLine(DriverStationLCD::kUser_Line3, "%.0f %.0f",
+						Modules[2]->GetValue(ParadoxModule::kSpeed), Modules[3]->GetValue(ParadoxModule::kSpeed));
+				ds->PrintfLine(DriverStationLCD::kUser_Line4, "heading %.2f", (kPi / 180) * gyro->GetAngle());
 			}
 			bool test_stall = false;
 			for (int i = 0; i < 4; i++) {if (Modules[i]->GetValue(ParadoxModule::kAmps) > kStallCurrent) test_stall = true;}

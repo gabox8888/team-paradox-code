@@ -6,11 +6,11 @@
 const float kSpeed_P = 0.7f;
 const float kSpeed_I = 0.005f;
 const float kSpeed_D = 0.5f;
-const UINT32 kSpeed_CPR = 36;
+const UINT32 kSpeed_CPR = 5;
 
-const float kAngle_P = 1.0f;
-const float kAngle_I = 0.0f;//0.75f;
-const float kAngle_D = 0.5f;
+const float kAngle_P = 0.2f;//1.0f;
+const float kAngle_I = 0.0f;//0.0f;
+const float kAngle_D = 0.1f;//0.5f;
 
 const float kCalibrateVoltage = 11.5f;
 const float kDeadZone = 0.15f;
@@ -43,15 +43,15 @@ void ParadoxModule::PIDWrite(float output)
 	Angle->PIDWrite(output);
 }
 
-float ParadoxModule::SetPropose(Joystick *joy)
+float ParadoxModule::SetPropose(float mag, float dir, float w, float heading)
 {
-	float Vmag = joy->GetMagnitude();
+	float Vmag = mag;
 	if (Vmag > 1.0) Vmag = 1.0;
-	float Vdir = -1.0*joy->GetDirectionRadians() + 0.5*kPi;
+	float Vdir = -1.0*dir + 0.5*kPi + heading;
 	if (Vmag < kDeadZone) Vmag = 0;
 	ParadoxVector *V = new ParadoxVector(Vmag, Vdir);
 
-	float Wmag = -1.0*joy->GetZ();
+	float Wmag = -1.0*w;
 	if (fabs(Wmag) < kDeadZone) Wmag = 0;
 	ParadoxVector *W = new ParadoxVector(Wmag, Wdir);
 
