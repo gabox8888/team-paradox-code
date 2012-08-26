@@ -7,7 +7,7 @@ const UINT32 kSpeed_CPR = 56;
 
 const float kCalibrateVoltage = 11.5f;
 const float kDeadZone = 0.15f;
-const float kMoveMutexEagerness = 7;
+const float kMoveMutexEagerness = 0;
 
 const float kPi = 4*atan(1);
 
@@ -93,7 +93,7 @@ void ParadoxModule::Calibrate(bool run_speed, float twist)
 		WasCalibrating = true;
 	}
 	Speed->Set(run_speed ? kCalibrateVoltage : 0);
-	Angle->Set(-0.05*twist);
+	Angle->Set(-1.0*twist);
 }
 
 void ParadoxModule::SetTopSpeed(float ts)
@@ -112,7 +112,10 @@ void ParadoxModule::AllStop()
 	AngPID->Disable();
 	Angle->Set(0);
 }
-
+void ParadoxModule::Dump(DriverStationLCD *ds,int column)
+{
+	ds->Printf(DriverStationLCD::kUser_Line5,column,"I: %.0f",Angle->GetOutputCurrent());
+}
 float ParadoxModule::GetSpeed() {return Speed->GetSpeed();}
 float ParadoxModule::GetAngle() {return (2.0*kPI / 5) * POT->GetVoltage();}
 float ParadoxModule::GetAmps() {return Speed->GetOutputCurrent();}

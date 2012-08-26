@@ -32,6 +32,7 @@ public:
 	float GetOffset() {return Offset;}
 	void SetOffset(float os);
 	void AllStop();
+	void Dump(DriverStationLCD *ds,int column);
 	
 	float GetSpeed();
 	float GetAngle();
