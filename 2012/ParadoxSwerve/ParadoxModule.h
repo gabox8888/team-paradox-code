@@ -20,21 +20,22 @@ public:
 class ParadoxModule: public PIDOutput
 {
 public:
-	typedef enum {kSpeed, kAngle, kAmps} ModuleValue;
-	
 	ParadoxModule(UINT32 angle_w, UINT32 speed_w, UINT32 absenc, UINT32 quadrant,
 			float a_P, float a_I, float a_D, float s_P, float s_I, float s_D);
 	virtual ~ParadoxModule() {}
 	
-	void PIDWrite(float output);
+	void PIDWrite(float output) {Angle->PIDWrite(output);}
 	float SetPropose(float mag, float dir, float w, float heading);
 	void SetCommit(float max);
 	void Calibrate(bool run_speed, float twist);
-	float GetValue(ModuleValue mv);
 	void SetTopSpeed(float ts);
 	float GetOffset() {return Offset;}
 	void SetOffset(float os);
 	void AllStop();
+	
+	float GetSpeed();
+	float GetAngle();
+	float GetAmps();
         
 public:
 	PIDController	*AngPID;
