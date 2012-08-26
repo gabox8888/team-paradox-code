@@ -1,7 +1,7 @@
 #include "ParadoxLib.h"
 
-const float kStallCurrent = 25;
-const float kStallTimeLimit = 0.5;
+const float kStallCurrent = 20;
+const float kStallTimeLimit = 1;
 
 const float kPi = 4*atan(1);
 
@@ -23,10 +23,10 @@ class ParadoxBot : public IterativeRobot
 public:
 	ParadoxBot()
 	{
-		Modules[0] = new ParadoxModule(22, 21, 3, 1); //White Two
-		Modules[1] = new ParadoxModule(32, 31, 4, 2); //Blue One
-		Modules[2] = new ParadoxModule(42, 41, 5, 3); //Blue Two
-		Modules[3] = new ParadoxModule(12, 11, 2, 4); //White One
+		Modules[0] = new ParadoxModule(22, 21, 3, 1, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White Two
+		Modules[1] = new ParadoxModule(32, 31, 4, 2, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //Blue One
+		Modules[2] = new ParadoxModule(42, 41, 5, 3, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //Blue Two
+		Modules[3] = new ParadoxModule(12, 11, 2, 4, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White One
 
 		CalFile = new ParadoxPersistentArray("calibrate.txt", 5);
 		gyro = new Gyro(1);
@@ -34,7 +34,7 @@ public:
 		for (int i = 0; i < 4; i++)
 		{
 			Modules[i]->SetTopSpeed(CalFile->Read(0));
-			Modules[i]->SetOffset(CalFile->Read(i + 1), false);
+			Modules[i]->SetOffset(CalFile->Read(i + 1));
 		}
 
 		Joy	= new Joystick(1);
@@ -48,7 +48,7 @@ public:
 
 	void TeleopPeriodic(void)
 	{
-		bool CalKeyCombo = Joy->GetRawButton(1) && Joy->GetRawButton(11) && Joy->GetRawButton(9);
+		bool CalKeyCombo = Joy->GetRawButton(1);
 
 		if (StallLock)
 		{
@@ -74,11 +74,9 @@ public:
 				if (calidx > 3) calidx = -1;
 	
 				ds->PrintfLine(DriverStationLCD::kUser_Line1, "##### CALIBRATING #####");
-				for (int i = 0; i < 4; i++) Modules[i]->Calibrate((calidx == -1) || (calidx == i));
+				for (int i = 0; i < 4; i++) Modules[i]->Calibrate(calidx == -1, (calidx == i) ? Joy->GetZ() : 0);
 				if (calidx >= 0)
 				{
-					Modules[calidx]->SetOffset(Joy->GetZ()*Joy->GetZ()*(Joy->GetZ() < 0 ? -1 : 1)*GetPeriod()*-1, true);
-	
 					ds->PrintfLine(DriverStationLCD::kUser_Line2, "ANGLE ADJUST");
 					ds->PrintfLine(DriverStationLCD::kUser_Line3, "selected wheel %d", calidx);
 					ds->PrintfLine(DriverStationLCD::kUser_Line4, "offset %f", Modules[calidx]->GetOffset());
@@ -104,6 +102,9 @@ public:
 					ds->Clear();
 					float values[5];
 					values[0] = lowest;
+					
+					for (int i = 0; i < 4; i++) Modules[i]->SetOffset(Modules[i]->GetValue(ParadoxModule::kAngle) - (0.5*kPi));
+					
 					for (int i = 0; i < 4; i++) values[i + 1] = Modules[i]->GetOffset();
 					CalFile->Write(values);
 					IsCalibrating = false;
@@ -111,6 +112,8 @@ public:
 				calidx = -1;
 				edge[0] = false;
 				edge[1] = false;
+				
+				if (Joy->GetRawButton(8) && (fabs(gyro->GetAngle()) > 1)) gyro->Reset();
 	
 				float highest = 1;
 				for (int i = 0; i < 4; i++)
@@ -121,7 +124,7 @@ public:
 	
 				for (int i = 0; i < 4; i++) Modules[i]->SetCommit(highest);
 	
-				ds->PrintfLine(DriverStationLCD::kUser_Line1, "FRONT (get spd)");
+				ds->PrintfLine(DriverStationLCD::kUser_Line1, "FRONT (get amps)");
 				ds->PrintfLine(DriverStationLCD::kUser_Line2, "%.0f %.0f",
 						Modules[1]->GetValue(ParadoxModule::kSpeed), Modules[0]->GetValue(ParadoxModule::kSpeed));
 				ds->PrintfLine(DriverStationLCD::kUser_Line3, "%.0f %.0f",
