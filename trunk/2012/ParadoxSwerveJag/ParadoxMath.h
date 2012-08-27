@@ -2,6 +2,7 @@
 #define PARADOXMATH_H_
 
 #include "WPILib.h"
+#include "RPMSource.h"
 
 static const float kPI = 3.14159265f;
 class ParadoxMath
@@ -9,6 +10,7 @@ class ParadoxMath
 public:
         ParadoxMath();
         virtual ~ParadoxMath() {}
+        float CalculateRPM(float period, Encoder *enco);
        
 private:
         DISALLOW_COPY_AND_ASSIGN(ParadoxMath);
@@ -23,6 +25,7 @@ public:
 	
 	float GetMagnitude();
 	float GetDirection();
+	
 	
 	float X;
 	float Y;

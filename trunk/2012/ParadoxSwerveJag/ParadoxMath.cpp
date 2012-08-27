@@ -27,3 +27,27 @@ float ParadoxVector::GetDirection()
 	if (A < 0) A += 2.0*kPi;
 	return A;
 }
+float ParadoxMath::CalculateRPM(float period, Encoder *enco)
+{
+	static int rawValue				= 0;
+	static int lastRawValue			= 0;
+	static int deltaCounts			= 0;
+	static double loopsPerSecond 	= 0;
+	static double rpm				= 0;
+	
+	if (period == 0)
+	{
+		loopsPerSecond = 50.0;
+	}
+	else
+	{
+		loopsPerSecond = 1/period;
+	}
+	rawValue = enco->GetRaw();
+	deltaCounts = rawValue - lastRawValue;
+	rpm = deltaCounts * (60.0/25) * loopsPerSecond;
+	lastRawValue = rawValue;
+	
+	return rpm/1000;
+	
+}

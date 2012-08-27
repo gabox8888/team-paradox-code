@@ -8,6 +8,7 @@ const float kPi = 4*atan(1);
 class ParadoxBot : public IterativeRobot
 {
 	ParadoxModule *Modules[4];
+	//ParadoxAutoLang *Auto;
 	Joystick *Joy;
 	DriverStationLCD *ds;
 	ParadoxPersistentArray *CalFile;
@@ -23,10 +24,13 @@ class ParadoxBot : public IterativeRobot
 public:
 	ParadoxBot()
 	{
+		printf("Ctor\n");
 		Modules[0] = new ParadoxModule(22, 21, 3, 1, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White Two
 		Modules[1] = new ParadoxModule(32, 31, 4, 2, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //Blue One
 		Modules[2] = new ParadoxModule(42, 41, 5, 3, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //Blue Two
 		Modules[3] = new ParadoxModule(12, 11, 2, 4, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White One
+		
+		//bpAuto = new ParadoxAutoLang("auto.pal");
 
 		CalFile = new ParadoxPersistentArray("calibrate.txt", 5);
 		gyro = new Gyro(1);
@@ -45,7 +49,25 @@ public:
 	};
 
 	~ParadoxBot(){}
-
+	/*
+	void AutonomousInit(void)
+	{
+		Auto->Reset();
+	}
+	
+	void AutonomousPeriodic(void)
+	{
+		Auto->Run(GetPeriod());
+		
+		float highest = 1;
+		for (int i = 0; i < 4; i++)
+		{
+			float sp = Modules[i]->SetPropose(Auto->GetOutput("Mag"), Auto->GetOutput("Dir"), Auto->GetOutput("Turn"), (kPi / 180) * gyro->GetAngle());
+			if (sp > highest) highest = sp;
+		}
+		for (int i = 0; i < 4; i++) Modules[i]->SetCommit(highest);
+	}
+	*/
 	void TeleopPeriodic(void)
 	{
 		if (Joy->GetRawButton(9) && Joy->GetRawButton(10)) CalKeyCombo = true;
@@ -121,9 +143,30 @@ public:
 				if (Joy->GetRawButton(8)) gyro->Reset();
 	
 				float highest = 1;
+				
+				float dir;
+				if (Joy->GetRawButton(2))
+				{
+					if ((Joy->GetDirectionDegrees() > -22.5)&&(Joy->GetDirectionDegrees()<= 22.5))dir = 0;
+					if ((Joy->GetDirectionDegrees() >  22.5)&&(Joy->GetDirectionDegrees()<= 67.5))dir = 45;
+					if ((Joy->GetDirectionDegrees() >  67.5)&&(Joy->GetDirectionDegrees()<= 112.5))dir = 90;
+					if ((Joy->GetDirectionDegrees() >  112.5)&&(Joy->GetDirectionDegrees()<= 157.5))dir = 135;
+					if ((Joy->GetDirectionDegrees() >  157.5)&&(Joy->GetDirectionDegrees()<= 180))dir = 180;
+					if ((Joy->GetDirectionDegrees() <  22.5)&&(Joy->GetDirectionDegrees()>= -22.5))dir = 0;
+					if ((Joy->GetDirectionDegrees() < -22.5)&&(Joy->GetDirectionDegrees()>= -67.5))dir = -45;
+					if ((Joy->GetDirectionDegrees() < -67.5)&&(Joy->GetDirectionDegrees()>= -112.5))dir = -90;
+					if ((Joy->GetDirectionDegrees() < -112.5)&&(Joy->GetDirectionDegrees()>= -157.5))dir = -135;
+					if ((Joy->GetDirectionDegrees() < -157.5)&&(Joy->GetDirectionDegrees()>= -180))dir = -180;
+				}
+				else 
+				{
+					dir=Joy->GetDirectionDegrees();
+				}
+				dir *= (kPi/180);
+				
 				for (int i = 0; i < 4; i++)
 				{
-					float sp = Modules[i]->SetPropose(Joy->GetMagnitude(), Joy->GetDirectionRadians(), (Joy->GetRawButton(2)) ? 0 : Joy->GetZ(), (kPi / 180) * gyro->GetAngle());
+					float sp = Modules[i]->SetPropose(Joy->GetMagnitude(), dir, (Joy->GetRawButton(2)) ? 0 : Joy->GetZ(), (kPi / 180) * gyro->GetAngle());
 					if (sp > highest) highest = sp;
 				}
 				for (int i = 0; i < 4; i++) Modules[i]->SetCommit(highest);

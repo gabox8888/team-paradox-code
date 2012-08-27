@@ -1,0 +1,9 @@
+FRC Sample Simple C Template
+--------------------------------
+
+This is a minimal C program that demonstrates how to get a robot running
+using the C API to the WPI Robotics Library. The C functions wrap the C++
+classes and methods. This must be created as a .cpp file since there are
+overloaded functions to make the set of functions smaller.
+
+
