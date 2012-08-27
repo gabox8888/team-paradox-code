@@ -6,6 +6,7 @@
 
 #include "ParadoxMath.h"
 #include "ParadoxModule.h"
+#include "ParadoxAutoLang.h"
 #include "ParadoxPersistentArray.h"
 
 #endif

@@ -52,6 +52,15 @@ float ParadoxModule::SetPropose(float mag, float dir, float w, float heading)
 	spd_proposal = Sum->GetMagnitude();
 	ang_proposal = Sum->GetDirection();
 
+	if (fabs(Vmag) < kDeadZone)
+	{
+		ang_proposal = Wdir;
+		if (Wmag < 0)
+		{
+		spd_proposal*=-1;
+//		ang_proposal+=kPi;
+		}
+	}
 	delete V;
 	delete W;
 	delete Sum;
@@ -79,6 +88,7 @@ void ParadoxModule::SetCommit(float max)
 	if (spd_proposal != 0) AngPID->SetSetpoint((5/(2*kPi))*ang_proposal);
 	float movement_mutex = fabs(ang_proposal - ((2*kPi / 5)*POT->GetVoltage())) * kMoveMutexEagerness;
 	if (movement_mutex < 1) movement_mutex = 1;
+	if (max < 1) max = 1;
 	Speed->Set(((spd_proposal / max) / movement_mutex)*TopSpeed);
 }
 
