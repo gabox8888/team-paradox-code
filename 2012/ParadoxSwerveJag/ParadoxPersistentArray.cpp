@@ -14,26 +14,29 @@ void ParadoxPersistentArray::UpdateArray()
 {
 	char buffer[20];
 	file = fopen(fname.c_str(), "r");
-	fscanf(file,"%s ",buffer);
-	if (strcmp(buffer,"Speed:") == 0)
+	for (int i=0;i<acnt;i++)
 	{
-		fscanf(file,"%f\n",&values[0]);
-	}
-	else if (strcmp(buffer,"Module1:") == 0)
-	{
-		fscanf(file,"%f\n",&values[1]);
-	}
-	else if (strcmp(buffer,"Module2:") == 0)
-	{
-		fscanf(file,"%f\n",&values[2]);
-	}
-	else if (strcmp(buffer,"Module3:") == 0)
-	{
-		fscanf(file,"%f\n",&values[3]);
-	}
-	else if (strcmp(buffer,"Module4:") == 0)
-	{
-		fscanf(file,"%f\n",&values[4]);
+		fscanf(file,"%s ",buffer);
+		if (strcmp(buffer,"Speed:") == 0)
+		{
+			fscanf(file,"%f\n",&values[0]);
+		}
+		else if (strcmp(buffer,"Module1:") == 0)
+		{
+			fscanf(file,"%f\n",&values[1]);
+		}
+		else if (strcmp(buffer,"Module2:") == 0)
+		{
+			fscanf(file,"%f\n",&values[2]);
+		}
+		else if (strcmp(buffer,"Module3:") == 0)
+		{
+			fscanf(file,"%f\n",&values[3]);
+		}
+		else if (strcmp(buffer,"Module4:") == 0)
+		{
+			fscanf(file,"%f\n",&values[4]);
+		}
 	}
 	//for (int i = 0; i < acnt ; i++) fscanf(file, "%f\n", &values[i]);
 	fclose(file);

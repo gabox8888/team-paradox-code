@@ -1,6 +1,6 @@
 #include "ParadoxLib.h"
 
-const float kStallCurrent = 20;
+volatile float kStallCurrent = 20;
 const float kStallTimeLimit = 1;
 
 const float kPi = 4*atan(1);
@@ -10,6 +10,7 @@ class ParadoxBot : public IterativeRobot
 	ParadoxModule *Modules[4];
 	//ParadoxAutoLang *Auto;
 	Joystick *Joy;
+	Joystick *Car;
 	DriverStationLCD *ds;
 	ParadoxPersistentArray *CalFile;
 	Gyro *gyro;
@@ -20,6 +21,9 @@ class ParadoxBot : public IterativeRobot
 	bool StallLock;
 	float StallTime;
 	bool CalKeyCombo;
+	bool CarMode;
+	float pedal1;
+	float pedal2;
 
 public:
 	ParadoxBot()
@@ -42,10 +46,12 @@ public:
 		}
 
 		Joy	= new Joystick(1);
+		Car = new Joystick(2);
 		ds	= DriverStationLCD::GetInstance();
 
 		SetPeriod(0.05);
 		StallLock = false;
+		CarMode = true;
 	};
 
 	~ParadoxBot(){}
@@ -71,7 +77,10 @@ public:
 	void TeleopPeriodic(void)
 	{
 		if (Joy->GetRawButton(9) && Joy->GetRawButton(10)) CalKeyCombo = true;
-
+		
+		if (Joy->GetRawAxis(4)> 0.0)CarMode=true;
+		else CarMode = false;
+		
 		if (StallLock)
 		{
 			ds->PrintfLine(DriverStationLCD::kUser_Line1, "!!!");
@@ -143,34 +152,84 @@ public:
 				if (Joy->GetRawButton(8)) gyro->Reset();
 	
 				float highest = 1;
-				
 				float dir;
-				if (Joy->GetRawButton(2))
+				float car_turnR;
+				float car_turnL;
+				float radius1;
+				float radius2;
+				float ac;
+				
+				if (CarMode)
 				{
-					if ((Joy->GetDirectionDegrees() > -22.5)&&(Joy->GetDirectionDegrees()<= 22.5))dir = 0;
-					if ((Joy->GetDirectionDegrees() >  22.5)&&(Joy->GetDirectionDegrees()<= 67.5))dir = 45;
-					if ((Joy->GetDirectionDegrees() >  67.5)&&(Joy->GetDirectionDegrees()<= 112.5))dir = 90;
-					if ((Joy->GetDirectionDegrees() >  112.5)&&(Joy->GetDirectionDegrees()<= 157.5))dir = 135;
-					if ((Joy->GetDirectionDegrees() >  157.5)&&(Joy->GetDirectionDegrees()<= 180))dir = 180;
-					if ((Joy->GetDirectionDegrees() <  22.5)&&(Joy->GetDirectionDegrees()>= -22.5))dir = 0;
-					if ((Joy->GetDirectionDegrees() < -22.5)&&(Joy->GetDirectionDegrees()>= -67.5))dir = -45;
-					if ((Joy->GetDirectionDegrees() < -67.5)&&(Joy->GetDirectionDegrees()>= -112.5))dir = -90;
-					if ((Joy->GetDirectionDegrees() < -112.5)&&(Joy->GetDirectionDegrees()>= -157.5))dir = -135;
-					if ((Joy->GetDirectionDegrees() < -157.5)&&(Joy->GetDirectionDegrees()>= -180))dir = -180;
+					kStallCurrent = 999;
+					if (Joy->GetZ()>0.0)
+					{
+						pedal1 = Joy->GetY();
+
+						radius1 = 130 - (Joy->GetZ()*85);
+						car_turnR = 90-(acos(13/radius1));
+						radius2 = sqrt((729)+(radius1*radius1)-(54*radius1*cos(car_turnR)));	
+						car_turnL = 90-(acos(13/radius2));
+						ac=(pedal1*pedal1)/radius1;
+						pedal2=sqrt(ac*radius2);
+					}
+					else
+					{
+						radius2 = 130 - (Joy->GetZ()*85);
+						car_turnL = 90-(acos(13/radius1));
+						radius1 = sqrt((729)+(radius2*radius2)-(54*radius2*cos(car_turnL)));	
+						car_turnR = 90-(acos(13/radius2));
+						ac=(pedal2*pedal1)/radius2;
+						pedal1=sqrt(ac*radius1);
+					}
+					if (fabs(Joy->GetZ())<0.1)
+					{
+						pedal1 = Joy->GetY();
+						car_turnR=0.0;
+						car_turnL=0.0;
+						pedal1=pedal2;
+					}
+					
+					car_turnR *= (kPi/180);
+					car_turnL *= (kPi/180);
+					Modules[0]->CarMode(pedal1,car_turnR);
+					Modules[1]->CarMode(pedal2,car_turnL);
+					Modules[2]->CarMode(pedal1,-car_turnR);
+					Modules[3]->CarMode(pedal2,-car_turnL);
+			
+					ds->PrintfLine(DriverStationLCD::kUser_Line1, "X: %f",Car->GetX());
+					ds->PrintfLine(DriverStationLCD::kUser_Line2, "Y: %f",Car->GetY());
+					ds->PrintfLine(DriverStationLCD::kUser_Line3, "Y': %f",Joy->GetY());
+					
 				}
 				else 
 				{
-					dir=Joy->GetDirectionDegrees();
-				}
-				dir *= (kPi/180);
+					if (Joy->GetRawButton(2))
+					{
+						if ((Joy->GetDirectionDegrees() > -22.5)&&(Joy->GetDirectionDegrees()<= 22.5))dir = 0;
+						if ((Joy->GetDirectionDegrees() >  22.5)&&(Joy->GetDirectionDegrees()<= 67.5))dir = 45;
+						if ((Joy->GetDirectionDegrees() >  67.5)&&(Joy->GetDirectionDegrees()<= 112.5))dir = 90;
+						if ((Joy->GetDirectionDegrees() >  112.5)&&(Joy->GetDirectionDegrees()<= 157.5))dir = 135;
+						if ((Joy->GetDirectionDegrees() >  157.5)&&(Joy->GetDirectionDegrees()<= 180))dir = 180;
+						if ((Joy->GetDirectionDegrees() <  22.5)&&(Joy->GetDirectionDegrees()>= -22.5))dir = 0;
+						if ((Joy->GetDirectionDegrees() < -22.5)&&(Joy->GetDirectionDegrees()>= -67.5))dir = -45;
+						if ((Joy->GetDirectionDegrees() < -67.5)&&(Joy->GetDirectionDegrees()>= -112.5))dir = -90;
+						if ((Joy->GetDirectionDegrees() < -112.5)&&(Joy->GetDirectionDegrees()>= -157.5))dir = -135;
+						if ((Joy->GetDirectionDegrees() < -157.5)&&(Joy->GetDirectionDegrees()>= -180))dir = -180;
+					}
+					else 
+					{
+						dir=Joy->GetDirectionDegrees();
+					}
+					dir *= (kPi/180);
 				
-				for (int i = 0; i < 4; i++)
-				{
-					float sp = Modules[i]->SetPropose(Joy->GetMagnitude(), dir, (Joy->GetRawButton(2)) ? 0 : Joy->GetZ(), (kPi / 180) * gyro->GetAngle());
-					if (sp > highest) highest = sp;
-				}
-				for (int i = 0; i < 4; i++) Modules[i]->SetCommit(highest);
-	
+					for (int i = 0; i < 4; i++)
+					{
+						float sp = Modules[i]->SetPropose(Joy->GetMagnitude(), dir, (Joy->GetRawButton(2)) ? 0 : Joy->GetZ(), (kPi / 180) * gyro->GetAngle());
+						if (sp > highest) highest = sp;
+					}
+					for (int i = 0; i < 4; i++) Modules[i]->SetCommit(highest);
+				
 				ds->PrintfLine(DriverStationLCD::kUser_Line1, "FRONT (get spd)");
 				ds->PrintfLine(DriverStationLCD::kUser_Line2, "%.0f %.0f",
 						Modules[1]->GetSpeed(), Modules[0]->GetSpeed());
@@ -181,6 +240,7 @@ public:
 				Modules[1]->Dump(ds,6);
 				Modules[2]->Dump(ds,11);
 				Modules[3]->Dump(ds,16);
+				}
 			}
 			bool test_stall = false;
 			for (int i = 0; i < 4; i++) {if (Modules[i]->GetAmps() > kStallCurrent) test_stall = true;}
