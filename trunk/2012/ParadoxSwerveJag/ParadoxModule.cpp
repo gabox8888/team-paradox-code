@@ -35,7 +35,14 @@ ParadoxModule::ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc, UINT3
 	if (quadrant == 4) Wdir = 0.25 * kPi;
 	WasCalibrating = false;
 }
-
+void ParadoxModule::CarMode(float mag, float dir)
+{
+	float Vmag = mag;
+	float Vdir = -1.0*dir + 0.5*kPi+Offset;
+	if (fabs(Vmag) < kDeadZone) Vmag = 0;
+	Speed->Set(Vmag*TopSpeed);
+	AngPID->SetSetpoint(5/(2*kPi)*Vdir);
+}
 float ParadoxModule::SetPropose(float mag, float dir, float w, float heading)
 {
 	float Vmag = mag;
@@ -64,7 +71,7 @@ float ParadoxModule::SetPropose(float mag, float dir, float w, float heading)
 	delete V;
 	delete W;
 	delete Sum;
-
+	
 	return spd_proposal;
 }
 
@@ -88,8 +95,8 @@ void ParadoxModule::SetCommit(float max)
 	if (spd_proposal != 0) AngPID->SetSetpoint((5/(2*kPi))*ang_proposal);
 	float movement_mutex = fabs(ang_proposal - ((2*kPi / 5)*POT->GetVoltage())) * kMoveMutexEagerness;
 	if (movement_mutex < 1) movement_mutex = 1;
-	if (max < 1) max = 1;
-	Speed->Set(((spd_proposal / max) / movement_mutex)*TopSpeed);
+	if (fabs(max) < 1) max = 1;
+	Speed->Set(((spd_proposal / fabs(max)) / movement_mutex)*TopSpeed);
 }
 
 void ParadoxModule::Calibrate(bool run_speed, float twist)

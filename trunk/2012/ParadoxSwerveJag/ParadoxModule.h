@@ -25,6 +25,7 @@ public:
 	virtual ~ParadoxModule() {}
 	
 	void PIDWrite(float output) {Angle->PIDWrite(output);}
+	void CarMode(float mag, float dir);
 	float SetPropose(float mag, float dir, float w, float heading);
 	void SetCommit(float max);
 	void Calibrate(bool run_speed, float twist);
