@@ -1,16 +1,16 @@
 #include "ParadoxLib.h"
 
-volatile float kStallCurrent = 20.0;//float because amperage is analog thus float
+volatile float kStallCurrent = 20.0;       //float because amperage is analog thus float
 const float kStallTimeLimit = 1.0;
 
-const float kPi = 4*atan(1);//set value for pi
+const float kPi = 4*atan(1);               //set value for pi
 
 class ParadoxBot : public IterativeRobot
 {
-	ParadoxModule *Modules[4];//calling module
+	ParadoxModule *Modules[4];             //calling module
 	//ParadoxAutoLang *Auto;
-	Joystick *Joy;//declaring object joy is and object of the joystick class from the wplib
-	Joystick *Car;// ditto but for car
+	Joystick *Joy;                         //declaring object joy is and object of the joystick class from the wplib
+	Joystick *Car;                         // ditto but for car
 	DriverStationLCD *ds;
 	ParadoxPersistentArray *CalFile;
 	Gyro *gyro;
