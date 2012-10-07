@@ -76,19 +76,19 @@ public:
 	*/
 	void TeleopPeriodic(void)
 	{
-		if (Joy->GetRawButton(9) && Joy->GetRawButton(10)) CalKeyCombo = true;
+		if (Joy->GetRawButton(9) && Joy->GetRawButton(10)) CalKeyCombo = true;//if you press 9&10, puts it in calibration mode
 		
-		if (Joy->GetRawAxis(4)> 0.0)CarMode=true;
+		if (Joy->GetRawAxis(4)> 0.0)CarMode=true;//if slider is flipped, starts car mode
 		else CarMode = false;
 		
 		if (StallLock)
 		{
-			ds->PrintfLine(DriverStationLCD::kUser_Line1, "!!!");
+			ds->PrintfLine(DriverStationLCD::kUser_Line1, "!!!");//prints to driver station
 			ds->PrintfLine(DriverStationLCD::kUser_Line2, "!!! STALL CURRENT REACHED");
 			ds->PrintfLine(DriverStationLCD::kUser_Line3, "!!! Press Button 7 To Unlock");
 			ds->PrintfLine(DriverStationLCD::kUser_Line4, "!!!");
-			if (Joy->GetRawButton(7)) StallLock = false;
-			else {for (int i = 0; i < 4; i++) Modules[i]->AllStop();}
+			if (Joy->GetRawButton(7)) StallLock = false;//turns off stall lock if you press 7
+			else {for (int i = 0; i < 4; i++) Modules[i]->AllStop();}//if you don't press 7 all modules turn off
 		}
 		else
 		{
