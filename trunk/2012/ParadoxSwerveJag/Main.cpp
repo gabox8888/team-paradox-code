@@ -11,9 +11,9 @@ class ParadoxBot : public IterativeRobot
 	//ParadoxAutoLang *Auto;
 	Joystick *Joy;                         //declaring object joy is and object of the joystick class from the wplib
 	Joystick *Car;                         // ditto but for car
-	DriverStationLCD *ds;
-	ParadoxPersistentArray *CalFile;
-	Gyro *gyro;
+	DriverStationLCD *ds;                  //pointer for a driverstation object
+	ParadoxPersistentArray *CalFile;       //pointer for calibration file
+	Gyro *gyro;                            //pointer for gyro object   
 
 	float lowest;
 	int calidx;
@@ -29,24 +29,24 @@ public:
 	ParadoxBot()
 	{
 		printf("Ctor\n");
-		Modules[0] = new ParadoxModule(22, 21, 3, 1, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White Two
+		Modules[0] = new ParadoxModule(22, 21, 3, 1, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White Two(jad id, jag id,?,?,p,i,d)
 		Modules[1] = new ParadoxModule(32, 31, 4, 2, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //Blue One
 		Modules[2] = new ParadoxModule(42, 41, 5, 3, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //Blue Two
 		Modules[3] = new ParadoxModule(12, 11, 2, 4, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White One
 		
 		//bpAuto = new ParadoxAutoLang("auto.pal");
 
-		CalFile = new ParadoxPersistentArray("calibrate.txt", 5);
+		CalFile = new ParadoxPersistentArray("calibrate.txt", 5);//opening calibration text file with recurring values
 		gyro = new Gyro(1);
 
-		for (int i = 0; i < 4; i++)
+		for (int i = 0; i < 4; i++)//setting topspeeds and offsets from calibration file
 		{
 			Modules[i]->SetTopSpeed(CalFile->Read(0));
 			Modules[i]->SetOffset(CalFile->Read(i + 1));
 		}
 
-		Joy	= new Joystick(1);
-		Car = new Joystick(2);
+		Joy	= new Joystick(1);//calling joystick class and assigning it to pointers to a joystick class
+		Car = new Joystick(2);//ditto
 		ds	= DriverStationLCD::GetInstance();
 
 		SetPeriod(0.05);
