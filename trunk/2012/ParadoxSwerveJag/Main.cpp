@@ -100,7 +100,7 @@ public:
 					ds->Clear();
 					IsCalibrating = true;
 				}
-				if (Joy->GetRawButton(2)) calidx = -1;
+				if (Joy->GetRawButton(2)) calidx = -1;//uses buttons to see which wheel to calibrate
 				if (Joy->GetRawButton(3)) calidx = 2;
 				if (Joy->GetRawButton(4)) calidx = 3;
 				if (Joy->GetRawButton(5)) calidx = 1;
