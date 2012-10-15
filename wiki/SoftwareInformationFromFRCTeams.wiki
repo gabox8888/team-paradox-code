@@ -15,6 +15,5 @@ Please add useful information as you come across other team's information that h
 An excellent guide to setting up a development computer for programming.
 
 Getting Started with C++ and FRC cRIO Programming
-
 http://spartanrobotics.org/content/getting-started-c-and-frc-programming
 A comprehensive guide with lots of useful links to additional resources.
