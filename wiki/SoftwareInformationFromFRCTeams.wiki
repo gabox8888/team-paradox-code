@@ -13,3 +13,7 @@ Please add useful information as you come across other team's information that h
 2012 Software - how to set up the programming computers and robot code for the 2012 competition season.
 [http://spartanrobotics.org/content/2012-software]
 An excellent guide to setting up a development computer for programming.
+
+Getting Started with C++ and FRC cRIO Programming
+http://spartanrobotics.org/content/getting-started-c-and-frc-programming
+A comprehensive guide with lots of useful links to additional resources.
