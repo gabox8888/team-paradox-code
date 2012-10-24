@@ -29,7 +29,7 @@ public:
 	ParadoxBot()
 	{
 		printf("Ctor\n");
-		Modules[0] = new ParadoxModule(22, 21, 3, 1, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White Two(jad id, jag id,?,?,p,i,d)
+		Modules[0] = new ParadoxModule(22, 21, 3, 1, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White Two(jag id, jag id,?,?,p,i,d)
 		Modules[1] = new ParadoxModule(32, 31, 4, 2, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //Blue One
 		Modules[2] = new ParadoxModule(42, 41, 5, 3, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //Blue Two
 		Modules[3] = new ParadoxModule(12, 11, 2, 4, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White One
