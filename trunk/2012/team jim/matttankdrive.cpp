@@ -18,20 +18,45 @@ while(true){
           float leftmotor;
           float rightmotor;
           
-          if(joy->GetY() > 0){
+         if (joy->GetY() >= 0){
+         
+          if(joy->GetX() > 0){
                          leftmotor = joy->GetMagnitude();
-                         righmotor = leftmotor - joy->GetY(); 
+                         righmotor = leftmotor - joy->GetX(); 
                          
                          }
                          
-          if(joy->GetY() < 0 ){
+          if(joy->GetX() < 0 ){
                           rightmotor = joy->GetMagnitude();
-                          leftmotor = rightmotor - joy->GetY();
+                          leftmotor = rightmotor - joy->GetX();
                           }
           
           else{
-               rightmotor = joy->getX();
-               leftmotor = rightmotor;
+               rightmotor = 0;
+               leftmotor = 0;
+               }
+               }
+               
+               
+          else{
+               
+                if(joy->GetX() > 0){
+                         leftmotor = -1 *joy->GetMagnitude();
+                         righmotor = (leftmotor *-1  - joy->GetX())*-1; 
+                         
+                         }
+                         
+          if(joy->GetX() < 0 ){
+                          rightmotor =  -1*joy->GetMagnitude();
+                          leftmotor = (rightmotor*-1 - joy->GetX())*-1;
+                          }
+          
+          else{
+               rightmotor = 0;
+               leftmotor = 0;
+               }
+               }
+               
                }
           
           vicleft->Set(leftmotor);
