@@ -14,7 +14,7 @@ void Initialize (void){
                      }
                      
 void OperatorControl (void){
-while(true){
+while(IsOperatorControl){
           float leftmotor;
           float rightmotor;
           
@@ -41,14 +41,14 @@ while(true){
           else{
                
                 if(joy->GetX() > 0){
-                         leftmotor = -1 *joy->GetMagnitude();
-                         righmotor = (leftmotor *-1  - joy->GetX())*-1; 
+                         leftmotor = (-1) *joy->GetMagnitude();
+                         righmotor = (leftmotor *(-1)  - joy->GetX())*(-1); 
                          
                          }
                          
           if(joy->GetX() < 0 ){
-                          rightmotor =  -1*joy->GetMagnitude();
-                          leftmotor = (rightmotor*-1 - joy->GetX())*-1;
+                          rightmotor =  (-1)*joy->GetMagnitude();
+                          leftmotor = (rightmotor*(-1) - joy->GetX())*(-1);
                           }
           
           else{
