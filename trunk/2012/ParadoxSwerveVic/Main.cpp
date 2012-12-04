@@ -5,6 +5,13 @@ const float kStallTimeLimit = 1;
 
 const float kPi = 4*atan(1);
 
+enum CalMode
+{
+	kAngle,
+	kTopSpeed,
+	kVictor
+};
+
 class ParadoxBot : public IterativeRobot
 {
 	ParadoxModule *Modules[4];
@@ -14,8 +21,9 @@ class ParadoxBot : public IterativeRobot
 	ParadoxPersistentArray *CalFile;
 	Gyro *gyro;
 
+	CalMode MyCal;
+	
 	float lowest;
-	int calidx;
 	bool IsCalibrating;
 	bool StallLock;
 	float StallTime;
@@ -24,11 +32,12 @@ class ParadoxBot : public IterativeRobot
 public:
 	ParadoxBot()
 	{
-		printf("Ctor\n");
-		Modules[0] = new ParadoxModule(22, 21, 3, 1, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White Two
-		Modules[1] = new ParadoxModule(32, 31, 4, 2, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //Blue One
-		Modules[2] = new ParadoxModule(42, 41, 5, 3, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //Blue Two
-		Modules[3] = new ParadoxModule(12, 11, 2, 4, 0.7, 0.1, 0.0, 0.7, 0.005, 0.0); //White One
+		printf("Ctor\n"); 
+									// v   j   as q  rs  p    i    d    p    i      d
+		Modules[0] = new ParadoxModule(10, 11, 4, 1, 3, 0.3, 0.0001, 0.0, 0.7, 0.005, 0.0); //White Two
+		Modules[1] = new ParadoxModule(9,  22, 7, 2, 4, 0.3, 0.0001, 0.0, 0.7, 0.005, 0.0); //Blue One
+		Modules[2] = new ParadoxModule(7,  33, 5, 3, 2, 0.3, 0.0001, 0.0, 0.7, 0.005, 0.0); //Blue Two
+		Modules[3] = new ParadoxModule(8,  44, 6, 4, 1, 0.3, 0.0001, 0.0, 0.7, 0.005, 0.0); //White One
 		
 		//bpAuto = new ParadoxAutoLang("auto.pal");
 
@@ -87,41 +96,49 @@ public:
 			{
 				if (!IsCalibrating)
 				{
-					calidx = -1;
+					MyCal = kAngle;
 					ds->Clear();
 					IsCalibrating = true;
 				}
-				if (Joy->GetRawButton(2)) calidx = -1;
-				if (Joy->GetRawButton(3)) calidx = 2;
-				if (Joy->GetRawButton(4)) calidx = 3;
-				if (Joy->GetRawButton(5)) calidx = 1;
-				if (Joy->GetRawButton(6)) calidx = 0;
 	
 				ds->PrintfLine(DriverStationLCD::kUser_Line1, "##### CALIBRATING #####");
-				for (int i = 0; i < 4; i++) Modules[i]->Calibrate(calidx == -1, (calidx == i) ? Joy->GetZ()*Joy->GetRawAxis(4) : 0);
-				if (calidx >= 0)
+				if (MyCal == kAngle)
 				{
-					ds->PrintfLine(DriverStationLCD::kUser_Line2, "ANGLE ADJUST");
-					ds->PrintfLine(DriverStationLCD::kUser_Line3, "selected wheel %d", calidx);
+					for (int i = 0; i < 4; i++) Modules[i]->Calibrate(false);
 				}
-				else
+				if ((Modules[0]->IsCalibrated())&&(Modules[2]->IsCalibrated())&&(Modules[3]->IsCalibrated()))//&&(Modules[1]->IsCalibrated())
+				{
+					MyCal = kTopSpeed;
+				}
+				if (MyCal == kTopSpeed)
 				{
 					lowest = 9999;
 					for (int i = 0; i < 4; i++)
 					{
+						Modules[i]->Calibrate(true);
 						float gv = Modules[i]->GetSpeed();
 						if ((gv < lowest) && (gv > 10)) lowest = gv;
 					}
 					for (int i = 0; i < 4; i++) Modules[i]->SetTopSpeed(lowest);
-	
 					ds->PrintfLine(DriverStationLCD::kUser_Line2, "TOP SPEED");
 					ds->PrintfLine(DriverStationLCD::kUser_Line3, "lowest %.2f", lowest);
+					if (Joy->GetRawButton(2) == true)
+					{
+						MyCal = kVictor;
+					}
 				}
-				if (Joy->GetRawButton(11)) CalKeyCombo = false;
-				if (Joy->GetRawButton(12))
+				if (MyCal == kVictor)
 				{
-					calidx = -2;
+					for (int i = 0; i < 4; i++)
+					{
+						Modules[i]->Calibrate(false);
+						Modules[i]->ManualVictor(Joy->GetY());
+					}
+				}
+				if ((Joy->GetRawButton(11)))
+				{
 					CalKeyCombo = false;
+					MyCal = kAngle;
 				}
 			}
 			else
@@ -129,14 +146,11 @@ public:
 				if (IsCalibrating)
 				{
 					ds->Clear();
-					if (calidx > -2)
-					{
-						float values[5];
-						values[0] = lowest;
-						for (int i = 0; i < 4; i++) Modules[i]->SetOffset(Modules[i]->GetAngle() - (0.5*kPi));
-						for (int i = 0; i < 4; i++) values[i + 1] = Modules[i]->GetOffset();
-						CalFile->Write(values);
-					}
+					float values[5];
+					values[0] = lowest;
+					for (int i = 0; i < 4; i++) Modules[i]->SetOffset((0.5*kPi*(i+1))+Modules[i]->GetAngle());
+					for (int i = 0; i < 4; i++) values[i + 1] = Modules[i]->GetOffset();
+					CalFile->Write(values);
 					IsCalibrating = false;
 				}
 				

@@ -3,21 +3,24 @@
 #include "ParadoxMath.h"
 #include "math.h"
 
-const UINT32 kSpeed_CPR = 56;
+const float width  = 21.3458369f; //These are floats because of future iterations of the code
+const float lenght = 29.8458369f; //in case the dimensions of the bot change and the atan() function asks for floats
+
+const UINT32 kSpeed_CPR = 25;
 
 const float kCalibrateVoltage = 11.5f;
 const float kDeadZone = 0.15f;
-const float kMoveMutexEagerness = 0;
 
 const float kPi = 4*atan(1);
 
-ParadoxModule::ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc, UINT32 quadrant,
+ParadoxModule::ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc, UINT32 quadrant, UINT32 c_sens,
 		float a_P, float a_I, float a_D, float s_P, float s_I, float s_D)
 {
-	Angle	= new CANJaguar(angle_w);
+	Angle	= new Victor(angle_w);
 	Speed	= new CANJaguar(speed_w, CANJaguar::kSpeed);
 	POT		= new ParadoxAnalogChannel(absenc);
-
+	Calibrate_sens = new DigitalInput(c_sens);
+	
 	AngPID	= new PIDController(a_P, a_I, a_D, POT, Angle);
 	AngPID->Enable();
 	AngPID->SetInputRange(kAngle_Min,kAngle_Max);
@@ -29,11 +32,18 @@ ParadoxModule::ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc, UINT3
 	Speed->ConfigEncoderCodesPerRev(kSpeed_CPR);
 	Speed->SetPID(s_P, s_I, s_D);
 
-	if (quadrant == 1) Wdir = 0.75 * kPi;
-	if (quadrant == 2) Wdir = 1.25 * kPi;
-	if (quadrant == 3) Wdir = 1.75 * kPi;
-	if (quadrant == 4) Wdir = 0.25 * kPi;
+	if (quadrant == 1) Wdir = atan(lenght/width) + (0.5 * kPi);
+	if (quadrant == 2) Wdir = (1.5 * kPi) - atan(lenght/width);
+	if (quadrant == 3) Wdir = atan(lenght/width) + (1.5 * kPi);
+	if (quadrant == 4) Wdir = (.5 * kPi) - atan(lenght/width);
+	/*if (quadrant == 1) Wdir = (1.5 * kPi) - atan(lenght/width);
+	if (quadrant == 2) Wdir = atan(lenght/width) + (0.5 * kPi);
+	if (quadrant == 3) Wdir = (.5 * kPi) - atan(lenght/width);
+	if (quadrant == 4) Wdir = atan(lenght/width) + (1.5 * kPi);
+	*/
+	
 	WasCalibrating = false;
+	Is_Calibrated   = false;
 }
 
 float ParadoxModule::SetPropose(float mag, float dir, float w, float heading)
@@ -82,17 +92,16 @@ void ParadoxModule::SetCommit(float max)
 		Speed->EnableControl();
 		WasCalibrating = false;
 	}
-	ang_proposal += Offset;
+	ang_proposal -= Offset;
 	while (ang_proposal > 2*kPi) ang_proposal -= 2*kPi;
 	while (ang_proposal < 0) ang_proposal += 2*kPi;
 	if (spd_proposal != 0) AngPID->SetSetpoint((5/(2*kPi))*ang_proposal);
-	float movement_mutex = fabs(ang_proposal - ((2*kPi / 5)*POT->GetVoltage())) * kMoveMutexEagerness;
-	if (movement_mutex < 1) movement_mutex = 1;
 	if (max < 1) max = 1;
-	Speed->Set(((spd_proposal / max) / movement_mutex)*TopSpeed);
+	spd_proposal *= -1.0;
+	Speed->Set((spd_proposal / max)*TopSpeed);
 }
 
-void ParadoxModule::Calibrate(bool run_speed, float twist)
+void ParadoxModule::Calibrate(bool run_speed)
 {
 	if (!WasCalibrating)
 	{
@@ -103,7 +112,24 @@ void ParadoxModule::Calibrate(bool run_speed, float twist)
 		WasCalibrating = true;
 	}
 	Speed->Set(run_speed ? kCalibrateVoltage : 0);
-	Angle->Set(-1.0*twist);
+	if (Calibrate_sens->Get() == 0)
+	{
+		Angle->Set(0);
+		Is_Calibrated = true;
+	}
+	else 
+	{
+		Angle->Set(.1);
+		Is_Calibrated = false;
+	}
+}
+
+void ParadoxModule::ManualVictor(float speed)
+{
+	if (WasCalibrating)
+	{
+		Angle->Set(speed);
+	}
 }
 
 void ParadoxModule::SetTopSpeed(float ts)
@@ -124,7 +150,11 @@ void ParadoxModule::AllStop()
 }
 void ParadoxModule::Dump(DriverStationLCD *ds,int column)
 {
-	ds->Printf(DriverStationLCD::kUser_Line5,column,"I: %.0f",Angle->GetOutputCurrent());
+	//ds->Printf(DriverStationLCD::kUser_Line5,column,"I: %.0f",Angle->GetOutputCurrent());
+}
+bool ParadoxModule::IsCalibrated()
+{
+	return Is_Calibrated;
 }
 float ParadoxModule::GetSpeed() {return Speed->GetSpeed();}
 float ParadoxModule::GetAngle() {return (2.0*kPI / 5) * POT->GetVoltage();}
