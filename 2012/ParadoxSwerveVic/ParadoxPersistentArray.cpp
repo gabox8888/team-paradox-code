@@ -49,7 +49,7 @@ float ParadoxPersistentArray::Read(int idx)
 void ParadoxPersistentArray::Write(float varray[])
 {
 	file = fopen(fname.c_str(), "w");
-	fprintf(file,"Speed: %f/n",varray[0]);
+	fprintf(file,"Speed: %f\n",varray[0]);
 	fprintf(file,"Module1: %f\n",varray[1]);
 	fprintf(file,"Module2: %f\n",varray[2]);
 	fprintf(file,"Module3: %f\n",varray[3]);
