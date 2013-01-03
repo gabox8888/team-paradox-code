@@ -35,6 +35,7 @@ public:
 	void AllStop();
 	void Dump(DriverStationLCD *ds,int column);
 	bool IsCalibrated();
+	void GoHome(bool home);
 	
 	float GetSpeed();
 	float GetAngle();
@@ -51,6 +52,8 @@ protected:
 	float Offset;
 	bool WasCalibrating;
 	bool Is_Calibrated;
+	bool Is_Range;
+	bool Is_Home;
 	ParadoxAnalogChannel *POT;
 	Victor *Angle;
 	CANJaguar *Speed;

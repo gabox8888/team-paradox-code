@@ -1,6 +1,6 @@
 #include "ParadoxLib.h"
 
-const float kStallCurrent = 20;
+const float kStallCurrent = 30;
 const float kStallTimeLimit = 1;
 
 const float kPi = 4*atan(1);
@@ -24,9 +24,10 @@ class ParadoxBot : public IterativeRobot
 	CalMode MyCal;
 	
 	float lowest;
+	float StallTime;
+	bool GoFwd;
 	bool IsCalibrating;
 	bool StallLock;
-	float StallTime;
 	bool CalKeyCombo;
 
 public:
@@ -34,10 +35,10 @@ public:
 	{
 		printf("Ctor\n"); 
 									// v   j   as q  rs  p    i    d    p    i      d
-		Modules[0] = new ParadoxModule(10, 11, 4, 1, 3, 0.3, 0.0001, 0.0, 0.7, 0.005, 0.0); //White Two
-		Modules[1] = new ParadoxModule(9,  22, 7, 2, 4, 0.3, 0.0001, 0.0, 0.7, 0.005, 0.0); //Blue One
-		Modules[2] = new ParadoxModule(7,  33, 5, 3, 2, 0.3, 0.0001, 0.0, 0.7, 0.005, 0.0); //Blue Two
-		Modules[3] = new ParadoxModule(8,  44, 6, 4, 1, 0.3, 0.0001, 0.0, 0.7, 0.005, 0.0); //White One
+		Modules[0] = new ParadoxModule(10, 11, 4, 1, 3, 0.4, 0.04, 0.2, 0.7, 0.005, 0.0); //White Two
+		Modules[1] = new ParadoxModule(9,  22, 7, 2, 4, 0.4, 0.04, 0.2, 0.7, 0.005, 0.0); //Blue One
+		Modules[2] = new ParadoxModule(7,  33, 5, 3, 2, 0.4, 0.04, 0.2, 0.7, 0.005, 0.0); //Blue Two
+		Modules[3] = new ParadoxModule(8,  44, 6, 4, 1, 0.4, 0.04, 0.2, 0.7, 0.005, 0.0); //White One
 		
 		//bpAuto = new ParadoxAutoLang("auto.pal");
 
@@ -55,6 +56,7 @@ public:
 
 		SetPeriod(0.05);
 		StallLock = false;
+		GoFwd = false;
 	};
 
 	~ParadoxBot(){}
@@ -87,7 +89,7 @@ public:
 			ds->PrintfLine(DriverStationLCD::kUser_Line2, "!!! STALL CURRENT REACHED");
 			ds->PrintfLine(DriverStationLCD::kUser_Line3, "!!! Press Button 7 To Unlock");
 			ds->PrintfLine(DriverStationLCD::kUser_Line4, "!!!");
-			if (Joy->GetRawButton(7)) StallLock = false;
+			if (Joy->GetRawButton(3)) StallLock = false;
 			else {for (int i = 0; i < 4; i++) Modules[i]->AllStop();}
 		}
 		else
@@ -106,7 +108,7 @@ public:
 				{
 					for (int i = 0; i < 4; i++) Modules[i]->Calibrate(false);
 				}
-				if ((Modules[0]->IsCalibrated())&&(Modules[2]->IsCalibrated())&&(Modules[3]->IsCalibrated()))//&&(Modules[1]->IsCalibrated())
+				if ((Modules[1]->IsCalibrated())&&(Modules[2]->IsCalibrated())&&(Modules[3]->IsCalibrated()))//&&(Modules[1]->IsCalibrated())
 				{
 					MyCal = kTopSpeed;
 				}
@@ -122,7 +124,7 @@ public:
 					for (int i = 0; i < 4; i++) Modules[i]->SetTopSpeed(lowest);
 					ds->PrintfLine(DriverStationLCD::kUser_Line2, "TOP SPEED");
 					ds->PrintfLine(DriverStationLCD::kUser_Line3, "lowest %.2f", lowest);
-					if (Joy->GetRawButton(2) == true)
+					if (Joy->GetRawButton(8) == true)
 					{
 						MyCal = kVictor;
 					}
@@ -135,7 +137,7 @@ public:
 						Modules[i]->ManualVictor(Joy->GetY());
 					}
 				}
-				if ((Joy->GetRawButton(11)))
+				if ((Joy->GetRawButton(7)))
 				{
 					CalKeyCombo = false;
 					MyCal = kAngle;
@@ -154,12 +156,13 @@ public:
 					IsCalibrating = false;
 				}
 				
-				if (Joy->GetRawButton(8)) gyro->Reset();
-	
+				if (Joy->GetRawButton(2)) gyro->Reset();
+				if (Joy->GetRawAxis(5))GoFwd = true; //i think that this is the correct axis but i am not sure
+				
 				float highest = 1;
 				
 				float dir;
-				if (Joy->GetRawButton(2))
+				if (Joy->GetRawButton(6))
 				{
 					if ((Joy->GetDirectionDegrees() > -22.5)&&(Joy->GetDirectionDegrees()<= 22.5))dir = 0;
 					if ((Joy->GetDirectionDegrees() >  22.5)&&(Joy->GetDirectionDegrees()<= 67.5))dir = 45;
@@ -178,12 +181,51 @@ public:
 				}
 				dir *= (kPi/180);
 				
-				for (int i = 0; i < 4; i++)
+				if (GoFwd)
 				{
-					float sp = Modules[i]->SetPropose(Joy->GetMagnitude(), dir, (Joy->GetRawButton(2)) ? 0 : Joy->GetZ(), (kPi / 180) * gyro->GetAngle());
-					if (sp > highest) highest = sp;
+					if (gyro->GetAngle()<0.2)//this might be flipped 
+					{
+						{
+							for (int i = 0; i < 4; i++)
+							{
+								float sp = Modules[i]->SetPropose(0, 0,0.5, (kPi / 180) * gyro->GetAngle());
+								if (sp > highest) highest = sp;
+							}
+						}
+						for (int i = 0; i < 4; i++) Modules[i]->SetCommit(highest);
+					}
+					else if (gyro->GetAngle()>0.2)
+					{
+						{
+							for (int i = 0; i < 4; i++)
+							{
+								float sp = Modules[i]->SetPropose(0, 0,-0.5, (kPi / 180) * gyro->GetAngle());
+								if (sp > highest) highest = sp;
+							}	
+						}
+						for (int i = 0; i < 4; i++) Modules[i]->SetCommit(highest);
+					}
+					else
+					{
+						{
+							for (int i = 0; i < 4; i++)
+							{
+								float sp = Modules[i]->SetPropose(0, 0,0, (kPi / 180) * gyro->GetAngle());
+								if (sp > highest) highest = sp;
+							}
+						}
+						for (int i = 0; i < 4; i++) Modules[i]->SetCommit(highest);
+					}
 				}
-				for (int i = 0; i < 4; i++) Modules[i]->SetCommit(highest);
+				else
+				{
+					for (int i = 0; i < 4; i++)
+					{
+						float sp = Modules[i]->SetPropose(Joy->GetMagnitude(), dir, (Joy->GetRawButton(2)) ? 0 : Joy->GetRawAxis(4), (kPi / 180) * gyro->GetAngle());
+						if (sp > highest) highest = sp;
+					}
+					for (int i = 0; i < 4; i++) Modules[i]->SetCommit(highest);
+				}
 	
 				ds->PrintfLine(DriverStationLCD::kUser_Line1, "FRONT (get spd)");
 				ds->PrintfLine(DriverStationLCD::kUser_Line2, "%.0f %.0f",

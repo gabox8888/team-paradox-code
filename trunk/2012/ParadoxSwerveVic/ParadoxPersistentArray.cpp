@@ -13,7 +13,7 @@ ParadoxPersistentArray::ParadoxPersistentArray(string fn, int array_cnt)
 void ParadoxPersistentArray::UpdateArray()
 {
 	char buffer[20];
-	file = fopen(fname.c_str(), "r");
+	file = fopen(fname.c_str(), "rb");
 	fscanf(file,"%s ",buffer);
 	if (strcmp(buffer,"Speed:") == 0)
 	{
@@ -48,7 +48,7 @@ float ParadoxPersistentArray::Read(int idx)
 
 void ParadoxPersistentArray::Write(float varray[])
 {
-	file = fopen(fname.c_str(), "w");
+	file = fopen(fname.c_str(), "wb");
 	fprintf(file,"Speed: %f\n",varray[0]);
 	fprintf(file,"Module1: %f\n",varray[1]);
 	fprintf(file,"Module2: %f\n",varray[2]);
