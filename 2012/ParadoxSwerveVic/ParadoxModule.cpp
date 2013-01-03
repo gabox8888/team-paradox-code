@@ -42,8 +42,9 @@ ParadoxModule::ParadoxModule(UINT32 angle_w,UINT32 speed_w, UINT32 absenc, UINT3
 	if (quadrant == 4) Wdir = atan(lenght/width) + (1.5 * kPi);
 	*/
 	
-	WasCalibrating = false;
+	WasCalibrating  = false;
 	Is_Calibrated   = false;
+	Is_Home 		= false;
 }
 
 float ParadoxModule::SetPropose(float mag, float dir, float w, float heading)
@@ -99,6 +100,7 @@ void ParadoxModule::SetCommit(float max)
 	if (max < 1) max = 1;
 	spd_proposal *= -1.0;
 	Speed->Set((spd_proposal / max)*TopSpeed);
+	
 }
 
 void ParadoxModule::Calibrate(bool run_speed)
@@ -155,6 +157,10 @@ void ParadoxModule::Dump(DriverStationLCD *ds,int column)
 bool ParadoxModule::IsCalibrated()
 {
 	return Is_Calibrated;
+}
+void ParadoxModule::GoHome(bool home)
+{
+	home = Is_Home;
 }
 float ParadoxModule::GetSpeed() {return Speed->GetSpeed();}
 float ParadoxModule::GetAngle() {return (2.0*kPI / 5) * POT->GetVoltage();}
