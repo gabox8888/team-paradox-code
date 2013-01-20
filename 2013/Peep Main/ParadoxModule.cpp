@@ -23,6 +23,7 @@ ParadoxModule::ParadoxModule(UINT32 channel)
 {
 	JagSpeed = new CANJaguar(channel);
 	
+	JagSpeed->ChangeControlMode(CANJaguar::kSpeed);
 	JagSpeed->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
 	JagSpeed->EnableControl();
 	JagSpeed->SetSafetyEnabled(false);
@@ -56,8 +57,9 @@ void ParadoxModule::SetRPM(float spd)
  * Determines the top speed and sets it to FltTopSpeed
  */
 
-void ParadoxModule::CalibrateTopSpeed()
+void ParadoxModule::CalibrateTopSpeed(float spd)
 {
-	JagSpeed->Set(200000);
+	JagSpeed->ChangeControlMode(CANJaguar::kPercentVbus);
+	JagSpeed->Set(spd);
 	FltTopSpeed = JagSpeed->GetSpeed();
 }
