@@ -12,7 +12,6 @@
  */
 
 #include "WPILib.h"
-#include "ParadoxModule.h"
 
 class ParadoxModule
 {
@@ -22,7 +21,7 @@ class ParadoxModule
 		
 		double GetRPM();
 		void SetRPM(float spd);
-		void CalibrateTopSpeed();
+		void CalibrateTopSpeed(float spd);
 		
 	protected:
 		CANJaguar *JagSpeed;
