@@ -12,6 +12,7 @@
  */
 
 #include "WPILib.h"
+#include "ParadoxModule.h"
 
 class ParadoxModule
 {
