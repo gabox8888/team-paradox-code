@@ -3,11 +3,14 @@
 
 #define TicksPerRev 00
 
-ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back)
+ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feed)
 {
 
-	JagFront = new CANJaguar(front);
-	JagBack	 = new CANJaguar(back);
+	JagFront 	= new CANJaguar(front);
+	JagBack	 	= new CANJaguar(back);
+	SolFeeder	= new Solenoid(feed);
+	
+	BlnIsCal = false;
 	
 	JagFront->ChangeControlMode(CANJaguar::kSpeed);
 	JagFront->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
@@ -28,4 +31,14 @@ void  ParadoxShooter::SetRPM(float speed)
 {
 	JagFront->Set(speed);
 	JagBack->Set(speed);
+}
+
+void ParadoxShooter::Calibrate(bool cal)
+{
+	
+}
+
+bool ParadoxShooter::IsCalibrated()
+{
+	return BlnIsCal;
 }
