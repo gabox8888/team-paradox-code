@@ -9,13 +9,17 @@ class ParadoxShooter
 {
 public:
 
-ParadoxShooter(UINT32 JaguarChannel);
+ParadoxShooter(UINT32 front,UINT32 back);
+	virtual ~ParadoxShooter(){}
 
-void SetRPM(float FltSpeed);
-
+void SetRPM(float speed);
 
 protected:
 
-CANJaguar *JagShooter;
+	CANJaguar *JagFront;
+	CANJaguar *JagBack;
+private:
+    DISALLOW_COPY_AND_ASSIGN(ParadoxShooter);
 
-}
+};
+#endif
