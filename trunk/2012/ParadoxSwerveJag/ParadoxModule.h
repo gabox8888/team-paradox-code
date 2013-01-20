@@ -13,27 +13,28 @@ public:
 
         virtual double PIDGet()
         {
-                return GetVoltage();
+                return kAngle_Max -GetVoltage();
         }
 };
 
 class ParadoxModule: public PIDOutput
 {
 public:
-	ParadoxModule(UINT32 angle_w, UINT32 speed_w, UINT32 absenc, UINT32 quadrant,
+	ParadoxModule(UINT32 angle_w, UINT32 speed_w, UINT32 absenc, UINT32 quadrant, UINT32 c_sens,
 			float a_P, float a_I, float a_D, float s_P, float s_I, float s_D);
 	virtual ~ParadoxModule() {}
 	
 	void PIDWrite(float output) {Angle->PIDWrite(output);}
-	void CarMode(float mag, float dir);
 	float SetPropose(float mag, float dir, float w, float heading);
 	void SetCommit(float max);
-	void Calibrate(bool run_speed, float twist);
+	void Calibrate(bool run_speed);
+	void ManualVictor(float speed);
 	void SetTopSpeed(float ts);
 	float GetOffset() {return Offset;}
 	void SetOffset(float os);
 	void AllStop();
 	void Dump(DriverStationLCD *ds,int column);
+	bool IsCalibrated();
 	
 	float GetSpeed();
 	float GetAngle();
@@ -49,9 +50,12 @@ protected:
 	float TopSpeed;
 	float Offset;
 	bool WasCalibrating;
+	bool Is_Calibrated;
 	ParadoxAnalogChannel *POT;
-	CANJaguar *Angle;
+	Victor *Angle;
 	CANJaguar *Speed;
+	DigitalInput *Calibrate_sens;
+
         
 private:
         DISALLOW_COPY_AND_ASSIGN(ParadoxModule);
