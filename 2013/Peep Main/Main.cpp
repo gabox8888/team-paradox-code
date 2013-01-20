@@ -1,12 +1,16 @@
-#include "WPILib.h"
+#include "ParadoxLib.h"
 
 
 class ParadoxBot : public IterativeRobot
 {
+	ParadoxDrive	*Drive;
+	ParadoxShooter	*Shooter;
 	
 public:
 	ParadoxBot()
 	{
+		Drive	= new ParadoxDrive (1,1,1,1);
+		Shooter	= new ParadoxShooter (1,1,1);
 		
 	};
 	~ParadoxBot(){}
@@ -23,7 +27,8 @@ public:
 	
 	void Test() 
 	{
-
+		Shooter->Calibrate(true);
+		Drive->Calibrate();
 	}
 };
 
