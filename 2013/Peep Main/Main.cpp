@@ -27,7 +27,7 @@ public:
 	
 	void Test() 
 	{
-		Shooter->Calibrate(true);
+		Shooter->Calibrate();
 		Drive->Calibrate();
 	}
 };

@@ -1,5 +1,6 @@
 
 #include "ParadoxShooter.h"
+#include "math.h"
 
 #define TicksPerRev 00
 
@@ -11,6 +12,16 @@ ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feed)
 	JagFront 	= new CANJaguar(front);//gives solenoid and jaguars reference #'s
 	JagBack	 	= new CANJaguar(back);
 	SolFeeder	= new Solenoid(feed);
+	
+	BlnIsCal = false;
+	BlnFire = false;
+	IntTimer = 0;
+	FltTopSpeed = 0.0f;
+	FltSetSpeed = 0.0f;
+	FltActualBack = JagBack->GetSpeed();
+	FltActualFront = JagFront->GetSpeed();
+	FltDiffFront = fabs(FltSetSpeed - FltActualFront);
+	FltDiffBack = fabs((FltSetSpeed*0.8) - FltActualBack);
 	
 	//initializes jaguars
 	JagFront->ChangeControlMode(CANJaguar::kSpeed);
@@ -33,11 +44,12 @@ ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feed)
 
 void  ParadoxShooter::SetRPM(float speed)
 {
-	JagFront->Set(speed);
-	JagBack->Set(speed);
+	FltSetSpeed = speed * FltTopSpeed;
+	JagFront->Set(FltSetSpeed);
+	JagBack->Set(FltSetSpeed*0.8);
 }
 
-void ParadoxShooter::Calibrate()
+float ParadoxShooter::Calibrate()
 {
 	
 	JagFront->ChangeControlMode(CANJaguar::kVoltage);//puts Jaguars in voltage mode
@@ -45,8 +57,10 @@ void ParadoxShooter::Calibrate()
 
 	JagFront->Set(1);//sets both motors to highest speed
 	JagBack->Set(1);
-        FltShooterTopSpeed = (JagFront->Get()+JagBack->Get())/2//checks how fast the jaguars are actually going 
-	BlnIsCal = true;// sets variables true so that is calibrated returns true							//and averages the speeds
+	FltTopSpeed = (JagFront->Get()+JagBack->Get())/2;//checks how fast the jaguars are actually going 
+	BlnIsCal = true;// sets variables true so that is calibrated returns true and averages the speeds
+	
+	return FltTopSpeed;
 }
 // tells if it's calibrated  
 bool ParadoxShooter::IsCalibrated()
@@ -54,33 +68,30 @@ bool ParadoxShooter::IsCalibrated()
 	return BlnIsCal;
 }
 // sets manually topspeed 
-void ParadoxShooter::SetTopSpeed(topspeed)
+void ParadoxShooter::SetTopSpeed(float topspeed)
 {
-FltTopSpeed = topspeed;
+	FltTopSpeed = topspeed;
 }
 
-void  ParadoxShooter::shoot()
+void  ParadoxShooter::Feed(bool go)
 {
-While(BlnSpeedCheck == false)
-{
-	JagFront->Set(FltTopSpeed); //starts motors speeding up
-	JagBack->Set(FltTopSpeed);
-//if the speed is within a certain error from the topspeed, it will set the solenoids
-
-if(JagFront->Get() < (FltTopSpeed+error) && JagFront->Get() > (FltTopSpeed-error))
-{
-
-	SolFeeder->Set(true);//extends solenoids
-	wait(.005);
-	SolFeeder->Set(false); // solenoids retract???
-
+	BlnFire = go;
+	IntTimer = 5;
+	if ((FltDiffBack == 10.0f) && (FltDiffFront == 10.0f) && (BlnFire == true))
+	{
+		while (IntTimer >= 0)
+		{
+			SolFeeder->Set(true);
+			IntTimer--;
+		}
+		BlnFire = false;
+	}
+	else
+	{
+		SolFeeder->Set(false);
+	}
 }
-BlnSpeedcheck=false; 
-}
 
-JagFront->Set(0);//turns off motors. 
-JagBack->Set(0);
-}
 
 
 
