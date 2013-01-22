@@ -1,6 +1,13 @@
 #ifndef PARADOXMODULE_H_
 #define PARADOXMODULE_H_
 
+/* TODO:
+Change naming from spd to speed
+Define what hardware is in a ParadoxModule-> CANJaguar and Encoder
+Define JagChannel-> Port number on the CAN network
+Change naming CalibrateTopSpeed to SetTopSpeed
+*/
+
 /*
  * ParadoxModule.h
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved.
