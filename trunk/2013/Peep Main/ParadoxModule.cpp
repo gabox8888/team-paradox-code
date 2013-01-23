@@ -1,4 +1,11 @@
 /*
+TODO:
+Create a private function (InitParadoxModule) and move all the init Jag code into it. To be called in constructor
+Collapse all the comments. No extra space in comments
+Add function to set the speed in voltage mode. Call it SetSpeedVoltage
+*/
+
+/*
  * ParadoxModule.cpp
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved
  * Paradox Module.
@@ -14,9 +21,7 @@
 
 /**
  * Constructor
- * 
  * @param channel The the address of the Jaguar on the CAN bus.
- * @param quad The quadrant in which the module is located.
  */
 
 ParadoxModule::ParadoxModule(UINT32 channel)
@@ -50,7 +55,7 @@ double ParadoxModule::GetRPM()
 
 void ParadoxModule::SetRPM(float spd)
 {
-	JagSpeed->Set(FltTopSpeed*spd);
+  JagSpeed->Set(FltTopSpeed * spd); 
 }
 
 /**
