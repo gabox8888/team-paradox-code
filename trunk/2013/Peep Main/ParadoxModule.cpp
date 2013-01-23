@@ -59,9 +59,8 @@ void ParadoxModule::SetRPM(float speed)
 
 void ParadoxModule::SetSpeedVoltage(float speed)
 {
-  JagSpeed->ChangeControlMode(CANJaguar::kVoltage);
-
-  JagSpeed->Set(); 
+  JagSpeed->ChangeControlMode(CANJaguar::kPercentVbus);
+  JagSpeed->Set(speed); 
   JagSpeed->ChangeControlMode(CANJaguar::kSpeed);
 }
 
@@ -72,7 +71,7 @@ void ParadoxModule::SetSpeedVoltage(float speed)
 void ParadoxModule::SetTopSpeed(float speed)
 {
 	JagSpeed->ChangeControlMode(CANJaguar::kPercentVbus);
-	JagSpeed->Set(spd);
+	JagSpeed->Set(speed);
 	FltTopSpeed = JagSpeed->GetSpeed();
   JagSpeed->ChangeControlMode(CANJaguar::kSpeed);
 }
