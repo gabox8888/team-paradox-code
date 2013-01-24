@@ -1,7 +1,6 @@
 /*
- * TO DO:
- * Revamp Calibrate() to collect an array of values over time and take
- * the lowest average.
+ * TODO:
+ * Comments
  */
 
 #include "ParadoxShooter.h"
@@ -147,9 +146,3 @@ void ParadoxShooter::InitJaguar()
 	JagBack->ConfigEncoderCodesPerRev(TicksPerRev);
 	JagBack->SetPID(0,0,0);
 }
-
-
-
-
-
-
