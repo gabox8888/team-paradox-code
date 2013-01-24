@@ -4,7 +4,6 @@
  * Paradox Drive.
  * This class serves to create an object in the code that represents a collection
  * of four independently controlled gearboxes.
- * 
  * Authors: Paradox++
  */
 
@@ -12,7 +11,6 @@
 
 /**
  * Constructor
- * 
  * @param JagOne The the address of a Jaguar on the CAN bus.
  * @param JagTwo The the address of a Jaguar on the CAN bus.
  * @param JagThree The the address of a Jaguar on the CAN bus.
@@ -42,7 +40,6 @@ void ParadoxDrive::Calibrate()
 /**
  * Provide tank steering.
  * This function lets you directly provide joystick values from any source.
- * 
  * @param left The value of the left stick.
  * @param right The value of the right stick.
  */
@@ -62,7 +59,6 @@ void ParadoxDrive::TankDrive(float left, float right)
 /**
  * Arcade drive implements single stick driving.
  * This function lets you directly provide joystick values from any source.
- * 
  * @param move The value to use for fowards/backwards
  * @param rotate The value to use for the rotate right/left
  */
