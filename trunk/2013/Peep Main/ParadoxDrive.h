@@ -7,7 +7,6 @@
  * Paradox Drive.
  * This class serves to create an object in the code that represents a collection
  * of four independently controlled gearboxes.
- * 
  * Authors: Paradox++
  */
 
