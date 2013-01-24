@@ -13,6 +13,7 @@
 
 #include "WPILib.h"
 #include "ParadoxModule.h"
+#include "ParadoxDrive.h"
 
 class ParadoxDrive
 {
