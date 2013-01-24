@@ -3,7 +3,8 @@
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved.
  * Paradox Drive.
  * This class serves to create an object in the code that represents a collection
- * of four independently controlled gearboxes.
+ * of four independently controlled gearboxes, the Jaguars controlling them, and 
+ * the encoders attached to those Jaguars.
  * Authors: Paradox++
  */
 
