@@ -1,46 +1,88 @@
+/*
+ * TO DO:
+ * Revamp Calibrate() to collect an array of values over time and take
+ * the lowest average.
+ */
 
 #include "ParadoxShooter.h"
 #include "math.h"
 
+/*  
+ * ParadoxShooter.h 
+ * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved. 
+ * Paradox Shooter. 
+ * This class serves to create an object in the code that represents a disc shooter
+ * and all of the associated sensors, motors, and pneumatics.
+ * Authors: Paradox++ 
+ */ 
+
 #define TicksPerRev 00
 
-#define error 1
+/** 
+ * Constructor 
+ * @param front The address of the front mounted Jaguar on the CAN bus.
+ * @param back The address of the rear mounted Jaguar on the CAN bus.
+ * @param feed The 
+ */ 
 
-ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feed)
+ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32 feedin)
 {
-
 	JagFront 	= new CANJaguar(front);//gives solenoid and jaguars reference #'s
 	JagBack	 	= new CANJaguar(back);
-	SolFeeder	= new Solenoid(feed);
-	
-	BlnIsCal = false;
-	BlnFire = false;
-	IntTimer = 0;
-	FltTopSpeed = 0.0f;
-	FltSetSpeed = 0.0f;
-	FltActualBack = JagBack->GetSpeed();
-	FltActualFront = JagFront->GetSpeed();
-	FltDiffFront = fabs(FltSetSpeed - FltActualFront);
-	FltDiffBack = fabs((FltSetSpeed*0.8) - FltActualBack);
-	
-	//initializes jaguars
-	JagFront->ChangeControlMode(CANJaguar::kSpeed);
-	JagFront->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
-	JagFront->EnableControl();
-	JagFront->SetSafetyEnabled(false);
-	JagFront->ConfigEncoderCodesPerRev(TicksPerRev);
-	JagFront->SetPID(0,0,0);
-	
-//ditto for back 
-	JagBack->ChangeControlMode(CANJaguar::kSpeed);
-	JagBack->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
-	JagBack->EnableControl();
-	JagBack->SetSafetyEnabled(false);
-	JagBack->ConfigEncoderCodesPerRev(TicksPerRev);
-	JagBack->SetPID(0,0,0);
+	SolFeeder	= new Solenoid(feedout, feedin);
+
+	InitParadoxShooter();
 }
 
-// sets speed
+/**
+ * Determines the average top speed of both the front and rear Jaguars
+ * and returns that number for output to a text file.
+ * @return FltTopSpeed The average top speed from both Jaguars.
+ */
+
+float ParadoxShooter::Calibrate()
+{
+	JagFront->ChangeControlMode(CANJaguar::kPercentVbus);
+	JagBack->ChangeControlMode(CANJaguar::kPercentVbus);
+
+	JagFront->Set(1);
+	JagBack->Set(1);
+	for(int i = 0, i++, i < 5)
+	{
+		float FltAverage = 0;
+
+		if(i > 0)
+		{
+			FltAverage =+ JagFront->GetSpeed();
+		}
+	}
+	BlnIsCal = true;
+	FltTopSpeed = FltAverage/4;
+	return FltTopSpeed;
+
+}
+
+/**
+ * Takes the top speed as an input, probably from a text file, and writes
+ * it to FltTopSpeed.
+ * @param topspeed The previously determined top speed from the Calibrate().
+ * function
+ */
+
+void ParadoxShooter::SetTopSpeed(float topspeed)
+{
+	FltTopSpeed = topspeed;
+}
+
+/**
+ * Returns whether or not the shooter has been calibrated.
+ * @return BlnIsCal Represents whether or not Calibrate() has been run.
+ */
+
+bool ParadoxShooter::IsCalibrated()
+{
+	return BlnIsCal;
+}
 
 void  ParadoxShooter::SetRPM(float speed)
 {
@@ -49,33 +91,9 @@ void  ParadoxShooter::SetRPM(float speed)
 	JagBack->Set(FltSetSpeed*0.8);
 }
 
-float ParadoxShooter::Calibrate()
+void  ParadoxShooter::Feed(bool primed)
 {
-	
-	JagFront->ChangeControlMode(CANJaguar::kVoltage);//puts Jaguars in voltage mode
-	JagBack->ChangeControlMode(CANJaguar::kVoltage);
-
-	JagFront->Set(1);//sets both motors to highest speed
-	JagBack->Set(1);
-	FltTopSpeed = (JagFront->Get()+JagBack->Get())/2;//checks how fast the jaguars are actually going 
-	BlnIsCal = true;// sets variables true so that is calibrated returns true and averages the speeds
-	
-	return FltTopSpeed;
-}
-// tells if it's calibrated  
-bool ParadoxShooter::IsCalibrated()
-{
-	return BlnIsCal;
-}
-// sets manually topspeed 
-void ParadoxShooter::SetTopSpeed(float topspeed)
-{
-	FltTopSpeed = topspeed;
-}
-
-void  ParadoxShooter::Feed(bool go)
-{
-	BlnFire = go;
+	BlnFire = primed;
 	IntTimer = 5;
 	if ((FltDiffBack == 10.0f) && (FltDiffFront == 10.0f) && (BlnFire == true))
 	{
@@ -91,6 +109,45 @@ void  ParadoxShooter::Feed(bool go)
 		SolFeeder->Set(false);
 	}
 }
+
+void ParadoxShooter::AllStop()
+{
+	JagFront->Set(0);
+	JagBack->Set(0);
+}
+
+void ParadoxShooter::InitParadoxShooter()
+{
+	InitJaguar();
+
+	BlnIsCal = false;
+	BlnFire = false;
+	IntTimer = 0;
+	FltTopSpeed = 999.0f;
+	FltSetSpeed = 0.0f;
+	FltActualBack = JagBack->GetSpeed();
+	FltActualFront = JagFront->GetSpeed();
+	FltDiffFront = fabs(FltSetSpeed - FltActualFront);
+	FltDiffBack = fabs((FltSetSpeed*0.8) - FltActualBack);
+}
+
+void ParadoxShooter::InitJaguar()
+{
+	JagFront->ChangeControlMode(CANJaguar::kSpeed);
+	JagFront->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
+	JagFront->EnableControl();
+	JagFront->SetSafetyEnabled(false);
+	JagFront->ConfigEncoderCodesPerRev(TicksPerRev);
+	JagFront->SetPID(0,0,0);
+
+	JagBack->ChangeControlMode(CANJaguar::kSpeed);
+	JagBack->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
+	JagBack->EnableControl();
+	JagBack->SetSafetyEnabled(false);
+	JagBack->ConfigEncoderCodesPerRev(TicksPerRev);
+	JagBack->SetPID(0,0,0);
+}
+
 
 
 
