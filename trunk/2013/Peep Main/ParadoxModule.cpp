@@ -1,9 +1,4 @@
 /*
-TO DO:
-Finish SetSpeedVoltage. Convert Joystick input into Voltage.
-*/
-
-/*
  * ParadoxModule.h
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved.
  * Paradox Module.
@@ -13,7 +8,6 @@ Finish SetSpeedVoltage. Convert Joystick input into Voltage.
  * on the CAN bus.
  * Authors: Paradox++
  */
-
 
 #include "ParadoxModule.h"
 
