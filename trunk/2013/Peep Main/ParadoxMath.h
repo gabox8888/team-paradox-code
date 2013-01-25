@@ -12,7 +12,8 @@ class ParadoxMath
         ParadoxMath();
         virtual ~ParadoxMath() {}
         float GetLowest(float array[]);
-       
+        float FltLowValue;
+
    private:
         DISALLOW_COPY_AND_ASSIGN(ParadoxMath);
 };
