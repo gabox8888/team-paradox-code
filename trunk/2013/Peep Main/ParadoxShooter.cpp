@@ -46,14 +46,15 @@ float ParadoxShooter::Calibrate()
 
 	JagFront->Set(1);
 	JagBack->Set(1);
-	for(int i = 0, i++, i < 5)
-	{
-		float FltAverage = 0;
+	 float FltAverage = 0;
 
+for(int i = 0, i++, i < 5)
+	{
+	  
 		if(i > 0)
 		{
 			FltAverage =+ JagFront->GetSpeed();
-		}
+  }
 	}
 	BlnIsCal = true;
 	FltTopSpeed = FltAverage/4;
