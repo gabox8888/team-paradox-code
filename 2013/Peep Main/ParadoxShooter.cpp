@@ -5,6 +5,7 @@
 
 #include "ParadoxShooter.h"
 #include "math.h"
+#include "ParadoxMath.h"
 
 /*  
  * ParadoxShooter.h 
@@ -29,6 +30,8 @@ ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32
 	JagFront 	= new CANJaguar(front);//gives solenoid and jaguars reference #'s
 	JagBack	 	= new CANJaguar(back);
 	SolFeeder	= new Solenoid(feedout, feedin);
+   
+  ModuleCalculator = new ParadoxMath;   
 
 	InitParadoxShooter();
 }
@@ -53,13 +56,11 @@ float ParadoxShooter::Calibrate()
 	  
 		if(i > 0)
 		{
-     FltAverage =+ JagFront->GetSpeed();
+         
     }
-	}
 	BlnIsCal = true;
-	FltTopSpeed = FltAverage/4;
-	return FltTopSpeed;
-
+		return FltTopSpeed;
+  
 }
 
 /**
