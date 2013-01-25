@@ -46,15 +46,15 @@ float ParadoxShooter::Calibrate()
 
 	JagFront->Set(1);
 	JagBack->Set(1);
-	 float FltAverage = 0;
+	float FltAverage = 0;
 
-for(int i = 0, i++, i < 5)
-	{
+  for(int i = 0, i++, i < 5)
+  {
 	  
 		if(i > 0)
 		{
-			FltAverage =+ JagFront->GetSpeed();
-  }
+     FltAverage =+ JagFront->GetSpeed();
+    }
 	}
 	BlnIsCal = true;
 	FltTopSpeed = FltAverage/4;
@@ -88,7 +88,10 @@ void  ParadoxShooter::SetRPM(float speed)
 {
 	FltSetSpeed = speed * FltTopSpeed;
 	JagFront->Set(FltSetSpeed);
-	JagBack->Set(FltSetSpeed*0.8);
+  JagBack->Set(FltSetSpeed*0.8);
+  FltDiffFront = fabs(FltSetSpeed - FltActualFront);
+	FltDiffBack = fabs((FltSetSpeed*0.8) - FltActualBack);
+
 }
 
 void  ParadoxShooter::Feed(bool primed)
@@ -127,8 +130,6 @@ void ParadoxShooter::InitParadoxShooter()
 	FltSetSpeed = 0.0f;
 	FltActualBack = JagBack->GetSpeed();
 	FltActualFront = JagFront->GetSpeed();
-	FltDiffFront = fabs(FltSetSpeed - FltActualFront);
-	FltDiffBack = fabs((FltSetSpeed*0.8) - FltActualBack);
 }
 
 void ParadoxShooter::InitJaguar()
