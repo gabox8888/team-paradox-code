@@ -88,7 +88,7 @@ void  ParadoxShooter::SetRPM(float speed)
 {
 	FltSetSpeed = speed * FltTopSpeed;
 	JagFront->Set(FltSetSpeed);
-  JagBack->Set(FltSetSpeed*0.8);
+  JagBack->Set(FltSetSpeed*0.8);//80% of front wheel's speed will gradually increase speed of frisbee
   FltDiffFront = fabs(FltSetSpeed - FltActualFront);
 	FltDiffBack = fabs((FltSetSpeed*0.8) - FltActualBack);
 
