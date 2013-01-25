@@ -14,6 +14,7 @@
 
 #include "WPILib.h"
 #include "ParadoxModule.h"
+#include "ParadoxMath.h"
 
 class ParadoxModule
 {
@@ -28,9 +29,10 @@ public:
 		
 	protected:
 		CANJaguar *JagSpeed;
-		
+		ParadoxMath *ModuleCalculator;
 		float FltTopSpeed;
-		
+	  Float FltAvgNum[4];  	
+
   private:
     void InitParadoxModule();
     DISALLOW_COPY_AND_ASSIGN(ParadoxModule);
