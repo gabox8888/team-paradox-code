@@ -1,4 +1,4 @@
-#summary One-sentence summary of this page.
+#summary C++ coding style
 #labels C,Style
 C++ coding style guide for Team Paradox
 
