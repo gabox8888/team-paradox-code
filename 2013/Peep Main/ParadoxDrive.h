@@ -14,6 +14,8 @@
 #include "WPILib.h"
 #include "ParadoxModule.h"
 #include "ParadoxDrive.h"
+#include "ParadoxPersistentArray.h"
+#include "ParadoxMath.h"
 
 class ParadoxDrive
 {
@@ -21,15 +23,21 @@ class ParadoxDrive
 		ParadoxDrive(UINT32 JagOne, UINT32 JagTwo, UINT32 JagThree, UINT32 JagFour);
 		virtual ~ParadoxDrive(){};
 		
-		void Calibrate();
+		void Calibrate(bool enabled);
 		void TankDrive(float left, float right);
 		void ArcadeDrive(float move, float rotate);
+		void Dump(DriverStationLCD *ds);
+		
 		
 	protected:
 		ParadoxModule *ModuleOne;
 		ParadoxModule *ModuleTwo;
 		ParadoxModule *ModuleThree;
 		ParadoxModule *ModuleFour;
+		ParadoxPersistentArray *PersArrayCalibration;
+		bool BlnIsCalibrating;
+		float FltLowest;
+		float FltArrayTopSpeeds[4];
 		
 	private:
         DISALLOW_COPY_AND_ASSIGN(ParadoxDrive);

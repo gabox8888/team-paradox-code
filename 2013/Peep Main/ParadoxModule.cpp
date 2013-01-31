@@ -11,7 +11,7 @@
 
 #include "ParadoxModule.h"
 
-#define TicksPerRev 00
+#define TicksPerRev 17
 
 /**
  * Constructor
@@ -53,9 +53,10 @@ void ParadoxModule::SetRPM(float speed)
 
 void ParadoxModule::SetSpeedVoltage(float speed)
 {
+  printf("Voltage In /n");
   JagSpeed->ChangeControlMode(CANJaguar::kPercentVbus);
   JagSpeed->Set(speed); 
-  JagSpeed->ChangeControlMode(CANJaguar::kSpeed);
+  printf("Voltage Out /n");
 }
 
 /**
@@ -64,12 +65,17 @@ void ParadoxModule::SetSpeedVoltage(float speed)
 
 void ParadoxModule::SetTopSpeed(float speed)
 {
-	JagSpeed->ChangeControlMode(CANJaguar::kPercentVbus);
-	JagSpeed->Set(speed);
-	FltTopSpeed = JagSpeed->GetSpeed();
-  JagSpeed->ChangeControlMode(CANJaguar::kSpeed);
+	FltTopSpeed = speed;
 }
 
+float ParadoxModule::Calibrate()
+{
+		JagSpeed->ChangeControlMode(CANJaguar::kPercentVbus);
+		JagSpeed->Set(1.0f);
+		
+		return JagSpeed->GetSpeed();
+  
+}
 /*
  * Initialization code for the Jaguar.
  */

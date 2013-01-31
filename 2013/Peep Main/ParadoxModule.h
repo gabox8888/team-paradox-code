@@ -14,28 +14,27 @@
 
 #include "WPILib.h"
 #include "ParadoxModule.h"
-#include "ParadoxMath.h"
 
 class ParadoxModule
 {
-public:			
-		ParadoxModule(UINT32 JagChannel);
+	public:			
+	ParadoxModule(UINT32 JagChannel);
 		virtual ~ParadoxModule(){};
 		
 		double GetRPM();
-    void SetRPM(float speed);
-    void SetSpeedVoltage(float speed);
+		void SetRPM(float speed);
+		void SetSpeedVoltage(float speed);
 		void SetTopSpeed(float speed);
+		float Calibrate();
 		
 	protected:
+		void InitParadoxModule();
 		CANJaguar *JagSpeed;
-		ParadoxMath *ModuleCalculator;
 		float FltTopSpeed;
-	  Float FltAvgNum[4];  	
+		float FltAvgNum[4];  	
 
-  private:
-    void InitParadoxModule();
-    DISALLOW_COPY_AND_ASSIGN(ParadoxModule);
+	private:
+		DISALLOW_COPY_AND_ASSIGN(ParadoxModule);
 };
 
 #endif

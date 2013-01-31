@@ -14,6 +14,7 @@ ParadoxTracker(UINT32 servo);
 	float GetAngle();
 	void Sweep(bool sweep);
 	void Filter();
+	void Set(float angle);
 	
 protected:
 	AxisCamera	*CamMain;

@@ -24,18 +24,38 @@ ParadoxDrive::ParadoxDrive(UINT32 JagOne, UINT32 JagTwo, UINT32 JagThree, UINT32
 	ModuleTwo	= new ParadoxModule(JagTwo);
 	ModuleThree = new ParadoxModule(JagThree);
 	ModuleFour 	= new ParadoxModule(JagFour);
+	PersArrayCalibration = new ParadoxPersistentArray("drivecalibration.txt", 1);
+	BlnIsCalibrating = false;
 }
 
 /**
  * Calibrates the top speed for each jaguar.
  */
 
-void ParadoxDrive::Calibrate()
+void ParadoxDrive::Calibrate(bool enabled)
 {
-	ModuleOne->CalibrateTopSpeed(1.0f);
-	ModuleTwo->CalibrateTopSpeed(1.0f);
-	ModuleThree->CalibrateTopSpeed(1.0f);
-	ModuleFour->CalibrateTopSpeed(1.0f);
+	if (enabled == true && BlnIsCalibrating == false) BlnIsCalibrating = true;
+	if (BlnIsCalibrating == true)
+	{
+		FltArrayTopSpeeds[0] = ModuleOne->Calibrate();
+		FltArrayTopSpeeds[1] = ModuleTwo->Calibrate();
+		FltArrayTopSpeeds[2] = ModuleThree->Calibrate();
+		FltArrayTopSpeeds[3] = ModuleFour->Calibrate();
+	}
+	if (enabled == false && BlnIsCalibrating == true)
+	{
+		FltLowest = 9999999;
+		for (int i = 0; i < 4; i++)
+		{
+			if ((FltArrayTopSpeeds[i] < FltLowest) && (FltArrayTopSpeeds[i] != 0))
+			{
+				FltLowest = FltArrayTopSpeeds[i];
+			}
+		}
+		PersArrayCalibration->Write(FltLowest, 0);
+		BlnIsCalibrating = false;
+	}
+	
 }
 
 /**
@@ -50,11 +70,16 @@ void ParadoxDrive::TankDrive(float left, float right)
 	float FltLeft = left;
 	float FltRight = right;
 	
-	ModuleOne->SetRPM(FltLeft);
-	ModuleThree->SetRPM(FltLeft);
+	float FltTopSpeed = PersArrayCalibration->Read(0);
+	ModuleOne->SetTopSpeed(FltTopSpeed);
+	ModuleTwo->SetTopSpeed(FltTopSpeed);
+	ModuleThree->SetTopSpeed(FltTopSpeed);
+	ModuleFour->SetTopSpeed(FltTopSpeed);
 	
-	ModuleTwo->SetRPM(FltRight);
-	ModuleFour->SetRPM(FltRight);
+	ModuleOne->SetSpeedVoltage(FltLeft);
+	ModuleTwo->SetSpeedVoltage(FltLeft);
+	ModuleThree->SetSpeedVoltage(FltRight);
+	ModuleFour->SetSpeedVoltage(FltRight);
 }
 
 /**
@@ -64,8 +89,9 @@ void ParadoxDrive::TankDrive(float left, float right)
  * @param rotate The value to use for the rotate right/left
  */
 
-void ParadoxDrive::ArcadeDrive(float move, float rotate)
-{
+void ParadoxDrive::ArcadeDrive(float rotate, float move)
+{ 
+	printf("Arcade IN");
 	float FltLeft;
 	float FltRight;
 	
@@ -101,5 +127,16 @@ void ParadoxDrive::ArcadeDrive(float move, float rotate)
 			FltRight = - max(-FltMove, -FltRotate);
 		}
 	}
-	TankDrive(FltLeft, FltRight);
+	ParadoxDrive::TankDrive(FltLeft,FltRight);
+	printf ("Arcade OUT");
+}
+void ParadoxDrive::Dump(DriverStationLCD *ds)
+{
+	ds->PrintfLine(DriverStationLCD::kUser_Line1,"Speed: %f",FltLowest);
+	ds->PrintfLine(DriverStationLCD::kUser_Line2, "MOne %f", ModuleOne->GetRPM());
+	ds->PrintfLine(DriverStationLCD::kUser_Line3, "MTwo %f", ModuleTwo->GetRPM());
+	ds->PrintfLine(DriverStationLCD::kUser_Line4, "MThree %f", ModuleThree->GetRPM());
+	ds->PrintfLine(DriverStationLCD::kUser_Line5, "MFour %f", ModuleFour->GetRPM());
+
+	ds->UpdateLCD();
 }

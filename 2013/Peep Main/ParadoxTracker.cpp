@@ -8,7 +8,7 @@ ParadoxTracker::ParadoxTracker(UINT servo)
 	
 	FltAngle = 0.0f;
 	FltSetAngle = 0.0f;
-	BlnDirection = false;
+	BlnDirection = true;
 }
 
 float ParadoxTracker::GetAngle()
@@ -19,14 +19,14 @@ float ParadoxTracker::GetAngle()
 
 void ParadoxTracker::Sweep(bool sweep)
 {
-	while (sweep)
+	if (sweep)
 	{
-		while (ParadoxTracker::GetDirection() == true)
+		if (ParadoxTracker::GetDirection() == true)
 		{
 			SrvSweep->SetAngle(FltSetAngle);
 			FltSetAngle++;
 		}
-		while (ParadoxTracker::GetDirection() == false)
+		else if (ParadoxTracker::GetDirection() == false)
 		{
 			SrvSweep->SetAngle(FltSetAngle);
 			FltSetAngle--;
@@ -50,13 +50,18 @@ void ParadoxTracker::Filter()
 	VecReport = ImgFiltered->GetOrderedParticleAnalysisReports();
 }
 
+void ParadoxTracker::Set(float angle)
+{
+	SrvSweep->Set(angle);
+}
+
 bool ParadoxTracker::GetDirection()
 {
 	if (FltSetAngle == 0)
 	{
 		BlnDirection = true;
 	}
-	if (FltSetAngle == 180)
+	if (FltSetAngle == 170)
 	{
 		BlnDirection = false;
 	}

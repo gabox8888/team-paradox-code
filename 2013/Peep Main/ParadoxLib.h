@@ -5,5 +5,6 @@
 
 #include "ParadoxDrive.h"
 #include "ParadoxShooter.h"
+#include "ParadoxTracker.h"
 
 #endif 
