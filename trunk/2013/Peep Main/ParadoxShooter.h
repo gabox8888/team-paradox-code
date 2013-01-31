@@ -12,17 +12,18 @@
 
 #include "WPILib.h"
 #include "ParadoxShooter.h"
+#include "ParadoxMath.h"
 
 class ParadoxShooter
 {
   public:
-    ParadoxShooter(UINT32 front,UINT32 back, UINT32 feed);
+    ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32 feedin);
     virtual ~ParadoxShooter(){}
-
+    
+    float FltArray[4];
     float Calibrate();
-    void SetTopSpeed(float topspeed);
     bool IsCalibrated();
-
+    void SetTopSpeed(float topspeed);
     void SetRPM(float speed);
     void Feed(bool primed);
     void AllStop();
@@ -31,6 +32,7 @@ class ParadoxShooter
     CANJaguar 		*JagFront;
     CANJaguar 		*JagBack;
     Solenoid 		*SolFeeder;
+    ParadoxMath		*ModuleCalculator;
     bool 		BlnIsCal;
     bool		BlnFire;
     int			IntTimer;

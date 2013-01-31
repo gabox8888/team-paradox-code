@@ -30,8 +30,7 @@ ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32
 	JagFront 	= new CANJaguar(front);//gives solenoid and jaguars reference #'s
 	JagBack	 	= new CANJaguar(back);
 	SolFeeder	= new Solenoid(feedout, feedin);
-   
-  ModuleCalculator = new ParadoxMath;   
+	ModuleCalculator = new ParadoxMath;   
 
 	InitParadoxShooter();
 }
@@ -45,22 +44,18 @@ ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32
 float ParadoxShooter::Calibrate()
 {
 	JagFront->ChangeControlMode(CANJaguar::kPercentVbus);
-	JagBack->ChangeControlMode(CANJaguar::kPercentVbus);
+	//JagBack->ChangeControlMode(CANJaguar::kPercentVbus);
 
 	JagFront->Set(1);
-	JagBack->Set(1);
-	float FltAverage = 0;
+	//JagBack->Set(1);
 
-  for(int i = 0, i++, i < 5)
+  for(int i = 0; i < 5; i++ )
   {
-	  
-		if(i > 0)
-		{
-         
-    }
-	BlnIsCal = true;
-		return FltTopSpeed;
-  
+      FltArray[i] = JagFront->GetSpeed();   
+  }
+	FltTopSpeed = ModuleCalculator->GetLowest(FltArray, 4);
+    BlnIsCal = true;
+	return FltTopSpeed;
 }
 
 /**
@@ -89,8 +84,8 @@ void  ParadoxShooter::SetRPM(float speed)
 {
 	FltSetSpeed = speed * FltTopSpeed;
 	JagFront->Set(FltSetSpeed);
-  JagBack->Set(FltSetSpeed*0.8);//80% of front wheel's speed will gradually increase speed of frisbee
-  FltDiffFront = fabs(FltSetSpeed - FltActualFront);
+	JagBack->Set(FltSetSpeed*0.8);//80% of front wheel's speed will gradually increase speed of frisbee
+	FltDiffFront = fabs(FltSetSpeed - FltActualFront);
 	FltDiffBack = fabs((FltSetSpeed*0.8) - FltActualBack);
 
 }

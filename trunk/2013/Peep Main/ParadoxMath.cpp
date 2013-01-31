@@ -1,25 +1,18 @@
 #include "WPILib.h" 
 #include "ParadoxMath.h" 
 #include "math.h"
-#define ARRAYSIZE 4
 
-ParadoxMath::ParadoxMath()
+float ParadoxMath::GetLowest(float array[], int asize)
 {
-
-}
-
-float ParadoxMath::GetLowest(float array[])
-{
-for(int i=0;i++; i < ARRAYSIZE)
-{
-if(array[i]<array[i+1])
-{
-FltLowValue=array[i];
-}
-else
-{
-FltLowValue=array[i+1];
-}
+	float FltLowest = 99999999;
+	for(int i=0; i < asize; i++)
+	{
+		if ((array[i] < FltLowest) && (array[i] != 0.0))
+		{
+			FltLowest = array[i];
+		}
+	}
+	return FltLowest;
 }
 
 

@@ -8,13 +8,10 @@ static const float kPI = 3.14159265f;
 
 class ParadoxMath
 {
-   public:
-        ParadoxMath();
-        virtual ~ParadoxMath() {}
-        float GetLowest(float array[]);
-        float FltLowValue;
-
-   private:
-        DISALLOW_COPY_AND_ASSIGN(ParadoxMath);
+	public:
+        float GetLowest(float array[], int asize);
+        
+//   private:
+//        DISALLOW_COPY_AND_ASSIGN(ParadoxMath);
 };
 #endif
