@@ -87,5 +87,5 @@ void ParadoxModule::InitParadoxModule()
 	JagSpeed->EnableControl();
 	JagSpeed->SetSafetyEnabled(false);
 	JagSpeed->ConfigEncoderCodesPerRev(TicksPerRev);
-	JagSpeed->SetPID(0,0,0);
+	JagSpeed->SetPID(0.7f,0.005f,0.0f);//PID constants were aquired from swerve
 }

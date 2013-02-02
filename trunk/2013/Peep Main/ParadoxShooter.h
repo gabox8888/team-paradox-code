@@ -20,7 +20,6 @@ class ParadoxShooter
     ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32 feedin);
     virtual ~ParadoxShooter(){}
     
-    float FltArray[4];
     float Calibrate();
     bool IsCalibrated();
     void SetTopSpeed(float topspeed);
@@ -42,6 +41,7 @@ class ParadoxShooter
     float 		FltActualFront;
     float		FltDiffFront;
     float		FltDiffBack;
+    float 		FltArray[4];
 	
 private:
     void InitParadoxShooter();

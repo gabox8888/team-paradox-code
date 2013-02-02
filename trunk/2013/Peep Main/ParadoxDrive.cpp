@@ -25,6 +25,7 @@ ParadoxDrive::ParadoxDrive(UINT32 JagOne, UINT32 JagTwo, UINT32 JagThree, UINT32
 	ModuleThree = new ParadoxModule(JagThree);
 	ModuleFour 	= new ParadoxModule(JagFour);
 	PersArrayCalibration = new ParadoxPersistentArray("drivecalibration.txt", 1);
+	
 	BlnIsCalibrating = false;
 }
 
@@ -34,7 +35,10 @@ ParadoxDrive::ParadoxDrive(UINT32 JagOne, UINT32 JagTwo, UINT32 JagThree, UINT32
 
 void ParadoxDrive::Calibrate(bool enabled)
 {
-	if (enabled == true && BlnIsCalibrating == false) BlnIsCalibrating = true;
+	if (enabled == true && BlnIsCalibrating == false) 
+	{
+		BlnIsCalibrating = true;
+	}
 	if (BlnIsCalibrating == true)
 	{
 		FltArrayTopSpeeds[0] = ModuleOne->Calibrate();
@@ -76,10 +80,10 @@ void ParadoxDrive::TankDrive(float left, float right)
 	ModuleThree->SetTopSpeed(FltTopSpeed);
 	ModuleFour->SetTopSpeed(FltTopSpeed);
 	
-	ModuleOne->SetSpeedVoltage(FltLeft);
-	ModuleTwo->SetSpeedVoltage(FltLeft);
-	ModuleThree->SetSpeedVoltage(FltRight);
-	ModuleFour->SetSpeedVoltage(FltRight);
+	ModuleOne->SetRPM(FltLeft);
+	ModuleTwo->SetRPM(FltLeft);
+	ModuleThree->SetRPM(FltRight);
+	ModuleFour->SetRPM(FltRight);
 }
 
 /**
