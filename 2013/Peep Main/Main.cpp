@@ -22,7 +22,17 @@ public:
 	
 	void AutonomousPeriodic(void)
 	{
-		
+		if (JoyMain->GetTrigger() == true)
+		{
+			printf ("Calibrate");
+			Drive->Calibrate(true);
+			Drive->Dump(DsLCD);
+		}
+		else
+		{
+			Drive->Calibrate(false);
+			Drive->Dump(DsLCD);
+		}
 	}
 	
 	void TeleopPeriodic(void)
@@ -30,17 +40,23 @@ public:
 		Drive->Calibrate(false);
 		Drive->ArcadeDrive(JoyMain->GetY(),JoyMain->GetX());
 		Drive->Dump(DsLCD);
-	}
-	
-	void TestPeriodic(void) 
-	{
-		printf("Test In");
 		if (JoyMain->GetTrigger() == true)
 		{
 			printf ("Calibrate");
 			Drive->Calibrate(true);
 			Drive->Dump(DsLCD);
 		}
+		else
+		{
+			Drive->Calibrate(false);
+			Drive->Dump(DsLCD);
+		}
+	}
+	
+	void TestPeriodic(void) 
+	{
+		printf("Test In");
+		
 		printf("Test Out");
 	}
 };

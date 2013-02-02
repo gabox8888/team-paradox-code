@@ -53,9 +53,9 @@ float ParadoxShooter::Calibrate()
   {
       FltArray[i] = JagFront->GetSpeed();   
   }
-	FltTopSpeed = ModuleCalculator->GetLowest(FltArray, 4);
-    BlnIsCal = true;
-	return FltTopSpeed;
+  FltTopSpeed = ModuleCalculator->GetLowest(FltArray, 4);
+  BlnIsCal = true;
+  return FltTopSpeed;
 }
 
 /**
