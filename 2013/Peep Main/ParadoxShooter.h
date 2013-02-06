@@ -9,10 +9,12 @@
  * and all of the associated sensors, motors, and pneumatics.
  * Authors: Paradox++ 
  */ 
-
+#include "ParadoxMath.h"
 #include "WPILib.h"
 #include "ParadoxShooter.h"
 #include "ParadoxMath.h"
+#include "ParadoxPersistentArray.h"
+#include "math.h"
 
 class ParadoxShooter
 {
@@ -20,18 +22,19 @@ class ParadoxShooter
     ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32 feedin);
     virtual ~ParadoxShooter(){}
     
-    float Calibrate();
-    bool IsCalibrated();
-    void SetTopSpeed(float topspeed);
-    void SetRPM(float speed);
-    void Feed(bool primed);
-    void AllStop();
+    float Calibrate();//writes topspeed to shootercalibration.txt and returns topspeed
+    bool IsCalibrated();//returns yes or no if is calibrated or not
+    void SetTopSpeed(float topspeed);//manually sets topspeed
+    void SetRPM(float speed);//does not actually take RPM, but 1-0 value that gets multiplied by topspeed
+    void Feed(bool primed);//actuates pistons
+    void AllStop();//turns off just motors
 
   protected:
     CANJaguar 		*JagFront;
     CANJaguar 		*JagBack;
     Solenoid 		*SolFeeder;
     ParadoxMath		*ModuleCalculator;
+    ParadoxPersistentArray  *PersArrayCalibration;
     bool 		BlnIsCal;
     bool		BlnFire;
     int			IntTimer;

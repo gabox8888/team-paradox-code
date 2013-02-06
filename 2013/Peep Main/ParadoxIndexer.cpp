@@ -5,25 +5,51 @@
  * 
  * 
  * Authors: Paradox++
- */
-
+ * 
+ */ 
+ 
 #include "ParadoxIndexer.h"
-
+//program, kill vikas
 /**
  * Constructor
  * 
  * 
  */
 
-ParadoxIndexer::ParadoxIndexer()
+ParadoxIndexer::ParadoxIndexer(UINT32 relay,UINT32 victor, UINT32 digbump, UINT32 digphoto)
 {	
-	External =	new Victor();
-	Internal =	new Relay();	
-	SensorBump =	new DigitalInput();
-	SensorPhoto =	new DigitalInput();
+	VicIntake =	new Victor(victor);
+	RlyIntake =	new Relay(relay);	
+	DigBump =	new DigitalInput(digbump);
+	DigPhoto =	new DigitalInput(digphoto);
+	SetReady();
 }
 
 void ParadoxIndexer::Intake()
 {
 	
+	if(BlnIsReady)
+	{
+		RlyIntake->Set(Relay::kForward);
+		while(!BlnIsUpTaken)
+		{
+			if(DigBump->Get())
+			{
+				RlyIntake->Set(Relay::kOff);
+				BlnIsUpTaken = true;
+			}
+		}
+		VicIntake->Set(1);
+	}
+	else SetReady();
+	
 }
+ void ParadoxIndexer::SetReady()
+ {
+	 VicIntake->Set(1);
+	while(!BlnIsReady)
+	 if(DigPhoto->Get()){
+		 VicIntake->Set(0);
+		 BlnIsReady = false;
+	 }
+ }

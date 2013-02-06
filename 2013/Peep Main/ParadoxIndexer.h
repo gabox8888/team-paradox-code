@@ -17,17 +17,19 @@
 class ParadoxIndexer
 {
 public:			
-	ParadoxIndexer();
+	ParadoxIndexer(UINT32 relay, UINT32 victor, UINT32 digbump, UINT32 digphoto);
 	virtual ~ParadoxIndexer() {};
 
 	void Intake();
 	
 protected:
-	Victor *External;
-	Relay *Internal;
-	DigitalInput *SensorBump;
-	DigitalInput *SensorPhoto;
-
+	Victor *VicIntake;
+	Relay *RlyIntake;
+	DigitalInput *DigBump;
+	DigitalInput *DigPhoto;
+    void SetReady();
+    bool BlnIsReady;
+    bool BlnIsUpTaken;
 private:
 	DISALLOW_COPY_AND_ASSIGN(ParadoxIndexer);
 };
