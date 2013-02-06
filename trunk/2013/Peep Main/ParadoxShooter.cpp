@@ -2,10 +2,8 @@
  * TODO:
  * Comments
  */
-
 #include "ParadoxShooter.h"
-#include "math.h"
-#include "ParadoxMath.h"
+
 
 /*  
  * ParadoxShooter.h 
@@ -17,7 +15,7 @@
  */ 
 
 #define TicksPerRev 00
-
+#define KCalVoltage 11.5
 /** 
  * Constructor 
  * @param front The address of the front mounted Jaguar on the CAN bus.
@@ -31,7 +29,7 @@ ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32
 	JagBack	 	= new CANJaguar(back);
 	SolFeeder	= new Solenoid(feedout, feedin);
 	ModuleCalculator = new ParadoxMath;   
-
+	PersArrayCalibration = new ParadoxPersistentArray("shootercalibration.txt",1);
 	InitParadoxShooter();
 }
 
@@ -43,17 +41,18 @@ ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32
 
 float ParadoxShooter::Calibrate()
 {
-	JagFront->ChangeControlMode(CANJaguar::kPercentVbus);
-	//JagBack->ChangeControlMode(CANJaguar::kPercentVbus);
+	JagFront->ChangeControlMode(CANJaguar::kVoltage);
+	//JagBack->ChangeControlMode(CANJaguar::kVoltage);
 
-	JagFront->Set(1);
-	//JagBack->Set(1);
+	JagFront->Set(KCalVoltage);
+	//JagBack->Set(KCalVoltage);
 
   for(int i = 0; i < 5; i++ )
   {
       FltArray[i] = JagFront->GetSpeed();   
   }
   FltTopSpeed = ModuleCalculator->GetLowest(FltArray, 4);
+  PersArrayCalibration->Write(FltTopSpeed,1);
   BlnIsCal = true;
   return FltTopSpeed;
 }
@@ -79,10 +78,10 @@ bool ParadoxShooter::IsCalibrated()
 {
 	return BlnIsCal;
 }
-
+//sets percent of topspeed
 void  ParadoxShooter::SetRPM(float speed)
 {
-	FltSetSpeed = speed * FltTopSpeed;
+	FltSetSpeed = speed * PersArrayCalibration->Read(1);//reads from text file
 	JagFront->Set(FltSetSpeed);
 	JagBack->Set(FltSetSpeed*0.8);//80% of front wheel's speed will gradually increase speed of frisbee
 	FltDiffFront = fabs(FltSetSpeed - FltActualFront);
@@ -90,6 +89,7 @@ void  ParadoxShooter::SetRPM(float speed)
 
 }
 
+//actuates pistons
 void  ParadoxShooter::Feed(bool primed)
 {
 	BlnFire = primed;
@@ -109,6 +109,7 @@ void  ParadoxShooter::Feed(bool primed)
 	}
 }
 
+//stops motors
 void ParadoxShooter::AllStop()
 {
 	JagFront->Set(0);
