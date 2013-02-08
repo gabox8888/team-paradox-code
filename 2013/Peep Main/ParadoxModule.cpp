@@ -11,7 +11,8 @@
 
 #include "ParadoxModule.h"
 
-#define TicksPerRev 17
+#define TicksPerRev 30
+#define CalibrationVoltage 11.5
 
 /**
  * Constructor
@@ -70,8 +71,8 @@ void ParadoxModule::SetTopSpeed(float speed)
 
 float ParadoxModule::Calibrate()
 {
-		JagSpeed->ChangeControlMode(CANJaguar::kPercentVbus);
-		JagSpeed->Set(1.0f);
+		JagSpeed->ChangeControlMode(CANJaguar::kVoltage);
+		JagSpeed->Set(CalibrationVoltage);
 		
 		return JagSpeed->GetSpeed();
   
