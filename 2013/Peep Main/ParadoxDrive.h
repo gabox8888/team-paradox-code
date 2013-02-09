@@ -11,9 +11,10 @@
  * Authors: Paradox++
  */
 
+#include "ParadoxDrive.h"
+
 #include "WPILib.h"
 #include "ParadoxModule.h"
-#include "ParadoxDrive.h"
 #include "ParadoxPersistentArray.h"
 #include "ParadoxMath.h"
 

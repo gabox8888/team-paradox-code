@@ -30,7 +30,8 @@ ParadoxDrive::ParadoxDrive(UINT32 JagOne, UINT32 JagTwo, UINT32 JagThree, UINT32
 }
 
 /**
- * Calibrates the top speed for each jaguar.
+ * Calibrates each Jaguar's top speed to the top speed of the
+ * slowest Jaguar.
  */
 
 void ParadoxDrive::Calibrate(bool enabled)
@@ -134,6 +135,14 @@ void ParadoxDrive::ArcadeDrive(float rotate, float move)
 	ParadoxDrive::TankDrive(FltLeft,FltRight);
 	printf ("Arcade OUT");
 }
+
+/**
+ * Dumps the following information, in order, to the Driver Station LCD:
+ * The callibrated top speed, the current speed of module one, the current
+ * speed of module two, the current speed of module three, and the current
+ * speed of module four.
+ */
+
 void ParadoxDrive::Dump(DriverStationLCD *ds)
 {
 	ds->PrintfLine(DriverStationLCD::kUser_Line1,"Speed: %f",FltLowest);

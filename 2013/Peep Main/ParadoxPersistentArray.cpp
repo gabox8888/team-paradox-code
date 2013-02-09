@@ -1,3 +1,11 @@
+/*  
+ * ParadoxPersistentArray.cpp
+ * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved. 
+ * Paradox Persistent Array. 
+ * 
+ * Authors: Paradox++ 
+ */ 
+
 #include "ParadoxPersistentArray.h"
 #include "WPILib.h"
 

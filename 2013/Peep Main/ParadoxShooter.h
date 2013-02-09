@@ -9,9 +9,11 @@
  * and all of the associated sensors, motors, and pneumatics.
  * Authors: Paradox++ 
  */ 
+
+#include "ParadoxShooter.h"
+
 #include "ParadoxMath.h"
 #include "WPILib.h"
-#include "ParadoxShooter.h"
 #include "ParadoxMath.h"
 #include "ParadoxPersistentArray.h"
 #include "math.h"

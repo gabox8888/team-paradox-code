@@ -12,8 +12,9 @@
  * Authors: Paradox++
  */
 
-#include "WPILib.h"
 #include "ParadoxModule.h"
+
+#include "WPILib.h"
 
 class ParadoxModule
 {
