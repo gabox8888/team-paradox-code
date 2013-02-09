@@ -23,14 +23,15 @@
  * @param feed The 
  */ 
 
-ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32 feedin)
+ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32 feedin, UINT32 anglein, UINT32 angleout)
 {
 	JagFront 	= new CANJaguar(front);//gives solenoid and jaguars reference #'s
 	JagBack	 	= new CANJaguar(back);
 	SolFeeder	= new Solenoid(feedout, feedin);
+	SolAngle	= new Solenoid(anglein,angleout);
 	ModuleCalculator = new ParadoxMath;   
 	PersArrayCalibration = new ParadoxPersistentArray("shootercalibration.txt",1);
-	InitParadoxShooter();
+	ParadoxShooter::InitParadoxShooter();
 }
 
 /**

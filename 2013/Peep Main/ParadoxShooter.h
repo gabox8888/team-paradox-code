@@ -19,7 +19,7 @@
 class ParadoxShooter
 {
   public:
-    ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32 feedin);
+    ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32 feedin, UINT32 anglein, UINT32 angleout);
     virtual ~ParadoxShooter(){}
     
     float Calibrate();//writes topspeed to shootercalibration.txt and returns topspeed
@@ -33,6 +33,7 @@ class ParadoxShooter
     CANJaguar 		*JagFront;
     CANJaguar 		*JagBack;
     Solenoid 		*SolFeeder;
+    Solenoid 		*SolAngle;
     ParadoxMath		*ModuleCalculator;
     ParadoxPersistentArray  *PersArrayCalibration;
     bool 		BlnIsCal;
