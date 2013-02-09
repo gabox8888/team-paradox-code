@@ -2,17 +2,17 @@
 #define PARADOXINDEXER_H_
 
 /*
- * ParadoxIndexer.h
+ * ParadoxIndexer.cpp
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved.
  * Paradox Indexer.
- * 
- * 
- * 
+ * This class serves to create an object in the code which represents the disc
+ * intake and storage system, as well as all sensors and motors involved.
  * Authors: Paradox++
- */
+ */ 
+
+#include "ParadoxIndexer.h"
 
 #include "WPILib.h"
-#include "ParadoxIndexer.h"
 
 class ParadoxIndexer
 {
@@ -35,4 +35,3 @@ private:
 };
 
 #endif
-

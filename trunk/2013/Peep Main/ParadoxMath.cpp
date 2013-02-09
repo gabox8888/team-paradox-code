@@ -1,3 +1,11 @@
+/*  
+ * ParadoxMath.cpp
+ * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved. 
+ * Paradox Math. 
+ * 
+ * Authors: Paradox++ 
+ */ 
+
 #include "WPILib.h" 
 #include "ParadoxMath.h" 
 #include "math.h"

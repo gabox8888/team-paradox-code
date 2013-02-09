@@ -1,5 +1,5 @@
 /*
- * ParadoxModule.h
+ * ParadoxModule.cpp
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved.
  * Paradox Module.
  * This class serves to create an object in the code that represents a single

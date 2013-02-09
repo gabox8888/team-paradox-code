@@ -1,12 +1,8 @@
-/*
- * TODO:
- * Comments
- */
 #include "ParadoxShooter.h"
 
 
 /*  
- * ParadoxShooter.h 
+ * ParadoxShooter.cpp
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved. 
  * Paradox Shooter. 
  * This class serves to create an object in the code that represents a disc shooter

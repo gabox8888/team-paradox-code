@@ -1,8 +1,20 @@
+//TODO: Comments!
+
 #ifndef PARADOXTRACKER_H_
 #define PARADOXTRACKER_H_
 
-#include "WPILib.h"
+/*  
+ * ParadoxTracker.h
+ * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved. 
+ * Paradox Tracker. 
+ * This class serves to create an object in the code that represents an Axis
+ * Camera and the servo that controls its direction.
+ * Authors: Paradox++ 
+ */ 
+
 #include "ParadoxTracker.h"
+
+#include "WPILib.h"
 
 class ParadoxTracker
 {
