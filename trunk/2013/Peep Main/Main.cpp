@@ -6,6 +6,7 @@ class ParadoxBot : public IterativeRobot
 	ParadoxDrive		*Drive;
 	ParadoxShooter		*Shooter;
 	ParadoxTracker		*Tracker;
+	ParadoxIndexer		*Indexer;
 	
 	Victor				*VicFinger;
 	Relay				*RlyIntake;
@@ -21,8 +22,8 @@ public:
 	ParadoxBot()
 	{
 		Drive	= new ParadoxDrive (4,5,2,3);
-		Shooter	= new ParadoxShooter (1,1,1,1);
-		//Indexer = new ParadoxIndexer(1,1,1,1);
+		Shooter	= new ParadoxShooter (1,1,1,1,1,1);
+		Indexer = new ParadoxIndexer(1,1,1,1);
 		
 		VicFinger = new Victor (10);
 		RlyIntake = new Relay (8);
@@ -45,11 +46,18 @@ public:
 	void TeleopPeriodic(void)
 	{
 		Drive->Calibrate(false);
-		Drive->ArcadeDrive(JoyMain->GetY(),JoyMain->GetX());
+		if (fabs(JoyMain->GetMagnitude()) <= 0.05)
+		{
+			Drive->ArcadeDrive(0.0,0.0);
+		}
+		else
+		{
+			Drive->ArcadeDrive(JoyMain->GetY(),JoyMain->GetX());
+		}
 		Drive->Dump(DsLCD);
 		if (JoyMain->GetTrigger()== true)
 		{
-			RlyIntake->Set(Relay::kReverse);
+			RlyIntake->Set(Relay::kForward);
 		}
 		else 
 		{
@@ -82,6 +90,7 @@ public:
 		}
 		Drive->Calibrate(BlnCal);
 		Drive->Dump(DsLCD);
+		DsLCD->PrintfLine(DriverStationLCD::kUser_Line6, "Sens: %d",DigPhoto->Get());
 	}
 	
 	void TestPeriodic(void) 
