@@ -19,7 +19,7 @@ class ParadoxIndexer
 public:			
 	ParadoxIndexer(UINT32 relay, UINT32 victor, UINT32 digbump, UINT32 digphoto);
 	virtual ~ParadoxIndexer() {};
-
+	void ManualIndex(Joystick *Joy);
 	void Intake();
 	
 protected:
@@ -27,8 +27,9 @@ protected:
 	Relay *RlyIntake;
 	DigitalInput *DigBump;
 	DigitalInput *DigPhoto;
+	
     void SetReady();
-    bool BlnIsReady;
+    bool BlnIntakeIsReady;
     bool BlnIsUpTaken;
 private:
 	DISALLOW_COPY_AND_ASSIGN(ParadoxIndexer);

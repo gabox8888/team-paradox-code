@@ -10,7 +10,7 @@
  * Authors: Paradox++ 
  */ 
 
-#define TicksPerRev 00
+#define TicksPerRev 17
 #define KCalVoltage 11.5
 /** 
  * Constructor 
@@ -87,7 +87,7 @@ void  ParadoxShooter::SetRPM(float speed)
 }
 
 //actuates pistons
-void  ParadoxShooter::Feed(bool primed)
+/*void  ParadoxShooter::Feed(bool primed)
 {
 	BlnFire = primed;
 	IntTimer = 5;
@@ -105,7 +105,7 @@ void  ParadoxShooter::Feed(bool primed)
 		SolFeeder->Set(false);
 	}
 }
-
+*/
 //stops motors
 void ParadoxShooter::AllStop()
 {

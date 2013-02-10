@@ -23,7 +23,7 @@ ParadoxIndexer::ParadoxIndexer(UINT32 relay,UINT32 victor, UINT32 digbump, UINT3
 	RlyIntake =	new Relay(relay);	
 	DigBump =	new DigitalInput(digbump);
 	DigPhoto =	new DigitalInput(digphoto);
-	ParadoxIndexer::SetReady();
+	//ParadoxIndexer::SetReady();
 }
 
 /**
@@ -32,18 +32,20 @@ ParadoxIndexer::ParadoxIndexer(UINT32 relay,UINT32 victor, UINT32 digbump, UINT3
 
 void ParadoxIndexer::Intake()
 {
-	if(BlnIsReady)
+	if(BlnIntakeIsReady)
 	{
-		RlyIntake->Set(Relay::kForward);
-		while(BlnIsUpTaken == false)
+		if(BlnIsUpTaken == false)
 		{
-			if(DigBump->Get())
+			if(DigBump->Get() == 0)
 			{
 				RlyIntake->Set(Relay::kOff);
-				BlnIsUpTaken = true;
+				BlnIntakeIsReady = false;
+			}
+			else
+			{
+				RlyIntake->Set(Relay::kForward);
 			}
 		}
-		VicIntake->Set(1);
 	}
 	else ParadoxIndexer::SetReady();	
 }
@@ -54,13 +56,47 @@ void ParadoxIndexer::Intake()
 
 void ParadoxIndexer::SetReady()
 {
-	VicIntake->Set(1);
-	while(BlnIsReady == false)
+	if(BlnIntakeIsReady == false)
 	{
-		if(DigPhoto->Get())
+		if(DigPhoto->Get() == 1)
 		{
 			VicIntake->Set(0);
-			BlnIsReady = false;
+			BlnIntakeIsReady = true;
+		}
+		else
+		{
+			VicIntake->Set(-0.5);
 		}
 	}
+}
+
+void ParadoxIndexer::ManualIndex(Joystick *Joy)
+{
+	BlnIntakeIsReady = false;
+	BlnIsUpTaken = false;
+	if (Joy->GetTrigger()== true)
+			{
+				RlyIntake->Set(Relay::kForward);
+			}
+			if(Joy->GetTrigger() == false) 
+			{
+				RlyIntake->Set(Relay::kOff);
+			}
+			
+			//If button 12 is pressed, run victor forwards.
+			if (Joy->GetRawButton(11))
+			{
+				VicIntake->Set(0.5);
+			}
+			//If button 11 is pressed, run victor backwards. Motors are reversed so negative
+			//is actually forward
+			else if (Joy->GetRawButton(12))
+			{
+				VicIntake->Set(-0.5);
+			}
+			//If neither are pressed, stop victor.
+			else 
+			{
+				VicIntake->Set(0.0);
+			}
 }
