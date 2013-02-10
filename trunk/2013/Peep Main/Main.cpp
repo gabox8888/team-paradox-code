@@ -13,7 +13,7 @@ class ParadoxBot : public IterativeRobot
 	ParadoxDrive		*Drive;
 	ParadoxShooter		*Shooter;
 	ParadoxTracker		*Tracker;
-	ParadoxIndexer		*Indexer;
+	ParadoxIndexer		*Indexer;	
 	
 	Victor				*VicFinger;
 	Relay				*RlyIntake;
@@ -22,6 +22,7 @@ class ParadoxBot : public IterativeRobot
 	Joystick			*JoyMain;
 	DriverStationLCD	*DsLCD;
 	
+	bool BlnIsSucking;
 	bool BlnIntake;
 	bool BlnCal;
 	
@@ -30,11 +31,11 @@ public:
 	{
 		Drive	= new ParadoxDrive (4,5,2,3);
 		Shooter	= new ParadoxShooter (1,1,1,1,1,1);
-		//Indexer = new ParadoxIndexer(8,10,0,12);
+		Indexer = new ParadoxIndexer(8,10,3,12);
 		
-		VicFinger = new Victor (10);
-		RlyIntake = new Relay (8);
-		DigPhoto  = new DigitalInput(12);
+		//VicFinger = new Victor (10);
+		//RlyIntake = new Relay (8);
+		//DigPhoto  = new DigitalInput(12);
 		
 		JoyMain = new Joystick(1);
 		DsLCD	= DriverStationLCD::GetInstance();
@@ -52,29 +53,45 @@ public:
 	
 	void TeleopPeriodic(void)
 	{
-		Drive->Calibrate(false);
+	
+		printf("hi\n");
+		//Drive->Calibrate(false);
 		
 		//Eliminates sensitivity issues
+		printf("hi\n");
 		if (fabs(JoyMain->GetMagnitude()) <= 0.05)
 		{
 			Drive->ArcadeDrive(0.0,0.0);
+			printf("hi\n");
 		}
 		
 		//Arcade drive
 		else
 		{
 			Drive->ArcadeDrive(JoyMain->GetY(),JoyMain->GetX());
+			printf("hi\n");
 		}
-		
+		//program kill greg
 		//Update Driver Station
 		Drive->Dump(DsLCD);
+
+		printf("hi\n");
+		if (JoyMain->GetRawButton(9))
+		{
+			Indexer->Intake();
+		}
+		else
+		{
+			Indexer->ManualIndex(JoyMain);
+		}
 		
+		/*	
 		//If trigger is pressed, run relay. If not, stop relay.
 		if (JoyMain->GetTrigger()== true)
 		{
 			RlyIntake->Set(Relay::kForward);
 		}
-		else 
+		if(JoyMain->GetTrigger() == false) 
 		{
 			RlyIntake->Set(Relay::kOff);
 		}
@@ -92,23 +109,28 @@ public:
 		//If neither are pressed, stop victor.
 		else 
 		{
-			VicFinger->Set(0.0);
+			VicFinger->Set(0.0);bp
 		}
-		
+		*/
 		//If button 7 is pressed, calibrate the drive. If button 8 is pressed, stop calibrating.
 		if (JoyMain->GetRawButton(7) == true)
 		{
 			BlnCal = true;
+			printf("hi\n");
 		}
 		else if (JoyMain->GetRawButton(8) == true)
 		{
 			BlnCal = false;
+		printf("hijjj\n");
 		}
-		Drive->Calibrate(BlnCal);
+		//Drive->Calibrate(BlnCal);
 		
 		//Update Driver Station
-		Drive->Dump(DsLCD);
-		DsLCD->PrintfLine(DriverStationLCD::kUser_Line6, "Sens: %d",DigPhoto->Get());
+		//Drive->Dump(DsLCD);
+		//DsLCD->PrintfLine(DriverStationLCD::kUser_Line6, "Sens: %d",DigPhoto->Get());
+		//DsLCD->UpdateLCD();
+		printf("hi\n");
+	
 	}
 	
 	void TestPeriodic(void) 
