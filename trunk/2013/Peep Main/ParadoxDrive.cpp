@@ -81,10 +81,10 @@ void ParadoxDrive::TankDrive(float left, float right)
 	ModuleThree->SetTopSpeed(FltTopSpeed);
 	ModuleFour->SetTopSpeed(FltTopSpeed);
 	
-	ModuleOne->SetRPM(FltLeft);
-	ModuleTwo->SetRPM(FltLeft);
-	ModuleThree->SetRPM(FltRight);
-	ModuleFour->SetRPM(FltRight);
+	ModuleOne->SetSpeedVoltage(FltLeft);
+	ModuleTwo->SetSpeedVoltage(FltLeft);
+	ModuleThree->SetSpeedVoltage(FltRight);
+	ModuleFour->SetSpeedVoltage(FltRight);
 }
 
 /**
@@ -96,7 +96,6 @@ void ParadoxDrive::TankDrive(float left, float right)
 
 void ParadoxDrive::ArcadeDrive(float rotate, float move)
 { 
-	printf("Arcade IN");
 	float FltLeft;
 	float FltRight;
 	
@@ -133,7 +132,14 @@ void ParadoxDrive::ArcadeDrive(float rotate, float move)
 		}
 	}
 	ParadoxDrive::TankDrive(FltLeft,FltRight);
-	printf ("Arcade OUT");
+}
+
+void ParadoxDrive::Drive(float rpm)
+{
+	ModuleOne->SetRPM(rpm);
+	ModuleTwo->SetRPM(rpm);
+	ModuleThree->SetRPM(rpm);
+	ModuleFour->SetRPM(rpm);
 }
 
 /**
@@ -150,6 +156,4 @@ void ParadoxDrive::Dump(DriverStationLCD *ds)
 	ds->PrintfLine(DriverStationLCD::kUser_Line3, "MTwo %f", ModuleTwo->GetRPM());
 	ds->PrintfLine(DriverStationLCD::kUser_Line4, "MThree %f", ModuleThree->GetRPM());
 	ds->PrintfLine(DriverStationLCD::kUser_Line5, "MFour %f", ModuleFour->GetRPM());
-
-	ds->UpdateLCD();
 }

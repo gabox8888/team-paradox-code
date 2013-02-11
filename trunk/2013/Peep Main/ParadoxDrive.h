@@ -27,6 +27,7 @@ class ParadoxDrive
 		void Calibrate(bool enabled);
 		void TankDrive(float left, float right);
 		void ArcadeDrive(float move, float rotate);
+		void Drive(float rpm);
 		void Dump(DriverStationLCD *ds);
 		
 		

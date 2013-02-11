@@ -19,11 +19,11 @@
  * @param feed The 
  */ 
 
-ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feedout, UINT32 feedin, UINT32 anglein, UINT32 angleout)
+ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feeder, UINT32 anglein, UINT32 angleout)
 {
 	JagFront 	= new CANJaguar(front);//gives solenoid and jaguars reference #'s
 	JagBack	 	= new CANJaguar(back);
-	SolFeeder	= new Solenoid(feedout, feedin);
+	RlyFeeder	= new Relay(feeder);
 	SolAngle	= new Solenoid(anglein,angleout);
 	ModuleCalculator = new ParadoxMath;   
 	PersArrayCalibration = new ParadoxPersistentArray("shootercalibration.txt",1);
@@ -80,14 +80,14 @@ void  ParadoxShooter::SetRPM(float speed)
 {
 	FltSetSpeed = speed * PersArrayCalibration->Read(1);//reads from text file
 	JagFront->Set(FltSetSpeed);
-	JagBack->Set(FltSetSpeed*0.8);//80% of front wheel's speed will gradually increase speed of frisbee
+	JagBack->Set(FltSetSpeed);//80% of front wheel's speed will gradually increase speed of frisbee
 	FltDiffFront = fabs(FltSetSpeed - FltActualFront);
-	FltDiffBack = fabs((FltSetSpeed*0.8) - FltActualBack);
+	FltDiffBack  = fabs(FltSetSpeed - FltActualBack);
 
 }
 
 //actuates pistons
-/*void  ParadoxShooter::Feed(bool primed)
+void  ParadoxShooter::Feed(bool primed)
 {
 	BlnFire = primed;
 	IntTimer = 5;
@@ -95,17 +95,16 @@ void  ParadoxShooter::SetRPM(float speed)
 	{
 		while (IntTimer >= 0)
 		{
-			SolFeeder->Set(true);
+			RlyFeeder->Set(Relay::kForward);
 			IntTimer--;
 		}
 		BlnFire = false;
 	}
 	else
 	{
-		SolFeeder->Set(false);
+		RlyFeeder->Set(Relay::kOff);
 	}
 }
-*/
 //stops motors
 void ParadoxShooter::AllStop()
 {
@@ -133,12 +132,12 @@ void ParadoxShooter::InitJaguar()
 	JagFront->EnableControl();
 	JagFront->SetSafetyEnabled(false);
 	JagFront->ConfigEncoderCodesPerRev(TicksPerRev);
-	JagFront->SetPID(0,0,0);
+	JagFront->SetPID(.7,0.005,0.5);
 
 	JagBack->ChangeControlMode(CANJaguar::kSpeed);
 	JagBack->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
 	JagBack->EnableControl();
 	JagBack->SetSafetyEnabled(false);
 	JagBack->ConfigEncoderCodesPerRev(TicksPerRev);
-	JagBack->SetPID(0,0,0);
+	JagBack->SetPID(.7,0.005,0.5);
 }
