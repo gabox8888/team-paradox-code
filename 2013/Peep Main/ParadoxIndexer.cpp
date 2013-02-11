@@ -65,7 +65,7 @@ void ParadoxIndexer::SetReady()
 		}
 		else
 		{
-			VicIntake->Set(-0.5);
+			VicIntake->Set(-1.0f);
 		}
 	}
 }
@@ -86,13 +86,13 @@ void ParadoxIndexer::ManualIndex(Joystick *Joy)
 			//If button 12 is pressed, run victor forwards.
 			if (Joy->GetRawButton(11))
 			{
-				VicIntake->Set(0.5);
+				VicIntake->Set(1.0f);
 			}
 			//If button 11 is pressed, run victor backwards. Motors are reversed so negative
 			//is actually forward
 			else if (Joy->GetRawButton(12))
 			{
-				VicIntake->Set(-0.5);
+				VicIntake->Set(-1.0f);
 			}
 			//If neither are pressed, stop victor.
 			else 
