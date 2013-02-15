@@ -5,6 +5,7 @@ ParadoxPersistentArray::ParadoxPersistentArray(string fn, int array_cnt)
 {
 	StrName = fn;
 	FltValues = new float[array_cnt];
+	IntValueArrayCount = array_cnt;
 	
 	UpdateArray();
 }
@@ -13,26 +14,29 @@ void ParadoxPersistentArray::UpdateArray()
 {
 	char buffer[20];
 	File = fopen(StrName.c_str(), "rb");
-	fscanf(File,"%s ",buffer);
-	if (strcmp(buffer,"Speed:") == 0)
+	for (int i = 0; i < IntValueArrayCount; i++)
 	{
-		fscanf(File,"%f\n",&FltValues[0]);
-	}
-	if (strcmp(buffer,"Module1:") == 0)
-	{
-		fscanf(File,"%f\n",&FltValues[1]);
-	}
-	if (strcmp(buffer,"Module2:") == 0)
-	{
-		fscanf(File,"%f\n",&FltValues[2]);
-	}
-	if (strcmp(buffer,"Module3:") == 0)
-	{
-		fscanf(File,"%f\n",&FltValues[3]);
-	}
-	if (strcmp(buffer,"Module4:") == 0)
-	{
-		fscanf(File,"%f\n",&FltValues[4]);
+		fscanf(File,"%s ",buffer);
+		if (strcmp(buffer,"Speed:") == 0)
+		{
+			fscanf(File,"%f\n",&FltValues[0]);
+		}
+		if (strcmp(buffer,"Module1:") == 0)
+		{
+			fscanf(File,"%f\n",&FltValues[1]);
+		}
+		if (strcmp(buffer,"Module2:") == 0)
+		{
+			fscanf(File,"%f\n",&FltValues[2]);
+		}
+		if (strcmp(buffer,"Module3:") == 0)
+		{
+			fscanf(File,"%f\n",&FltValues[3]);
+		}
+		if (strcmp(buffer,"Module4:") == 0)
+		{
+			fscanf(File,"%f\n",&FltValues[4]);
+		}
 	}
 	fclose(File);
 	BlnHasChanged = false;

@@ -81,10 +81,10 @@ void ParadoxDrive::TankDrive(float left, float right)
 	ModuleThree->SetTopSpeed(FltTopSpeed);
 	ModuleFour->SetTopSpeed(FltTopSpeed);
 	
-	ModuleOne->SetSpeedVoltage(FltLeft);
-	ModuleTwo->SetSpeedVoltage(FltLeft);
-	ModuleThree->SetSpeedVoltage(FltRight);
-	ModuleFour->SetSpeedVoltage(FltRight);
+	ModuleOne->SetRPM(FltLeft);
+	ModuleTwo->SetRPM(FltLeft);
+	ModuleThree->SetRPM(FltRight);
+	ModuleFour->SetRPM(FltRight);
 }
 
 /**
@@ -151,7 +151,6 @@ void ParadoxDrive::Drive(float rpm)
 
 void ParadoxDrive::Dump(DriverStationLCD *ds)
 {
-	ds->PrintfLine(DriverStationLCD::kUser_Line1,"Speed: %f",FltLowest);
 	ds->PrintfLine(DriverStationLCD::kUser_Line2, "MOne %f", ModuleOne->GetRPM());
 	ds->PrintfLine(DriverStationLCD::kUser_Line3, "MTwo %f", ModuleTwo->GetRPM());
 	ds->PrintfLine(DriverStationLCD::kUser_Line4, "MThree %f", ModuleThree->GetRPM());

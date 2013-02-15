@@ -10,6 +10,13 @@
  * Authors: Paradox++
  */ 
 
+enum PickUpStates
+{
+	Align,
+	Rollers,
+	Up
+};
+
 #include "ParadoxIndexer.h"
 
 #include "WPILib.h"
@@ -20,17 +27,21 @@ public:
 	ParadoxIndexer(UINT32 relay, UINT32 victor, UINT32 digbump, UINT32 digphoto);
 	virtual ~ParadoxIndexer() {};
 	void ManualIndex(Joystick *Joy);
-	void Intake();
+	void Intake(bool suck);
+	void Dump(DriverStationLCD *ds);
 	
 protected:
 	Victor *VicIntake;
 	Relay *RlyIntake;
-	DigitalInput *DigBump;
-	DigitalInput *DigPhoto;
+	DigitalInput *DigPhotoSuck;
+	DigitalInput *DigPhotoUp;
+	
+	PickUpStates PickUp;
 	
     void SetReady();
     bool BlnIntakeIsReady;
     bool BlnIsUpTaken;
+    bool BlnNextFinger;
 private:
 	DISALLOW_COPY_AND_ASSIGN(ParadoxIndexer);
 };

@@ -17,6 +17,7 @@ protected:
 	FILE *File;
 	string StrName;
 	float *FltValues;
+	UINT32 IntValueArrayCount;
 };
 
 #endif

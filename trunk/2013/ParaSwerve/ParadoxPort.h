@@ -19,13 +19,14 @@ class ParadoxPort
 public:	
 	ParadoxPort(string fn, int array_cnt);
 	virtual ~ParadoxPort() {}
-	float Read(int idx);
+	UINT32 Read(int idx);
 		
 protected:
 	FILE	*File;
 	string	StrName;
 	bool	BlnHasChanged;
 	UINT32	*IntValues;
+	UINT32	IntValueArrayCount;
 	void	UpdateArray();
 	
 private: 

@@ -9,12 +9,29 @@
 
 #define JoyPort 1
 #define GyrPort 1
+#define SQ1 11
+#define AQ1 10
+#define PQ1 4
+#define RQ1 3
+#define SQ2 22
+#define AQ2 9
+#define PQ2 7
+#define RQ2 4
+#define SQ3 33
+#define AQ3 7
+#define PQ3 5
+#define RQ3 2
+#define SQ4 44
+#define AQ4 8
+#define PQ4 6
+#define RQ4 1
+		
 
 const float kPi = 4*atan(1);
 
 class ParadoxBot : public IterativeRobot
 {
-	ParadoxPort				*FilePorts;
+	//ParadoxPort				*FilePorts;
 	
 	ParadoxDrive			*ParaSwerve;
 	
@@ -26,29 +43,14 @@ class ParadoxBot : public IterativeRobot
 	bool 					BlnCal;
 	bool					BlnIsCal;
 	float					FltGyrRad;
+	bool					BlnTestStrobe;
 
 public:
 	ParadoxBot()
 	{
-		FilePorts	= new ParadoxPort("FilePorts.txt",16);
-		
-		#define SQ1 FilePorts->Read(0)
-		#define AQ1 FilePorts->Read(1)
-		#define PQ1 FilePorts->Read(2)
-		#define RQ1 FilePorts->Read(3)
-		#define SQ2 FilePorts->Read(4)
-		#define AQ2 FilePorts->Read(5)
-		#define PQ2 FilePorts->Read(6)
-		#define RQ2 FilePorts->Read(7)
-		#define SQ3 FilePorts->Read(8)
-		#define AQ3 FilePorts->Read(9)
-		#define PQ3 FilePorts->Read(10)
-		#define RQ3 FilePorts->Read(11)
-		#define SQ4 FilePorts->Read(12)
-		#define AQ4 FilePorts->Read(13)
-		#define PQ4 FilePorts->Read(14)
-		#define RQ4 FilePorts->Read(15)
-		
+		printf("ctor in /n");
+		//FilePorts	= new ParadoxPort("FilePorts.txt",16);
+	
 		ParaSwerve	= new ParadoxDrive(SQ1,AQ1,PQ1,RQ1,
 									   SQ2,AQ2,PQ2,RQ2,
 									   SQ3,AQ3,PQ3,RQ3,
@@ -61,6 +63,7 @@ public:
 		
 		BlnCal		= false;
 		FltGyrRad	= (GyrMain->GetAngle()*(kPi / 180));
+		printf("ctor out /n");
 		
 	};
 	
@@ -73,6 +76,18 @@ public:
 
 	void TeleopPeriodic(void)
 	{
+		printf("tele in /n");
+		BlnTestStrobe = !BlnTestStrobe;
+		if (BlnTestStrobe)
+		{
+			DsLCD->PrintfLine(DriverStationLCD::kUser_Line1, "!!!!!!");
+		}
+		else
+		{
+			DsLCD->PrintfLine(DriverStationLCD::kUser_Line1, ".");
+		}
+		DsLCD->Clear();
+		DsLCD->UpdateLCD();
 		if (JoyMain->GetRawButton(9) && JoyMain->GetRawButton(10)) BlnCal = true;
 		
 		if (ParaSwerve->StallLock())
@@ -98,10 +113,11 @@ public:
 			}
 			else 
 			{	
-				ParaSwerve->Calibrate(false);
+				//ParaSwerve->Calibrate(false);
 				ParaSwerve->Drive(JoyMain->GetMagnitude(),JoyMain->GetDirectionRadians(),JoyMain->GetRawAxis(4),FltGyrRad);
 			}
 		}
+		printf("tele out /n");
 	}
 	
 	void Test() 

@@ -38,6 +38,7 @@ ParadoxDrive::ParadoxDrive(UINT32 SQ1,UINT32 AQ1,UINT32 PQ1, UINT32 RQ1,
 }
 void ParadoxDrive::Drive(float mag,float dir,float turn,float gyro)
 {
+	printf("drive in /n");
 	for (int i = 0; i < 4; i++)
 	{
 		FltSpd = Modules[i]->SetPropose(mag, dir,turn,gyro);
