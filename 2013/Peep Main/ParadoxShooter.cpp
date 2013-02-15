@@ -78,11 +78,11 @@ bool ParadoxShooter::IsCalibrated()
 //sets percent of topspeed
 void  ParadoxShooter::SetRPM(float speed)
 {
-	FltSetSpeed = speed * PersArrayCalibration->Read(1);//reads from text file
-	JagFront->Set(FltSetSpeed);
-	JagBack->Set(FltSetSpeed);//80% of front wheel's speed will gradually increase speed of frisbee
-	FltDiffFront = fabs(FltSetSpeed - FltActualFront);
-	FltDiffBack  = fabs(FltSetSpeed - FltActualBack);
+	FltSetSpeed = speed;
+	JagFront->Set(-FltSetSpeed);
+	JagBack->Set(FltSetSpeed);
+	FltDiffFront = fabs(FltSetSpeed - (JagFront->GetSpeed()));
+	FltDiffBack  = fabs(FltSetSpeed - (JagBack->GetSpeed()));
 
 }
 
@@ -91,7 +91,7 @@ void  ParadoxShooter::Feed(bool primed)
 {
 	BlnFire = primed;
 	IntTimer = 5;
-	if ((FltDiffBack == 10.0f) && (FltDiffFront == 10.0f) && (BlnFire == true))
+	if ((BlnFire == true))//if ((FltDiffBack == 100.0f) && (FltDiffFront == 100.0f) && (BlnFire == true))
 	{
 		while (IntTimer >= 0)
 		{
@@ -103,6 +103,7 @@ void  ParadoxShooter::Feed(bool primed)
 	else
 	{
 		RlyFeeder->Set(Relay::kOff);
+		IntTimer = 5;
 	}
 }
 //stops motors
@@ -121,8 +122,6 @@ void ParadoxShooter::InitParadoxShooter()
 	IntTimer = 0;
 	FltTopSpeed = 999.0f;
 	FltSetSpeed = 0.0f;
-	FltActualBack = JagBack->GetSpeed();
-	FltActualFront = JagFront->GetSpeed();
 }
 
 void ParadoxShooter::InitJaguar()

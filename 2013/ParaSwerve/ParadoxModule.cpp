@@ -10,13 +10,13 @@
 #include "ParadoxModule.h"
 
 #define CntEncoder 25 
-#define kPAng 0.4
-#define kIAng 0.04
-#define kDAng 0.2
-#define kPSpd 0.7
-#define kISpd 0.005
-#define kDSpd 0.0
 
+const float kPAng = 0.4;
+const float kIAng = 0.04;
+const float kDAng = 0.2;
+const float kPSpd = 0.7;
+const float kISpd = 0.005;
+const float kDSpd = 0.0;
 const float kFltWidth  = 21.3458369f; //These are floats because of future iterations of the code
 const float kFltLenght = 29.8458369f; //in case the dimensions of the bot change and the atan() function asks for floats
 const float kFltCalibrateVoltage = 11.5f;

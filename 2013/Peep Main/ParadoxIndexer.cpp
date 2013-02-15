@@ -19,54 +19,56 @@
 
 ParadoxIndexer::ParadoxIndexer(UINT32 relay,UINT32 victor, UINT32 digbump, UINT32 digphoto)
 {	
-	VicIntake =	new Victor(victor);
-	RlyIntake =	new Relay(relay);	
-	DigBump =	new DigitalInput(digbump);
-	DigPhoto =	new DigitalInput(digphoto);
-	//ParadoxIndexer::SetReady();
+	VicIntake 		= new Victor(victor);
+	RlyIntake 		= new Relay(relay);	
+	DigPhotoSuck	= new DigitalInput(digbump);
+	DigPhotoUp 		= new DigitalInput(digphoto);
+	
+	PickUp 			= Align;
+		
+	BlnIntakeIsReady = false;
+	BlnIsUpTaken = false;
+	BlnNextFinger = false;
 }
 
-/**
- * 
- */
 
-void ParadoxIndexer::Intake()
+void ParadoxIndexer::Intake(bool suck)
 {
-	if(BlnIntakeIsReady)
+	switch (PickUp)
 	{
-		if(BlnIsUpTaken == false)
-		{
-			if(DigBump->Get() == 0)
+		case Align:
+			if (DigPhotoUp->Get() == 0)
 			{
-				RlyIntake->Set(Relay::kOff);
-				BlnIntakeIsReady = false;
+				VicIntake->Set(-0.8f);
 			}
-			else
+			else if (DigPhotoUp->Get() == 1)
+			{
+				VicIntake->Set(0.0f);
+				PickUp = Rollers;
+			}
+			break;
+		case Rollers:
+			if ((suck == true)&&(DigPhotoSuck->Get() == 0))
 			{
 				RlyIntake->Set(Relay::kForward);
 			}
-		}
-	}
-	else ParadoxIndexer::SetReady();	
-}
-
-/**
- * 
- */
-
-void ParadoxIndexer::SetReady()
-{
-	if(BlnIntakeIsReady == false)
-	{
-		if(DigPhoto->Get() == 1)
-		{
-			VicIntake->Set(0);
-			BlnIntakeIsReady = true;
-		}
-		else
-		{
-			VicIntake->Set(-1.0f);
-		}
+			else if (DigPhotoSuck->Get() == 1)
+			{
+				RlyIntake->Set(Relay::kOff);
+				PickUp = Up;
+			}
+			break;
+		case Up:
+			
+			if (DigPhotoSuck->Get() == 1)
+			{
+				VicIntake->Set(-0.8f);
+			}
+			else 
+			{
+				PickUp = Align;
+			}
+			break;
 	}
 }
 
@@ -99,4 +101,9 @@ void ParadoxIndexer::ManualIndex(Joystick *Joy)
 			{
 				VicIntake->Set(0.0);
 			}
+}
+
+void ParadoxIndexer::Dump(DriverStationLCD *ds)
+{
+	ds->PrintfLine(DriverStationLCD::kUser_Line6, "Sens: %d", DigPhotoUp->Get());
 }
