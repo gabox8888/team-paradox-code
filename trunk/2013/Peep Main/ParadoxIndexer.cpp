@@ -31,11 +31,17 @@ ParadoxIndexer::ParadoxIndexer(UINT32 relay,UINT32 victor, UINT32 digbump, UINT3
 	BlnNextFinger = false;
 }
 
+/**
+ * Primes the intake system. Then, based on input, runs it to draw disks into
+ * the magazine, one at a time.
+ * @param suck Determines whether to run the intake or just to prime it.
+ */
 
 void ParadoxIndexer::Intake(bool suck)
 {
 	switch (PickUp)
 	{
+		//Positions a finger on the internal belt in front of the lower photo sensor.
 		case Align:
 			if (DigPhotoUp->Get() == 0)
 			{
@@ -47,6 +53,8 @@ void ParadoxIndexer::Intake(bool suck)
 				PickUp = Rollers;
 			}
 			break;
+		
+		//If the input is true, runs the intake belt until a disk is detected.
 		case Rollers:
 			if ((suck == true)&&(DigPhotoSuck->Get() == 0))
 			{
@@ -58,8 +66,9 @@ void ParadoxIndexer::Intake(bool suck)
 				PickUp = Up;
 			}
 			break;
-		case Up:
 			
+		//If a disk is detected, draws it up to the magazine. Then realigns for the next disk.
+		case Up:
 			if (DigPhotoSuck->Get() == 1)
 			{
 				VicIntake->Set(-0.8f);
@@ -72,36 +81,48 @@ void ParadoxIndexer::Intake(bool suck)
 	}
 }
 
+/**
+ * Gives the driver manual control over the intake system through use of a joystick.
+ * @param Joy A joystick object that will be used to control the intake system.
+ */
+
 void ParadoxIndexer::ManualIndex(Joystick *Joy)
 {
 	BlnIntakeIsReady = false;
 	BlnIsUpTaken = false;
+	
+	//If trigger is pressed, run internal belt fowards.
 	if (Joy->GetTrigger()== true)
-			{
-				RlyIntake->Set(Relay::kForward);
-			}
-			if(Joy->GetTrigger() == false) 
-			{
-				RlyIntake->Set(Relay::kOff);
-			}
-			
-			//If button 12 is pressed, run victor forwards.
-			if (Joy->GetRawButton(11))
-			{
-				VicIntake->Set(1.0f);
-			}
-			//If button 11 is pressed, run victor backwards. Motors are reversed so negative
-			//is actually forward
-			else if (Joy->GetRawButton(12))
-			{
-				VicIntake->Set(-1.0f);
-			}
-			//If neither are pressed, stop victor.
-			else 
-			{
-				VicIntake->Set(0.0);
-			}
+	{
+		RlyIntake->Set(Relay::kForward);
+	}
+	//If trigger is not pressed, stop internal belt.
+	if(Joy->GetTrigger() == false) 
+	{
+		RlyIntake->Set(Relay::kOff);
+	}
+	
+	//If button 11 is pressed, run intake belt backwards. Motors are reversed, making positive backwards.
+	if (Joy->GetRawButton(11))
+	{
+		VicIntake->Set(1.0f);
+	}
+	//If button 12 is pressed, run intake belt fowards.
+	else if (Joy->GetRawButton(12))
+	{
+		VicIntake->Set(-1.0f);
+	}
+	//If neither are pressed, stop intake belt.
+	else 
+	{
+		VicIntake->Set(0.0);
+	}
 }
+
+/**
+ * Dumps the current status of the lower photo sensor to the Driver Station LCD.
+ * @param ds A driver station object.
+ */
 
 void ParadoxIndexer::Dump(DriverStationLCD *ds)
 {

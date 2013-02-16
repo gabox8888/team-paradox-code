@@ -64,7 +64,7 @@ void ParadoxDrive::Calibrate(bool enabled)
 }
 
 /**
- * Provide tank steering.
+ * Provides tank steering.
  * This function lets you directly provide joystick values from any source.
  * @param left The value of the left stick.
  * @param right The value of the right stick.
@@ -134,6 +134,11 @@ void ParadoxDrive::ArcadeDrive(float rotate, float move)
 	ParadoxDrive::TankDrive(FltLeft,FltRight);
 }
 
+/**
+ * Drives by running all wheels fowards at the same speed.
+ * @param rpm The speed to run all motors at.
+ */
+
 void ParadoxDrive::Drive(float rpm)
 {
 	ModuleOne->SetRPM(rpm);
@@ -147,6 +152,7 @@ void ParadoxDrive::Drive(float rpm)
  * The callibrated top speed, the current speed of module one, the current
  * speed of module two, the current speed of module three, and the current
  * speed of module four.
+ * @param ds A Driver Station object.
  */
 
 void ParadoxDrive::Dump(DriverStationLCD *ds)
