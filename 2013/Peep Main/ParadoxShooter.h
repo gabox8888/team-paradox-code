@@ -29,15 +29,13 @@ class ParadoxShooter
     void SetTopSpeed(float topspeed);//manually sets topspeed
     void SetRPM(float speed);//does not actually take RPM, but 1-0 value that gets multiplied by topspeed
     void Feed(bool primed);//actuates pistons
-    void Angle(bool up);
     void AllStop();//turns off just motors
 
   protected:
     CANJaguar 		*JagFront;
     CANJaguar 		*JagBack;
     Relay	 		*RlyFeeder;
-    Solenoid 		*SolAngleUp;
-    Solenoid 		*SolAngleDown;
+    Solenoid 		*SolAngle;
     ParadoxMath		*ModuleCalculator;
     ParadoxPersistentArray  *PersArrayCalibration;
     bool 		BlnIsCal;

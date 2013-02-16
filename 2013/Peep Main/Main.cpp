@@ -6,11 +6,23 @@
  * Authors: Paradox++ 
  */ 
 
+#define alliancedelay 5.0f
+#define autodriveshoot 3.0f
+#define autodrivecollect 3.0f
+
 #include "ParadoxLib.h"
+
+enum TimerConstants
+{
+	AutoTime_A,
+	AutoTime_B,
+	NumOfAutoTimers
+};
 
 enum AutoSteps
 {
 	StpInit,
+	StpDelay,
 	StpMoveForward,
 	StpShootThree,
 	StpMoveToPickUp,
@@ -29,64 +41,77 @@ class ParadoxBot : public IterativeRobot
 	
 	Joystick			*JoyMain;
 	Joystick			*JoyShoot;
-	Compressor			*CompMain;
 	DriverStationLCD	*DsLCD;
 	
 	bool BlnIsSucking;
 	bool BlnIntake;
 	bool BlnCal;
-	bool BlnStop;
 	int	 IntFrisbeesToShoot;
 	int	 IntShooterSpeed;
 	float FltShooterSpeed;
-	float FltShooterJoy;
+	float AutoTime[NumOfAutoTimers];
 	
 public:
 	ParadoxBot()
 	{
-		Drive		= new ParadoxDrive (4,5,8,9);
-		Shooter		= new ParadoxShooter (6,7,2,1,2);
-		Indexer 	= new ParadoxIndexer(8,10,12,13);
+		Drive				= new ParadoxDrive (4,5,8,9);
+		Shooter				= new ParadoxShooter (6,7,2,1,2);
+		Indexer 			= new ParadoxIndexer(8,10,12,13);
 		
-		JoyMain	 	= new Joystick(1);
-		JoyShoot	= new Joystick(2);
-		CompMain	= new Compressor(14,1);
-		DsLCD		= DriverStationLCD::GetInstance();
+		JoyMain 			= new Joystick(1);
+		JoyShoot			= new Joystick(2);
+		DsLCD				= DriverStationLCD::GetInstance();
 		
-		BlnIntake = false;
-		BlnCal = false;
-		IntFrisbeesToShoot = 0;
-		IntShooterSpeed = 0;
-		FltShooterSpeed = 0.0f;
-		FltShooterJoy = 0.0f;
+		BlnIntake			= false;
+		BlnCal 				= false;
+		IntFrisbeesToShoot 	= 0;
+		IntShooterSpeed 	= 0;
+		FltShooterSpeed 	= 0.0f;
 		
-		Auto = StpInit;
-		
-		CompMain->Start();
-		
+		Auto 				= StpInit;
 	};
 	~ParadoxBot(){}
 	
 	void AutonomousPeriodic(void)
 	{
+		const float period = GetPeriod();
+
+		for (int i = 0; i < NumOfAutoTimers; i++)
+		{
+			if (Auto == StpStop) AutoTime[i] = 0;
+			else AutoTime[i] -= period;
+		}
+	}
+	
+	void AutonomousContinuous(void)
+	{
 		switch (Auto)
 		{
 			//Initialization
 			case StpInit:
+				AutoTime[AutoTime_A] = 99.0;			
+				AutoTime[AutoTime_B] = 99.0;
+				Auto = StpDelay;
+				break;
 				
-				Auto = StpMoveForward;
+			//Pauses for a set number of seconds to allow alliance members to act
+			case StpDelay:
+				AutoTime[AutoTime_B] = 99.0f;
+				if (AutoTime[AutoTime_A] > 90.0f) AutoTime[AutoTime_A] = alliancedelay;
+				if (AutoTime[AutoTime_A] <= 0.0f) Auto = StpMoveForward;
 				break;
 			
-			//Drives forward until *condition* and sets the shooter spinning
+			//Drives forward for a set number of seconds and starts the shooter spinning
 			case StpMoveForward:
 				Drive->Drive(500.0f);
 				Shooter->SetRPM(-2900.0f);
 				IntFrisbeesToShoot = 3;
 				
-				if (/*something*/ 0)
+				AutoTime[AutoTime_A] = 99.0f;
+				if (AutoTime[AutoTime_B] > 90.0f) AutoTime[AutoTime_B] = autodriveshoot;
+				if (AutoTime[AutoTime_B] <= 0.0f) 
 				{
 					Drive->Drive(0.0f);
-					
 					Auto = StpShootThree;
 				}
 				break;
@@ -103,15 +128,16 @@ public:
 				Auto = StpMoveToPickUp;
 				break;
 				
-			//Drives foward until *condition* and runs the intake system
+			//Drives foward for a set number of seconds and runs the intake system
 			case StpMoveToPickUp:
 				Drive->Drive(500.0f);
-				Indexer->Intake(true,true);
+				Indexer->Intake(true);
 				
-				if (/*something*/ 0)
+				AutoTime[AutoTime_B] = 99.0f;
+				if (AutoTime[AutoTime_A] > 90.0f) AutoTime[AutoTime_A] = autodrivecollect;
+				if (AutoTime[AutoTime_A] <= 0.0f)
 				{
 					Drive->Drive(0.0f);
-					
 					Auto = StpShootFour;
 				}
 				break;
@@ -124,8 +150,10 @@ public:
 				
 			//Stops everything in preparation for TeleOp
 			case StpStop:
+				AutoTime[AutoTime_A] = 0.0f;
+				AutoTime[AutoTime_B] = 0.0f;
 				Shooter->SetRPM(0.0f);
-				Indexer->Intake(false,false);
+				Indexer->Intake(false);
 				break;
 		}
 	}
@@ -142,29 +170,12 @@ public:
 		//Arcade drive
 		else
 		{
-			Drive->ArcadeDrive(JoyMain->GetY(),JoyMain->GetX());
-		}
-		
-		if (fabs(JoyShoot->GetMagnitude()) <= 0.05)
-		{
-			FltShooterJoy = 0.0f;
-		}
-		else
-		{
-			FltShooterJoy = JoyShoot->GetY();
+			Drive->ArcadeDrive(JoyMain->GetY(),JoyMain->GetZ());
 		}
 	
 		//Runs the intake system if button 3 on the shooter joystick is pressed
+		Indexer->Intake(JoyShoot->GetRawButton(3));
 		
-		if (JoyShoot->GetRawButton(4))
-		{
-			BlnIntake = true;
-		}
-		else if (JoyShoot->GetRawButton(5))
-		{
-			BlnIntake = false;
-		}
-		Indexer->Intake(JoyShoot->GetRawButton(3), BlnIntake);
 		//Sets the speed of the shooter based on button presses
 		if (JoyShoot->GetRawButton(6) == true)  IntShooterSpeed = 0; 
 		if (JoyShoot->GetRawButton(11) == true) IntShooterSpeed = 1; 
@@ -193,18 +204,9 @@ public:
 				break;
 		}
 		//Alters speed based on throttle applied to the shooter joystick.
-		Shooter->SetRPM(FltShooterSpeed + (FltShooterJoy*1000.0f));
+		Shooter->SetRPM(FltShooterSpeed + (JoyShoot->GetY()*1000.0f));
 		//Shoots when the trigger on the shooter joystick is pressed.
 		Shooter->Feed(JoyShoot->GetTrigger());
-		
-		if (JoyShoot->GetRawAxis(4)>= 0.0f)
-		{
-			Shooter->Angle(true);
-		}
-		else 
-		{
-			Shooter->Angle(false);
-		}
 		
 		//If button 7 on the main joystick is pressed, calibrate the drive. If button 8 is pressed, stop calibrating.
 		if (JoyMain->GetRawButton(7) == true)

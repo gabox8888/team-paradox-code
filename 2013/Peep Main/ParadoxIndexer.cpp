@@ -37,54 +37,47 @@ ParadoxIndexer::ParadoxIndexer(UINT32 relay,UINT32 victor, UINT32 digbump, UINT3
  * @param suck Determines whether to run the intake or just to prime it.
  */
 
-void ParadoxIndexer::Intake(bool suck, bool safety)
+void ParadoxIndexer::Intake(bool suck)
 {
-	if (safety == true)
+	switch (PickUp)
 	{
-			switch (PickUp)
-		{
-			//Positions a finger on the internal belt in front of the lower photo sensor.
-			case Align:
-				if (DigPhotoUp->Get() == 0)
-				{
-					VicIntake->Set(-0.8f);
-				}
-				else if (DigPhotoUp->Get() == 1)
-				{
-					VicIntake->Set(0.0f);
-					PickUp = Rollers;
-				}
-				break;
+		//Positions a finger on the internal belt in front of the lower photo sensor.
+		case Align:
+			if (DigPhotoUp->Get() == 0)
+			{
+				VicIntake->Set(-0.8f);
+			}
+			else if (DigPhotoUp->Get() == 1)
+			{
+				VicIntake->Set(0.0f);
+				PickUp = Rollers;
+			}
+			break;
+		
+		//If the input is true, runs the intake belt until a disk is detected.
+		case Rollers:
+			if ((suck == true)&&(DigPhotoSuck->Get() == 0))
+			{
+				RlyIntake->Set(Relay::kForward);
+			}
+			else if (DigPhotoSuck->Get() == 1)
+			{
+				RlyIntake->Set(Relay::kOff);
+				PickUp = Up;
+			}
+			break;
 			
-			//If the input is true, runs the intake belt until a disk is detected.
-			case Rollers:
-				if ((suck == true)&&(DigPhotoSuck->Get() == 0))
-				{
-					RlyIntake->Set(Relay::kForward);
-				}
-				else if (DigPhotoSuck->Get() == 1)
-				{
-					RlyIntake->Set(Relay::kOff);
-					PickUp = Up;
-				}
-				break;
-				
-			//If a disk is detected, draws it up to the magazine. Then realigns for the next disk.
-			case Up:
-				if (DigPhotoSuck->Get() == 1)
-				{
-					VicIntake->Set(-0.8f);
-				}
-				else 
-				{
-					PickUp = Align;
-				}
-				break;
-		}
-	}
-	else
-	{
-		ParadoxIndexer::AllStop();
+		//If a disk is detected, draws it up to the magazine. Then realigns for the next disk.
+		case Up:
+			if (DigPhotoSuck->Get() == 1)
+			{
+				VicIntake->Set(-0.8f);
+			}
+			else 
+			{
+				PickUp = Align;
+			}
+			break;
 	}
 }
 
@@ -99,23 +92,23 @@ void ParadoxIndexer::ManualIndex(Joystick *Joy)
 	BlnIsUpTaken = false;
 	
 	//If trigger is pressed, run internal belt fowards.
-	if (Joy->GetRawButton(2)== true)
+	if (Joy->GetTrigger()== true)
 	{
 		RlyIntake->Set(Relay::kForward);
 	}
 	//If trigger is not pressed, stop internal belt.
-	if(Joy->GetRawButton(2) == false) 
+	if(Joy->GetTrigger() == false) 
 	{
 		RlyIntake->Set(Relay::kOff);
 	}
 	
 	//If button 11 is pressed, run intake belt backwards. Motors are reversed, making positive backwards.
-	if (Joy->GetRawButton(10))
+	if (Joy->GetRawButton(11))
 	{
 		VicIntake->Set(1.0f);
 	}
 	//If button 12 is pressed, run intake belt fowards.
-	else if (Joy->GetRawButton(8))
+	else if (Joy->GetRawButton(12))
 	{
 		VicIntake->Set(-1.0f);
 	}
@@ -124,11 +117,6 @@ void ParadoxIndexer::ManualIndex(Joystick *Joy)
 	{
 		VicIntake->Set(0.0);
 	}
-}
-void ParadoxIndexer::AllStop()
-{
-	VicIntake->Set(0.0f);
-	RlyIntake->Set(Relay::kOff);
 }
 
 /**
