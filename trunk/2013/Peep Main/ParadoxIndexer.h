@@ -27,9 +27,8 @@ public:
 	ParadoxIndexer(UINT32 relay, UINT32 victor, UINT32 digbump, UINT32 digphoto);
 	virtual ~ParadoxIndexer() {};
 	void ManualIndex(Joystick *Joy);
-	void Intake(bool suck, bool safety);
+	void Intake(bool suck);
 	void Dump(DriverStationLCD *ds);
-	void AllStop();
 	
 protected:
 	Victor *VicIntake;

@@ -81,10 +81,10 @@ void ParadoxDrive::TankDrive(float left, float right)
 	ModuleThree->SetTopSpeed(FltTopSpeed);
 	ModuleFour->SetTopSpeed(FltTopSpeed);
 	
-	ModuleOne->SetSpeedVoltage(FltLeft);
-	ModuleTwo->SetSpeedVoltage(FltLeft);
-	ModuleThree->SetSpeedVoltage(FltRight);
-	ModuleFour->SetSpeedVoltage(FltRight);
+	ModuleOne->SetRPM(FltLeft);
+	ModuleTwo->SetRPM(FltLeft);
+	ModuleThree->SetRPM(FltRight);
+	ModuleFour->SetRPM(FltRight);
 }
 
 /**
