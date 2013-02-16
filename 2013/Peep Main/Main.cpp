@@ -64,29 +64,61 @@ public:
 	{
 		switch (Auto)
 		{
+			//Initialization
 			case StpInit:
 				
+				Auto = StpMoveForward;
 				break;
+			
+			//Drives forward until *condition* and sets the shooter spinning
 			case StpMoveForward:
 				Drive->Drive(500.0f);
 				Shooter->SetRPM(-2900.0f);
 				IntFrisbeesToShoot = 3;
+				
+				if (/*something*/ 0)
+				{
+					Drive->Drive(0.0f);
+					
+					Auto = StpShootThree;
+				}
 				break;
+			
+			//Shoots however many frisbees were declared in StpMoveFoward
 			case StpShootThree:
 				while (IntFrisbeesToShoot >= 0)
 				{
 					Shooter->Feed(true);
 					IntFrisbeesToShoot--;
 				}
+				Shooter->Feed(false);
 				
+				Auto = StpMoveToPickUp;
 				break;
+				
+			//Drives foward until *condition* and runs the intake system
 			case StpMoveToPickUp:
 				Drive->Drive(500.0f);
 				Indexer->Intake(true);
+				
+				if (/*something*/ 0)
+				{
+					Drive->Drive(0.0f);
+					
+					Auto = StpShootFour;
+				}
 				break;
+				
+			//Shoots however many frisbess were taken in in StpMoveToPickUp
 			case StpShootFour:
+				
+				Auto = StpStop;
 				break;
+				
+			//Stops everything in preparation for TeleOp
 			case StpStop:
+				Shooter->SetRPM(0.0f);
+				Indexer->Intake(false);
 				break;
 		}
 	}
@@ -106,13 +138,21 @@ public:
 			Drive->ArcadeDrive(JoyMain->GetY(),JoyMain->GetZ());
 		}
 	
+		//Runs the intake system if button 3 on the shooter joystick is pressed
 		Indexer->Intake(JoyShoot->GetRawButton(3));
 		
+		//Sets the speed of the shooter based on button presses
 		if (JoyShoot->GetRawButton(6) == true)  IntShooterSpeed = 0; 
 		if (JoyShoot->GetRawButton(11) == true) IntShooterSpeed = 1; 
 		if (JoyShoot->GetRawButton(9) == true)  IntShooterSpeed = 2; 
 		if (JoyShoot->GetRawButton(7) == true)  IntShooterSpeed = 3; 
 		
+		/*
+		 * case 0 Button 6 is pressed. The shooter is stopped.
+		 * case 1 Button 11 is pressed. The shooter runs at 2900 RPM.
+		 * case 2 Button 9 is pressed. The shooter runs at 2000 RPM.
+		 * case 3 Button 7 is pressed. The shooter runs at 4500 RPM.
+		 */
 		switch (IntShooterSpeed)
 		{
 			case 0:
@@ -128,10 +168,12 @@ public:
 				FltShooterSpeed = -4500.f;
 				break;
 		}
+		//Alters speed based on throttle applied to the shooter joystick.
 		Shooter->SetRPM(FltShooterSpeed + (JoyShoot->GetY()*1000.0f));
+		//Shoots when the trigger on the shooter joystick is pressed.
 		Shooter->Feed(JoyShoot->GetTrigger());
 		
-		//If button 7 is pressed, calibrate the drive. If button 8 is pressed, stop calibrating.
+		//If button 7 on the main joystick is pressed, calibrate the drive. If button 8 is pressed, stop calibrating.
 		if (JoyMain->GetRawButton(7) == true)
 		{
 			BlnCal = true;
@@ -142,7 +184,7 @@ public:
 		}
 		Drive->Calibrate(BlnCal);
 		
-		//Update Driver Station
+		//Update Driver Station display
 		DsLCD->PrintfLine(DriverStationLCD::kUser_Line1,"Speed: %f",FltShooterSpeed + (JoyShoot->GetY()*1000.0f));
 		Drive->Dump(DsLCD);
 		Indexer->Dump(DsLCD);

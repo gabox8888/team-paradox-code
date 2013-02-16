@@ -5,7 +5,7 @@
  * ParadoxMath.h
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved. 
  * Paradox Math. 
- * 
+ * A collection of custom math functions.
  * Authors: Paradox++ 
  */ 
 

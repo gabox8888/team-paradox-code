@@ -27,7 +27,7 @@ ParadoxModule::ParadoxModule(UINT32 channel)
  }
 
 /**
- * Get the current speed in rotations per minute.
+ * Gets the current speed in rotations per minute.
  * @return The current speed as a double.
  */
 
@@ -49,7 +49,7 @@ void ParadoxModule::SetRPM(float speed)
 /**
  * Sets the jaguar to a speed expressed in voltage and then returns
  * the control mode to RPM.
- * @param speed A value between representing the input in voltage
+ * @param speed A value representing the input in voltage
  */
 
 void ParadoxModule::SetSpeedVoltage(float speed)
@@ -61,7 +61,8 @@ void ParadoxModule::SetSpeedVoltage(float speed)
 }
 
 /**
- * Determines the top speed and sets it to FltTopSpeed
+ * Sets the top speed based on input.
+ * @param speed The number the top speed should be set to.
  */
 
 void ParadoxModule::SetTopSpeed(float speed)
@@ -69,15 +70,20 @@ void ParadoxModule::SetTopSpeed(float speed)
 	FltTopSpeed = speed;
 }
 
+/**
+ * Determines the the speed at a certain voltage.
+ * @return The speed of the Jaguar, in RPM, at a set voltage.
+ */
+
 float ParadoxModule::Calibrate()
 {
 		JagSpeed->ChangeControlMode(CANJaguar::kVoltage);
 		JagSpeed->Set(CalibrationVoltage);
 		
 		return JagSpeed->GetSpeed();
-  
 }
-/*
+
+/**
  * Initialization code for the Jaguar.
  */
 
@@ -88,5 +94,5 @@ void ParadoxModule::InitParadoxModule()
 	JagSpeed->EnableControl();
 	JagSpeed->SetSafetyEnabled(false);
 	JagSpeed->ConfigEncoderCodesPerRev(TicksPerRev);
-	JagSpeed->SetPID(0.7f,0.005f,0.0f);//PID constants were aquired from swerve
+	JagSpeed->SetPID(0.7f,0.005f,0.0f);
 }

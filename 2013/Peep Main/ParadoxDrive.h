@@ -30,7 +30,6 @@ class ParadoxDrive
 		void Drive(float rpm);
 		void Dump(DriverStationLCD *ds);
 		
-		
 	protected:
 		ParadoxModule *ModuleOne;
 		ParadoxModule *ModuleTwo;
