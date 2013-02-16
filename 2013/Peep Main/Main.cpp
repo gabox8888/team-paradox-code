@@ -29,33 +29,40 @@ class ParadoxBot : public IterativeRobot
 	
 	Joystick			*JoyMain;
 	Joystick			*JoyShoot;
+	Compressor			*CompMain;
 	DriverStationLCD	*DsLCD;
 	
 	bool BlnIsSucking;
 	bool BlnIntake;
 	bool BlnCal;
+	bool BlnStop;
 	int	 IntFrisbeesToShoot;
 	int	 IntShooterSpeed;
 	float FltShooterSpeed;
+	float FltShooterJoy;
 	
 public:
 	ParadoxBot()
 	{
-		Drive	= new ParadoxDrive (4,5,8,9);
-		Shooter	= new ParadoxShooter (6,7,2,1,2);
-		Indexer = new ParadoxIndexer(8,10,12,13);
+		Drive		= new ParadoxDrive (4,5,8,9);
+		Shooter		= new ParadoxShooter (6,7,2,1,2);
+		Indexer 	= new ParadoxIndexer(8,10,12,13);
 		
-		JoyMain = new Joystick(1);
-		JoyShoot= new Joystick(2);
-		DsLCD	= DriverStationLCD::GetInstance();
+		JoyMain	 	= new Joystick(1);
+		JoyShoot	= new Joystick(2);
+		CompMain	= new Compressor(14,1);
+		DsLCD		= DriverStationLCD::GetInstance();
 		
 		BlnIntake = false;
 		BlnCal = false;
 		IntFrisbeesToShoot = 0;
 		IntShooterSpeed = 0;
 		FltShooterSpeed = 0.0f;
+		FltShooterJoy = 0.0f;
 		
 		Auto = StpInit;
+		
+		CompMain->Start();
 		
 	};
 	~ParadoxBot(){}
@@ -99,7 +106,7 @@ public:
 			//Drives foward until *condition* and runs the intake system
 			case StpMoveToPickUp:
 				Drive->Drive(500.0f);
-				Indexer->Intake(true);
+				Indexer->Intake(true,true);
 				
 				if (/*something*/ 0)
 				{
@@ -118,7 +125,7 @@ public:
 			//Stops everything in preparation for TeleOp
 			case StpStop:
 				Shooter->SetRPM(0.0f);
-				Indexer->Intake(false);
+				Indexer->Intake(false,false);
 				break;
 		}
 	}
@@ -135,12 +142,29 @@ public:
 		//Arcade drive
 		else
 		{
-			Drive->ArcadeDrive(JoyMain->GetY(),JoyMain->GetZ());
+			Drive->ArcadeDrive(JoyMain->GetY(),JoyMain->GetX());
+		}
+		
+		if (fabs(JoyShoot->GetMagnitude()) <= 0.05)
+		{
+			FltShooterJoy = 0.0f;
+		}
+		else
+		{
+			FltShooterJoy = JoyShoot->GetY();
 		}
 	
 		//Runs the intake system if button 3 on the shooter joystick is pressed
-		Indexer->Intake(JoyShoot->GetRawButton(3));
 		
+		if (JoyShoot->GetRawButton(4))
+		{
+			BlnIntake = true;
+		}
+		else if (JoyShoot->GetRawButton(5))
+		{
+			BlnIntake = false;
+		}
+		Indexer->Intake(JoyShoot->GetRawButton(3), BlnIntake);
 		//Sets the speed of the shooter based on button presses
 		if (JoyShoot->GetRawButton(6) == true)  IntShooterSpeed = 0; 
 		if (JoyShoot->GetRawButton(11) == true) IntShooterSpeed = 1; 
@@ -169,9 +193,18 @@ public:
 				break;
 		}
 		//Alters speed based on throttle applied to the shooter joystick.
-		Shooter->SetRPM(FltShooterSpeed + (JoyShoot->GetY()*1000.0f));
+		Shooter->SetRPM(FltShooterSpeed + (FltShooterJoy*1000.0f));
 		//Shoots when the trigger on the shooter joystick is pressed.
 		Shooter->Feed(JoyShoot->GetTrigger());
+		
+		if (JoyShoot->GetRawAxis(4)>= 0.0f)
+		{
+			Shooter->Angle(true);
+		}
+		else 
+		{
+			Shooter->Angle(false);
+		}
 		
 		//If button 7 on the main joystick is pressed, calibrate the drive. If button 8 is pressed, stop calibrating.
 		if (JoyMain->GetRawButton(7) == true)

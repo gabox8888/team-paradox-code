@@ -21,10 +21,11 @@
 
 ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feeder, UINT32 anglein, UINT32 angleout)
 {
-	JagFront 	= new CANJaguar(front);//gives solenoid and jaguars reference #'s
-	JagBack	 	= new CANJaguar(back);
-	RlyFeeder	= new Relay(feeder);
-	SolAngle	= new Solenoid(anglein,angleout);
+	JagFront 		= new CANJaguar(front);//gives solenoid and jaguars reference #'s
+	JagBack	 		= new CANJaguar(back);
+	RlyFeeder		= new Relay(feeder);
+	SolAngleUp		= new Solenoid(anglein);
+	SolAngleDown	= new Solenoid(angleout);
 	ModuleCalculator = new ParadoxMath;   
 	PersArrayCalibration = new ParadoxPersistentArray("shootercalibration.txt",1);
 	ParadoxShooter::InitParadoxShooter();
@@ -104,6 +105,19 @@ void  ParadoxShooter::Feed(bool primed)
 	{
 		RlyFeeder->Set(Relay::kOff);
 		IntTimer = 5;
+	}
+}
+void ParadoxShooter::Angle(bool up)
+{
+	if (up == true)
+	{
+		SolAngleUp->Set(true);
+		SolAngleDown->Set(false);
+	}
+	else
+	{
+		SolAngleUp->Set(false);
+		SolAngleDown->Set(true);	
 	}
 }
 //stops motors
