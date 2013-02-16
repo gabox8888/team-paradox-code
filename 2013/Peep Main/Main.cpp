@@ -6,9 +6,9 @@
  * Authors: Paradox++ 
  */ 
 
-#define alliancedelay 5.0f
-#define autodriveshoot 3.0f
-#define autodrivecollect 3.0f
+#define alliancedelay 0.0f
+#define autodriveshoot 0.0f
+#define autodrivecollect 0.0f
 
 #include "ParadoxLib.h"
 
@@ -118,7 +118,7 @@ public:
 			
 			//Shoots however many frisbees were declared in StpMoveFoward
 			case StpShootThree:
-				while (IntFrisbeesToShoot >= 0)
+				while (IntFrisbeesToShoot > 0)
 				{
 					Shooter->Feed(true);
 					IntFrisbeesToShoot--;
@@ -138,6 +138,7 @@ public:
 				if (AutoTime[AutoTime_A] <= 0.0f)
 				{
 					Drive->Drive(0.0f);
+					Indexer->Intake(false);
 					Auto = StpShootFour;
 				}
 				break;
@@ -153,7 +154,6 @@ public:
 				AutoTime[AutoTime_A] = 0.0f;
 				AutoTime[AutoTime_B] = 0.0f;
 				Shooter->SetRPM(0.0f);
-				Indexer->Intake(false);
 				break;
 		}
 	}
