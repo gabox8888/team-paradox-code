@@ -16,6 +16,7 @@
  * @param asize The size of the array to be analyzed.
  * @return The lowest value in the array.
  */
+
 float ParadoxMath::GetLowest(float array[], int asize)
 {
 	float FltLowest = 99999999;

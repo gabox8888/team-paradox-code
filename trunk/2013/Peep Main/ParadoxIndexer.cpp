@@ -11,10 +11,10 @@
 
 /**
  * Constructor
- * @param relay The port on the digital sidecar to which the relay controller is connected
- * @param victor The port on the digital sidecar to which the victor controller is connected
- * @param digbump The port on the digital sidecar to which the bump sensor is connected
- * @param digphoto The port on the digital sidecar to which the photo sensor is connected
+ * @param relay The port on the digital sidecar to which the relay controller is connected.
+ * @param victor The port on the digital sidecar to which the victor controller is connected.
+ * @param digbump The port on the digital sidecar to which the bump sensor is connected.
+ * @param digphoto The port on the digital sidecar to which the photo sensor is connected.
  */
 
 ParadoxIndexer::ParadoxIndexer(UINT32 relay,UINT32 victor, UINT32 digbump, UINT32 digphoto)
