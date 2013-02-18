@@ -15,6 +15,7 @@ const float shottime		= 3.0f;
 const float shotdelay 		= 5.0f;
 const float autodrivecollect= 0.0f;
 
+//Constants to be used as part of a timer in autonomous
 enum TimerConstants
 {
 	AutoTime_A,
@@ -22,6 +23,7 @@ enum TimerConstants
 	NumOfAutoTimers
 };
 
+//The steps of the autonomous routine
 enum AutoSteps
 {
 	StpInit,
@@ -136,7 +138,7 @@ public:
 				printf("Move\n");
 				
 				Drive->Drive(0.0f);
-				Shooter->SetRPM(-1800.0f);
+				Shooter->SetRPM(-1700.0f);
 				IntFrisbeesToShoot = 3;
 				
 				AutoTime[AutoTime_B] = 99.0f;
@@ -153,7 +155,7 @@ public:
 				printf("Shoot\n");
 				
 				IntFrisbeesToShoot = 3;
-				Shooter->SetRPM(-2100.0f);
+				Shooter->SetRPM(-2000.0f);
 				Shooter->Feed(true);
 				
 				AutoTime[AutoTime_A] = 99.0f;
@@ -212,7 +214,7 @@ public:
 	void TeleopPeriodic(void)
 	{
 			
-		//Eliminates sensitivity issues
+		//Eliminates sensitivity issues on the main joystick
 		if (fabs(JoyMain->GetMagnitude()) <= 0.05)
 		{
 			Drive->ArcadeDrive(0.0,0.0);
@@ -224,20 +226,24 @@ public:
 			Drive->ArcadeDrive(JoyMain->GetY(),JoyMain->GetX());
 		}
 		
+		//Eliminates sensitivity issues on the shooter joystick
 		if (fabs(JoyShoot->GetMagnitude()) <= 0.05)
 		{
 			FltShooterJoy = 0.0f;
 		}
+		
+		//Reads from the shooter joystick
 		else
 		{
 			FltShooterJoy = JoyShoot->GetY();
 		}
 	
-		//Runs the intake system if button 3 on the shooter joystick is pressed
-		
+		//Raises the shooter if the slider is pushed forward
 		if (JoyShoot->GetRawAxis(4)>= 0.0f)
 		{
 			Shooter->Angle(true);
+			
+			//Runs the intake if button 4 is pressed
 			if (JoyShoot->GetRawButton(4))
 			{
 				BlnIntake = true;
@@ -246,6 +252,8 @@ public:
 			{
 				BlnIntake = false;
 			}
+			
+			
 			if (BlnIntake == false)
 			{
 				Indexer->ManualIndex(JoyShoot);
@@ -261,18 +269,17 @@ public:
 			Indexer->AllStop();
 		}
 		
-		//Sets the speed of the shooter based on button presses
+		/* Sets the speed of the shooter based on button presses.
+		 * If button 6 is pressed, then the shooter is stopped.
+		 * If button 11 is pressed, then the shooter runs at 2900 RPM.
+		 * If button 9 is pressed, then the shooter runs at 2000 RPM.
+		 * If button 7 is pressed, then the shooter runs at 4500 RPM.
+		 */
 		if (JoyShoot->GetRawButton(6) == true)  IntShooterSpeed = 0; 
 		if (JoyShoot->GetRawButton(11) == true) IntShooterSpeed = 1; 
 		if (JoyShoot->GetRawButton(9) == true)  IntShooterSpeed = 2; 
-		if (JoyShoot->GetRawButton(7) == true)  IntShooterSpeed = 3; 
+		if (JoyShoot->GetRawButton(7) == true)  IntShooterSpeed = 3;
 		
-		/*
-		 * case 0 Button 6 is pressed. The shooter is stopped.
-		 * case 1 Button 11 is pressed. The shooter runs at 2900 RPM.
-		 * case 2 Button 9 is pressed. The shooter runs at 2000 RPM.
-		 * case 3 Button 7 is pressed. The shooter runs at 4500 RPM.
-		 */
 		switch (IntShooterSpeed)
 		{
 			case 0:
@@ -288,8 +295,10 @@ public:
 				FltShooterSpeed = -4500.f;
 				break;
 		}
-		//Alters speed based on throttle applied to the shooter joystick.
+		
+		//Alters speed based on throttle applied to the shooter joystick and then applies it to the shooter.
 		Shooter->SetRPM(FltShooterSpeed + (FltShooterJoy*1000.0f));
+		
 		//Shoots when the trigger on the shooter joystick is pressed.
 		Shooter->Feed(JoyShoot->GetTrigger());
 		
@@ -304,11 +313,13 @@ public:
 		}
 		Drive->Calibrate(BlnCal);
 		
+		//If button 9 on the main joystick is pressed, raise the lifting arms.
 		if (JoyMain->GetRawButton(9))
 		{
 			SolLifterUp->Set(true);
 			SolLifterDown->Set(false);
 		}
+		//If button 10 on the main joystick is pressed, lower lifting arms.
 		else if (JoyMain->GetRawButton(10))
 		{
 			SolLifterDown->Set(true);
@@ -320,8 +331,6 @@ public:
 		Drive->Dump(DsLCD);
 		Indexer->Dump(DsLCD);
 		DsLCD->UpdateLCD();
-
-	
 	}
 	
 	void TestPeriodic(void) 
