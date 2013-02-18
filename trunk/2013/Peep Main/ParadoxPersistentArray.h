@@ -5,10 +5,7 @@
  * ParadoxPersistentArray.cpp
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved. 
  * Paradox Persistent Array. 
- * This class creates an object in the code to be used as an array that is persistent
- * across all functions. It can be read from and written to as a normal array, but it
- * is not automatically desconstructed when it goes out of scope. This is accomplished
- * by placing the array in a separate text file.
+ * 
  * Authors: Paradox++ 
  */ 
 
