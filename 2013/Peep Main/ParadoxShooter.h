@@ -28,7 +28,9 @@ class ParadoxShooter
     bool IsCalibrated();//returns yes or no if is calibrated or not
     void SetTopSpeed(float topspeed);//manually sets topspeed
     void SetRPM(float speed);//does not actually take RPM, but 1-0 value that gets multiplied by topspeed
-    void Feed(bool primed);//actuates pistons
+    void Feed(bool primed);
+    void Shoot(int disks, float speed);
+    bool DoneShooting();
     void Angle(bool up);
     void AllStop();//turns off just motors
     void Dump(DriverStationLCD *ds);
@@ -43,6 +45,8 @@ class ParadoxShooter
     ParadoxPersistentArray  *PersArrayCalibration;
     bool 		BlnIsCal;
     bool		BlnFire;
+    bool		BlnDoneShooting;
+    int			IntTimer;
     float		FltTopSpeed;
     float 		FltSetSpeed;
     float 		FltActualBack;

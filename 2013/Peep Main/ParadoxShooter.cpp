@@ -1,6 +1,3 @@
-#include "ParadoxShooter.h"
-
-
 /*  
  * ParadoxShooter.cpp
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved. 
@@ -10,13 +7,18 @@
  * Authors: Paradox++ 
  */ 
 
+#include "ParadoxShooter.h"
+
 #define TicksPerRev 17
 #define KCalVoltage 11.5
+
 /** 
  * Constructor 
  * @param front The address of the front mounted Jaguar on the CAN bus.
  * @param back The address of the rear mounted Jaguar on the CAN bus.
- * @param feed The 
+ * @param feeder
+ * @param anglein
+ * @param angleout
  */ 
 
 ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feeder, UINT32 anglein, UINT32 angleout)
@@ -103,6 +105,40 @@ void  ParadoxShooter::Feed(bool primed)
 		RlyFeeder->Set(Relay::kOff);
 	}
 }
+
+/**
+ * Fires a set umber of disks at a set speed. Note that the shooter will
+ * still be spinning upon exiting the function.
+ * @param disks How many disks to be fired.
+ * @param speed The speed to fire the disks at. 
+ */
+
+void ParadoxShooter::Shoot(int disks, float speed)
+{
+	BlnDoneShooting = false;
+	int IntDisks = disks;
+	float FltSpeed = speed;
+	
+	ParadoxShooter::SetRPM(FltSpeed);
+	
+	for (int i = 0; i < IntDisks; i++)
+	{
+		ParadoxShooter::Feed(true);
+	}
+	
+	ParadoxShooter::Feed(false);
+	BlnDoneShooting = true;
+}
+
+/**
+ * Determines whether Shoot() has completed or not.
+ * @return Whether or not the robot is done shooting.
+ */
+bool ParadoxShooter::DoneShooting()
+{
+	return BlnDoneShooting;
+}
+
 void ParadoxShooter::Angle(bool up)
 {
 	if (up == true)
