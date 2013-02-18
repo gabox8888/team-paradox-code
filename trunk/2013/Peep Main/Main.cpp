@@ -8,14 +8,7 @@
 
 #include "ParadoxLib.h"
 
-const float inittime		= 4.0f;
-const float alliancedelay 	= 0.0f;
-const float autodriveshoot 	= 0.0f;
-const float shottime		= 3.0f;
-const float shotdelay 		= 5.0f;
-const float autodrivecollect= 0.0f;
-
-//Constants to be used as part of a timer in autonomous
+//Constants to be used as part of a timer in autonomous.
 enum TimerConstants
 {
 	AutoTime_A,
@@ -23,14 +16,21 @@ enum TimerConstants
 	NumOfAutoTimers
 };
 
-//The steps of the autonomous routine
+//Times for the timers. Units are seconds.
+const float init			= 4.0f;
+const float alliancedelay 	= 0.0f;
+const float drivealign 		= 0.0f;
+const float shoot			= 3.0f;
+const float shotdelay 		= 5.0f;
+const float drivecollect	= 0.0f;
+
+//The steps of the autonomous routine.
 enum AutoSteps
 {
 	StpInit,
 	StpDelay,
 	StpMoveForward,
 	StpShootThree,
-	StpWait,
 	StpMoveToPickUp,
 	StpShootFour,
 	StpStop
@@ -50,8 +50,8 @@ class ParadoxBot : public IterativeRobot
 	Compressor			*CompMain;
 	DriverStationLCD	*DsLCD;
 	AxisCamera			*CamMain;
-	Solenoid 			*SolLifterUp;
-	Solenoid			*SolLifterDown;
+	Solenoid 			*SolLifterDown;
+	Solenoid			*SolLifterUp;
 	
 	bool BlnIsSucking;
 	bool BlnIntake;
@@ -67,7 +67,7 @@ public:
 	ParadoxBot()
 	{
 		Drive			= new ParadoxDrive (4,5,8,9);
-		Shooter			= new ParadoxShooter (6,7,2,1,2);
+		Shooter			= new ParadoxShooter (6,7,2,2,1);
 		Indexer 		= new ParadoxIndexer(8,10,12,13);
 		
 		JoyMain	 		= new Joystick(1);
@@ -75,8 +75,8 @@ public:
 		CompMain		= new Compressor(14,1);
 		DsLCD			= DriverStationLCD::GetInstance();
 		CamMain 		= &AxisCamera::GetInstance("10.21.2.11");
-		SolLifterUp 	= new Solenoid(3);
-		SolLifterDown 	= new Solenoid(4);
+		SolLifterDown 	= new Solenoid(3);
+		SolLifterUp 	= new Solenoid(4);
 		
 		BlnIntake = false;
 		BlnCal = false;
@@ -120,7 +120,7 @@ public:
 				Shooter->Angle(false);
 				
 				AutoTime[AutoTime_B] = 99.0f;
-				if (AutoTime[AutoTime_A] > 90.0f) AutoTime[AutoTime_A] = inittime;
+				if (AutoTime[AutoTime_A] > 90.0f) AutoTime[AutoTime_A] = init;
 				if (AutoTime[AutoTime_A] <= 0.0f) Auto = StpDelay;
 				break;
 						
@@ -142,7 +142,7 @@ public:
 				IntFrisbeesToShoot = 3;
 				
 				AutoTime[AutoTime_B] = 99.0f;
-				if (AutoTime[AutoTime_A] > 90.0f) AutoTime[AutoTime_A] = autodriveshoot;
+				if (AutoTime[AutoTime_A] > 90.0f) AutoTime[AutoTime_A] = drivealign;
 				if (AutoTime[AutoTime_A] <= 0.0f) 
 				{
 					Drive->Drive(0.0f);
@@ -150,30 +150,12 @@ public:
 				}
 				break;
 			
-			//Shoots a single disk and then delays the routine
+			//Shoots three disks
 			case StpShootThree:
 				printf("Shoot\n");
 				
-				IntFrisbeesToShoot = 3;
-				Shooter->SetRPM(-2000.0f);
-				Shooter->Feed(true);
-				
-				AutoTime[AutoTime_A] = 99.0f;
-				if (AutoTime[AutoTime_B] > 90.0f) AutoTime[AutoTime_B] = shottime;
-				if (AutoTime[AutoTime_B] <= 0.0f) Auto = StpWait;
-				break;
-				
-			//Delays the routine for a set number of seconds
-			case StpWait:
-				printf("Wait\n");
-				
-				IntFrisbeesToShoot--;
-				Shooter->Feed(false);
-				
-				AutoTime[AutoTime_B] = 99.0f;
-				if (AutoTime[AutoTime_A] > 90.0f) AutoTime[AutoTime_A] = shotdelay;
-				if (IntFrisbeesToShoot >= 1) Auto = StpShootThree;
-				else if (AutoTime[AutoTime_A] <= 0.0f) Auto = StpMoveToPickUp;
+				Shooter->Shoot(IntFrisbeesToShoot,-2000.0f);
+				if(Shooter->DoneShooting() == true) Auto = StpMoveToPickUp;
 				break;
 				
 			//Drives foward for a set number of seconds and runs the intake system
@@ -184,7 +166,7 @@ public:
 				Indexer->Intake(false, false);
 				
 				AutoTime[AutoTime_A] = 99.0f;
-				if (AutoTime[AutoTime_B] > 90.0f) AutoTime[AutoTime_B] = autodrivecollect;
+				if (AutoTime[AutoTime_B] > 90.0f) AutoTime[AutoTime_B] = drivecollect;
 				if (AutoTime[AutoTime_B] <= 0.0f)
 				{
 					Drive->Drive(0.0f);
@@ -342,4 +324,4 @@ public:
 	}
 };
 
-START_ROBOT_CLASS(ParadoxBot);
+START_ROBOT_CLASS(ParadoxBot);	
