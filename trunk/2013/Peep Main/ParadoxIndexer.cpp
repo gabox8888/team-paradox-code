@@ -60,11 +60,18 @@ void ParadoxIndexer::Intake(bool suck, bool safety)
 			//If the input is true, runs the intake belt until a disk is detected.
 			case Rollers:
 				VicIntake->Set(0.0f);
-				if ((suck == true)&&(DigPhotoSuck->Get() == 0))
+				if (DigPhotoSuck->Get() == 0)
 				{
-					RlyIntake->Set(Relay::kForward);
+					if (suck == true)
+					{
+						RlyIntake->Set(Relay::kForward);
+					}
+					else
+					{
+						RlyIntake->Set(Relay::kOff);
+					}
 				}
-				else if (DigPhotoSuck->Get() == 1)
+				else
 				{
 					RlyIntake->Set(Relay::kOff);
 					PickUp = Up;

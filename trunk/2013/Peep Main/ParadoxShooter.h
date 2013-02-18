@@ -31,6 +31,7 @@ class ParadoxShooter
     void Feed(bool primed);//actuates pistons
     void Angle(bool up);
     void AllStop();//turns off just motors
+    void Dump(DriverStationLCD *ds);
 
   protected:
     CANJaguar 		*JagFront;
@@ -42,7 +43,6 @@ class ParadoxShooter
     ParadoxPersistentArray  *PersArrayCalibration;
     bool 		BlnIsCal;
     bool		BlnFire;
-    int			IntTimer;
     float		FltTopSpeed;
     float 		FltSetSpeed;
     float 		FltActualBack;
