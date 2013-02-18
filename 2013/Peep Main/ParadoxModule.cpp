@@ -47,14 +47,17 @@ void ParadoxModule::SetRPM(float speed)
 }
 
 /**
- * Sets the jaguar to a speed expressed in a percentage of max voltage
- * @param speed A value between 1 and -1 representing the input
+ * Sets the jaguar to a speed expressed in voltage and then returns
+ * the control mode to RPM.
+ * @param speed A value representing the input in voltage
  */
 
 void ParadoxModule::SetSpeedVoltage(float speed)
 {
+  printf("Voltage In /n");
   JagSpeed->ChangeControlMode(CANJaguar::kPercentVbus);
   JagSpeed->Set(speed); 
+  printf("Voltage Out /n");
 }
 
 /**

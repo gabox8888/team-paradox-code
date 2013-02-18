@@ -1,5 +1,6 @@
 #include "ParadoxShooter.h"
 
+
 /*  
  * ParadoxShooter.cpp
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved. 
@@ -11,22 +12,20 @@
 
 #define TicksPerRev 17
 #define KCalVoltage 11.5
-
 /** 
  * Constructor 
  * @param front The address of the front mounted Jaguar on the CAN bus.
  * @param back The address of the rear mounted Jaguar on the CAN bus.
- * @param feeder The port on the digital sidecar to which the relay controller is connected.
- * @param anglein The module number of the solenoid.
- * @param angleout The port number of the solenoid.
+ * @param feed The 
  */ 
 
 ParadoxShooter::ParadoxShooter(UINT32 front, UINT32 back, UINT32 feeder, UINT32 anglein, UINT32 angleout)
 {
-	JagFront 	= new CANJaguar(front);//gives solenoid and jaguars reference #'s
-	JagBack	 	= new CANJaguar(back);
-	RlyFeeder	= new Relay(feeder);
-	SolAngle	= new Solenoid(anglein,angleout);
+	JagFront 		= new CANJaguar(front);//gives solenoid and jaguars reference #'s
+	JagBack	 		= new CANJaguar(back);
+	RlyFeeder		= new Relay(feeder);
+	SolAngleUp		= new Solenoid(anglein);
+	SolAngleDown	= new Solenoid(angleout);
 	ModuleCalculator = new ParadoxMath;   
 	PersArrayCalibration = new ParadoxPersistentArray("shootercalibration.txt",1);
 	ParadoxShooter::InitParadoxShooter();
@@ -46,20 +45,21 @@ float ParadoxShooter::Calibrate()
 	JagFront->Set(KCalVoltage);
 	//JagBack->Set(KCalVoltage);
 
-	for(int i = 0; i < 5; i++ )
-	{
-		FltArray[i] = JagFront->GetSpeed();   
-	}
-	FltTopSpeed = ModuleCalculator->GetLowest(FltArray, 4);
-	PersArrayCalibration->Write(FltTopSpeed,1);
-	BlnIsCal = true;
-	return FltTopSpeed;
+  for(int i = 0; i < 5; i++ )
+  {
+      FltArray[i] = JagFront->GetSpeed();   
+  }
+  FltTopSpeed = ModuleCalculator->GetLowest(FltArray, 4);
+  PersArrayCalibration->Write(FltTopSpeed,1);
+  BlnIsCal = true;
+  return FltTopSpeed;
 }
 
 /**
  * Takes the top speed as an input, probably from a text file, and writes
  * it to FltTopSpeed.
- * @param topspeed The previously determined top speed from Calibrate().
+ * @param topspeed The previously determined top speed from the Calibrate().
+ * function
  */
 
 void ParadoxShooter::SetTopSpeed(float topspeed)
@@ -76,10 +76,7 @@ bool ParadoxShooter::IsCalibrated()
 {
 	return BlnIsCal;
 }
-
-/**
- * 
- */
+//sets percent of topspeed
 void  ParadoxShooter::SetRPM(float speed)
 {
 	FltSetSpeed = speed;
@@ -87,13 +84,14 @@ void  ParadoxShooter::SetRPM(float speed)
 	JagBack->Set(FltSetSpeed);
 	FltDiffFront = fabs(FltSetSpeed - (JagFront->GetSpeed()));
 	FltDiffBack  = fabs(FltSetSpeed - (JagBack->GetSpeed()));
+
 }
 
 //actuates pistons
 void  ParadoxShooter::Feed(bool primed)
 {
 	BlnFire = primed;
-	IntTimer = 5;
+	IntTimer = 500;
 	if ((BlnFire == true))//if ((FltDiffBack == 100.0f) && (FltDiffFront == 100.0f) && (BlnFire == true))
 	{
 		while (IntTimer >= 0)
@@ -106,7 +104,20 @@ void  ParadoxShooter::Feed(bool primed)
 	else
 	{
 		RlyFeeder->Set(Relay::kOff);
-		IntTimer = 5;
+		IntTimer = 500;
+	}
+}
+void ParadoxShooter::Angle(bool up)
+{
+	if (up == true)
+	{
+		SolAngleUp->Set(true);
+		SolAngleDown->Set(false);
+	}
+	else
+	{
+		SolAngleUp->Set(false);
+		SolAngleDown->Set(true);	
 	}
 }
 //stops motors
