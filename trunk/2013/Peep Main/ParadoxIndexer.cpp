@@ -42,7 +42,7 @@ void ParadoxIndexer::Intake(bool suck, bool safety)
 {
 	if (safety == true)
 	{
-			switch (PickUp)
+		switch (PickUp)
 		{
 			//Positions a finger on the internal belt in front of the lower photo sensor.
 			case Align:
