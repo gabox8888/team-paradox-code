@@ -328,7 +328,8 @@ public:
 		
 		//Update Driver Station display
 		DsLCD->PrintfLine(DriverStationLCD::kUser_Line1,"Speed: %f",FltShooterSpeed + (JoyShoot->GetY()*1000.0f));
-		Drive->Dump(DsLCD);
+		//Drive->Dump(DsLCD);
+		Shooter->Dump(DsLCD);
 		Indexer->Dump(DsLCD);
 		DsLCD->UpdateLCD();
 	}

@@ -90,21 +90,17 @@ void  ParadoxShooter::SetRPM(float speed)
 //actuates pistons
 void  ParadoxShooter::Feed(bool primed)
 {
+	FltDiffFront = fabs(fabs(FltSetSpeed) - (JagFront->GetSpeed()));
+	FltDiffBack  = fabs(fabs(FltSetSpeed) - (JagBack->GetSpeed()));
 	BlnFire = primed;
-	IntTimer = 500;
-	if ((BlnFire == true))//if ((FltDiffBack == 100.0f) && (FltDiffFront == 100.0f) && (BlnFire == true))
+	if ((FltDiffBack < 100.0f) && (FltDiffFront < 100.0f) && (BlnFire == true) && (JagFront->GetOutputCurrent() < 20) && (JagBack->GetOutputCurrent() < 20))
 	{
-		while (IntTimer >= 0)
-		{
-			RlyFeeder->Set(Relay::kForward);
-			IntTimer--;
-		}
+		RlyFeeder->Set(Relay::kForward);
 		BlnFire = false;
 	}
 	else
 	{
 		RlyFeeder->Set(Relay::kOff);
-		IntTimer = 500;
 	}
 }
 void ParadoxShooter::Angle(bool up)
@@ -127,13 +123,20 @@ void ParadoxShooter::AllStop()
 	JagBack->Set(0);
 }
 
+void ParadoxShooter::Dump(DriverStationLCD *ds)
+{
+	ds->PrintfLine(DriverStationLCD::kUser_Line2, "front amps %f", JagFront->GetOutputCurrent());
+	ds->PrintfLine(DriverStationLCD::kUser_Line3, "back amps %f", JagBack->GetOutputCurrent());
+	ds->PrintfLine(DriverStationLCD::kUser_Line4, "front spd %f", JagFront->GetSpeed());
+	ds->PrintfLine(DriverStationLCD::kUser_Line5, "back spd %f", JagBack->GetSpeed());
+}
+
 void ParadoxShooter::InitParadoxShooter()
 {
 	InitJaguar();
 
 	BlnIsCal = false;
 	BlnFire = false;
-	IntTimer = 0;
 	FltTopSpeed = 999.0f;
 	FltSetSpeed = 0.0f;
 }
