@@ -11,8 +11,6 @@
 
 #include "ParadoxModule.h"
 
-#define TicksPerRev 30
-#define CalibrationVoltage 11.5
 
 /**
  * Constructor
@@ -21,7 +19,7 @@
 
 ParadoxModule::ParadoxModule(UINT32 channel)
 {
-  JagSpeed = new CANJaguar(channel);
+  VicSpeed = new Victor(channel);
   
   InitParadoxModule();
  }
@@ -33,7 +31,7 @@ ParadoxModule::ParadoxModule(UINT32 channel)
 
 double ParadoxModule::GetRPM()
 {
-	return JagSpeed->GetSpeed();
+	return 1;
 }
 
 /**
@@ -43,7 +41,7 @@ double ParadoxModule::GetRPM()
 
 void ParadoxModule::SetRPM(float speed)
 {
-  JagSpeed->Set(FltTopSpeed * speed); 
+ 
 }
 
 /**
@@ -54,10 +52,7 @@ void ParadoxModule::SetRPM(float speed)
 
 void ParadoxModule::SetSpeedVoltage(float speed)
 {
-  printf("Voltage In /n");
-  JagSpeed->ChangeControlMode(CANJaguar::kPercentVbus);
-  JagSpeed->Set(speed); 
-  printf("Voltage Out /n");
+  VicSpeed->Set(speed);
 }
 
 /**
@@ -67,7 +62,7 @@ void ParadoxModule::SetSpeedVoltage(float speed)
 
 void ParadoxModule::SetTopSpeed(float speed)
 {
-	FltTopSpeed = speed;
+	
 }
 
 /**
@@ -77,10 +72,7 @@ void ParadoxModule::SetTopSpeed(float speed)
 
 float ParadoxModule::Calibrate()
 {
-		JagSpeed->ChangeControlMode(CANJaguar::kVoltage);
-		JagSpeed->Set(CalibrationVoltage);
-		
-		return JagSpeed->GetSpeed();
+		return 1;
 }
 
 /**
@@ -89,10 +81,5 @@ float ParadoxModule::Calibrate()
 
 void ParadoxModule::InitParadoxModule()
 {   
-	JagSpeed->ChangeControlMode(CANJaguar::kSpeed);
-	JagSpeed->SetSpeedReference(CANJaguar::kSpeedRef_Encoder);
-	JagSpeed->EnableControl();
-	JagSpeed->SetSafetyEnabled(false);
-	JagSpeed->ConfigEncoderCodesPerRev(TicksPerRev);
-	JagSpeed->SetPID(0.7f,0.005f,0.0f);
+
 }

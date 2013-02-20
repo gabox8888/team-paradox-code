@@ -21,7 +21,7 @@
 class ParadoxDrive
 {
 	public:
-		ParadoxDrive(UINT32 JagOne, UINT32 JagTwo, UINT32 JagThree, UINT32 JagFour);
+		ParadoxDrive(UINT32 VicLeft, UINT32 VicRight);
 		virtual ~ParadoxDrive(){};
 		
 		void Calibrate(bool enabled);
@@ -31,10 +31,8 @@ class ParadoxDrive
 		void Dump(DriverStationLCD *ds);
 		
 	protected:
-		ParadoxModule *ModuleOne;
-		ParadoxModule *ModuleTwo;
-		ParadoxModule *ModuleThree;
-		ParadoxModule *ModuleFour;
+		ParadoxModule *ModuleLeft;
+		ParadoxModule *ModuleRight;
 		ParadoxPersistentArray *PersArrayCalibration;
 		bool BlnIsCalibrating;
 		float FltLowest;
