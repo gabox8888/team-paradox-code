@@ -68,13 +68,13 @@ public:
 	{
 		Drive			= new ParadoxDrive (8,9);
 		Shooter			= new ParadoxShooter (6,7,2,2,1);
-		Indexer 		= new ParadoxIndexer(8,10,12,13);
+		Indexer 		= new ParadoxIndexer(3,10,1,2);
 		
 		JoyMain	 		= new Joystick(1);
 		JoyShoot		= new Joystick(2);
 		CompMain		= new Compressor(14,1);
 		DsLCD			= DriverStationLCD::GetInstance();
-		CamMain 		= &AxisCamera::GetInstance("10.21.2.11");
+		//CamMain 		= &AxisCamera::GetInstance("10.21.2.11");
 		SolLifterDown 	= new Solenoid(3);
 		SolLifterUp 	= new Solenoid(4);
 		

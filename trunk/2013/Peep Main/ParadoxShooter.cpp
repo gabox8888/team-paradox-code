@@ -9,7 +9,7 @@
 
 #include "ParadoxShooter.h"
 
-#define TicksPerRev 17
+#define TicksPerRev 30
 #define KCalVoltage 11.5
 
 /** 
