@@ -18,15 +18,10 @@
  * @param JagFour The the address of a Jaguar on the CAN bus.
  */
 
-ParadoxDrive::ParadoxDrive(UINT32 JagOne, UINT32 JagTwo, UINT32 JagThree, UINT32 JagFour)
+ParadoxDrive::ParadoxDrive(UINT32 VicLeft, UINT32 VicRight)
 {
-	ModuleOne 	= new ParadoxModule(JagOne);
-	ModuleTwo	= new ParadoxModule(JagTwo);
-	ModuleThree = new ParadoxModule(JagThree);
-	ModuleFour 	= new ParadoxModule(JagFour);
-	PersArrayCalibration = new ParadoxPersistentArray("drivecalibration.txt", 1);
-	
-	BlnIsCalibrating = false;
+	ModuleLeft 	= new ParadoxModule(VicLeft);
+	ModuleRight	= new ParadoxModule(VicRight);
 }
 
 /**
@@ -36,30 +31,6 @@ ParadoxDrive::ParadoxDrive(UINT32 JagOne, UINT32 JagTwo, UINT32 JagThree, UINT32
 
 void ParadoxDrive::Calibrate(bool enabled)
 {
-	if (enabled == true && BlnIsCalibrating == false) 
-	{
-		BlnIsCalibrating = true;
-	}
-	if (BlnIsCalibrating == true)
-	{
-		FltArrayTopSpeeds[0] = ModuleOne->Calibrate();
-		FltArrayTopSpeeds[1] = ModuleTwo->Calibrate();
-		FltArrayTopSpeeds[2] = ModuleThree->Calibrate();
-		FltArrayTopSpeeds[3] = ModuleFour->Calibrate();
-	}
-	if (enabled == false && BlnIsCalibrating == true)
-	{
-		FltLowest = 9999999;
-		for (int i = 0; i < 4; i++)
-		{
-			if ((FltArrayTopSpeeds[i] < FltLowest) && (FltArrayTopSpeeds[i] != 0))
-			{
-				FltLowest = FltArrayTopSpeeds[i];
-			}
-		}
-		PersArrayCalibration->Write(FltLowest, 0);
-		BlnIsCalibrating = false;
-	}
 	
 }
 
@@ -75,16 +46,8 @@ void ParadoxDrive::TankDrive(float left, float right)
 	float FltLeft = left;
 	float FltRight = right;
 	
-	float FltTopSpeed = PersArrayCalibration->Read(0);
-	ModuleOne->SetTopSpeed(FltTopSpeed);
-	ModuleTwo->SetTopSpeed(FltTopSpeed);
-	ModuleThree->SetTopSpeed(FltTopSpeed);
-	ModuleFour->SetTopSpeed(FltTopSpeed);
-	
-	ModuleOne->SetSpeedVoltage(FltLeft);
-	ModuleTwo->SetSpeedVoltage(FltLeft);
-	ModuleThree->SetSpeedVoltage(FltRight);
-	ModuleFour->SetSpeedVoltage(FltRight);
+	ModuleLeft->SetSpeedVoltage(FltLeft);
+	ModuleRight->SetSpeedVoltage(FltRight);
 }
 
 /**
@@ -141,10 +104,7 @@ void ParadoxDrive::ArcadeDrive(float rotate, float move)
 
 void ParadoxDrive::Drive(float rpm)
 {
-	ModuleOne->SetRPM(rpm);
-	ModuleTwo->SetRPM(rpm);
-	ModuleThree->SetRPM(rpm);
-	ModuleFour->SetRPM(rpm);
+	
 }
 
 /**
@@ -157,8 +117,5 @@ void ParadoxDrive::Drive(float rpm)
 
 void ParadoxDrive::Dump(DriverStationLCD *ds)
 {
-	ds->PrintfLine(DriverStationLCD::kUser_Line2, "MOne %f", ModuleOne->GetRPM());
-	ds->PrintfLine(DriverStationLCD::kUser_Line3, "MTwo %f", ModuleTwo->GetRPM());
-	ds->PrintfLine(DriverStationLCD::kUser_Line4, "MThree %f", ModuleThree->GetRPM());
-	ds->PrintfLine(DriverStationLCD::kUser_Line5, "MFour %f", ModuleFour->GetRPM());
+	
 }

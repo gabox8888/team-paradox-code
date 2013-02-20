@@ -66,7 +66,7 @@ class ParadoxBot : public IterativeRobot
 public:
 	ParadoxBot()
 	{
-		Drive			= new ParadoxDrive (4,5,8,9);
+		Drive			= new ParadoxDrive (8,9);
 		Shooter			= new ParadoxShooter (6,7,2,2,1);
 		Indexer 		= new ParadoxIndexer(8,10,12,13);
 		
@@ -293,7 +293,6 @@ public:
 		{
 			BlnCal = false;
 		}
-		Drive->Calibrate(BlnCal);
 		
 		//If button 9 on the main joystick is pressed, raise the lifting arms.
 		if (JoyMain->GetRawButton(9))

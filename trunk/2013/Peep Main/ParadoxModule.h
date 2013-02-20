@@ -19,7 +19,7 @@
 class ParadoxModule
 {
 	public:			
-	ParadoxModule(UINT32 JagChannel);
+		ParadoxModule(UINT32 VicChannel);
 		virtual ~ParadoxModule(){};
 		
 		double GetRPM();
@@ -30,7 +30,7 @@ class ParadoxModule
 		
 	protected:
 		void InitParadoxModule();
-		CANJaguar *JagSpeed;
+		Victor *VicSpeed;
 		float FltTopSpeed;
 		float FltAvgNum[4];  	
 
