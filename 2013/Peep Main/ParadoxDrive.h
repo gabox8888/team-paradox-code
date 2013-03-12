@@ -21,7 +21,7 @@
 class ParadoxDrive
 {
 	public:
-		ParadoxDrive(UINT32 VicLeft, UINT32 VicRight);
+		ParadoxDrive(UINT32 VicLeft, UINT32 VicRight, UINT32 EncoLeft, UINT32 EncoRight);
 		virtual ~ParadoxDrive(){};
 		
 		void Calibrate(bool enabled);
@@ -29,6 +29,8 @@ class ParadoxDrive
 		void ArcadeDrive(float move, float rotate);
 		void Drive(float rpm);
 		void Dump(DriverStationLCD *ds);
+		float GetDistance();
+		void ResetDistance();
 		
 	protected:
 		ParadoxModule *ModuleLeft;

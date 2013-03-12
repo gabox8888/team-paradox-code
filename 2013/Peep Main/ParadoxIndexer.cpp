@@ -21,8 +21,8 @@ ParadoxIndexer::ParadoxIndexer(UINT32 relay,UINT32 victor, UINT32 digbump, UINT3
 {	
 	VicIntake 		= new Victor(victor);
 	RlyIntake 		= new Relay(relay);	
-	DigPhotoSuck	= new DigitalInput(digbump);
-	DigPhotoUp 		= new DigitalInput(digphoto);
+	DigPhotoFrisbee	= new DigitalInput(digbump);
+	DigPhotoFinger 	= new DigitalInput(digphoto);
 	
 	PickUp 			= Align;
 	BlnAlternate	= false;
@@ -46,11 +46,11 @@ void ParadoxIndexer::Intake(bool suck, bool safety)
 		{
 			//Positions a finger on the internal belt in front of the lower photo sensor.
 			case Align:
-				if (DigPhotoUp->Get() == 0)
+				if (DigPhotoFinger->Get() == 1)
 				{
-					VicIntake->Set(-0.8f);
+					VicIntake->Set(0.8f);
 				}
-				else if (DigPhotoUp->Get() == 1)
+				else if (DigPhotoFinger->Get() == 0)
 				{
 					PickUp = Rollers;
 					VicIntake->Set(0.0f);
@@ -60,18 +60,11 @@ void ParadoxIndexer::Intake(bool suck, bool safety)
 			//If the input is true, runs the intake belt until a disk is detected.
 			case Rollers:
 				VicIntake->Set(0.0f);
-				if (DigPhotoSuck->Get() == 0)
+				if ((DigPhotoFrisbee->Get() == 0)&&(suck == true))
 				{
-					if (suck == true)
-					{
-						RlyIntake->Set(Relay::kForward);
-					}
-					else
-					{
-						RlyIntake->Set(Relay::kOff);
-					}
+					RlyIntake->Set(Relay::kForward);
 				}
-				else
+				else if (DigPhotoFrisbee->Get() == 1)
 				{
 					RlyIntake->Set(Relay::kOff);
 					PickUp = Up;
@@ -80,9 +73,9 @@ void ParadoxIndexer::Intake(bool suck, bool safety)
 				
 			//If a disk is detected, draws it up to the magazine. Then realigns for the next disk.
 			case Up:
-				if (DigPhotoSuck->Get() == 1)
+				if (DigPhotoFrisbee->Get() == 1)
 				{
-					VicIntake->Set(-0.8f);
+					VicIntake->Set(0.8f);
 				}
 				else 
 				{
@@ -147,5 +140,19 @@ void ParadoxIndexer::AllStop()
 
 void ParadoxIndexer::Dump(DriverStationLCD *ds)
 {
-	ds->PrintfLine(DriverStationLCD::kUser_Line6, "Sens: %d", DigPhotoUp->Get());
+	if (DigPhotoFrisbee->Get() == true )ds->PrintfLine(DriverStationLCD::kUser_Line6, "GO!");
+	else ds->PrintfLine(DriverStationLCD::kUser_Line6,"NO FRISBEE");
+}
+
+void ParadoxIndexer::Suck(bool roll)
+{
+	if (roll == true)
+	{
+		RlyIntake->Set(Relay::kForward);
+	}
+	//If trigger is not pressed, stop internal belt.
+	if(roll == false) 
+	{
+		RlyIntake->Set(Relay::kOff);
+	}
 }

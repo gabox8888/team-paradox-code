@@ -19,7 +19,7 @@
 class ParadoxModule
 {
 	public:			
-		ParadoxModule(UINT32 VicChannel);
+		ParadoxModule(UINT32 channel, UINT32 enco);
 		virtual ~ParadoxModule(){};
 		
 		double GetRPM();
@@ -27,10 +27,13 @@ class ParadoxModule
 		void SetSpeedVoltage(float speed);
 		void SetTopSpeed(float speed);
 		float Calibrate();
+		float GetRevolutions();
+		void ResetRevolutions();
 		
 	protected:
 		void InitParadoxModule();
 		Victor *VicSpeed;
+		Encoder *EncoCounter;
 		float FltTopSpeed;
 		float FltAvgNum[4];  	
 

@@ -11,9 +11,12 @@
 
 #include "ParadoxLib.h"
 
+#include "math.h"
+
 #include "ParadoxDrive.h"
 #include "ParadoxShooter.h"
 #include "ParadoxTracker.h"
 #include "ParadoxIndexer.h"
+#include "ParadoxAutonomous.h"
 
 #endif 

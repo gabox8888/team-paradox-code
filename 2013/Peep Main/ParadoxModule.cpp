@@ -11,19 +11,31 @@
 
 #include "ParadoxModule.h"
 
-
+#define CPR 81;
 /**
  * Constructor
  * @param channel The the address of the Jaguar on the CAN bus.
  */
 
-ParadoxModule::ParadoxModule(UINT32 channel)
+ParadoxModule::ParadoxModule(UINT32 channel, UINT32 enco)
 {
   VicSpeed = new Victor(channel);
-  
+  EncoCounter = new Encoder(enco, NULL);
   InitParadoxModule();
- }
+  
+  EncoCounter->Start();
+}
 
+float ParadoxModule::GetRevolutions()
+{
+	return EncoCounter->GetRaw() / CPR;
+}
+
+void ParadoxModule::ResetRevolutions()
+{
+	EncoCounter->Start();
+	EncoCounter->Reset();
+}
 /**
  * Gets the current speed in rotations per minute.
  * @return The current speed as a double.

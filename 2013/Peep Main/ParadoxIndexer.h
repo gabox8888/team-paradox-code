@@ -28,14 +28,15 @@ public:
 	virtual ~ParadoxIndexer() {};
 	void ManualIndex(Joystick *Joy);
 	void Intake(bool suck, bool safety);
+	void Suck(bool roll);
 	void Dump(DriverStationLCD *ds);
 	void AllStop();
 	
 protected:
 	Victor *VicIntake;
 	Relay *RlyIntake;
-	DigitalInput *DigPhotoSuck;
-	DigitalInput *DigPhotoUp;
+	DigitalInput *DigPhotoFrisbee;
+	DigitalInput *DigPhotoFinger;
 	
 	PickUpStates PickUp;
 	

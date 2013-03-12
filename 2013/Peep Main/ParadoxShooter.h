@@ -47,6 +47,7 @@ class ParadoxShooter
     bool		BlnFire;
     bool		BlnDoneShooting;
     int			IntTimer;
+    int 		IntDisks;
     float		FltTopSpeed;
     float 		FltSetSpeed;
     float 		FltActualBack;
