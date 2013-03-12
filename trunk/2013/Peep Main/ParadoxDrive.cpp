@@ -18,16 +18,31 @@
  * @param JagFour The the address of a Jaguar on the CAN bus.
  */
 
-ParadoxDrive::ParadoxDrive(UINT32 VicLeft, UINT32 VicRight)
+#define CIRCUMFRENCE 28
+
+ParadoxDrive::ParadoxDrive(UINT32 VicLeft, UINT32 VicRight, UINT32 EncoLeft, UINT32 EncoRight)
 {
-	ModuleLeft 	= new ParadoxModule(VicLeft);
-	ModuleRight	= new ParadoxModule(VicRight);
+	ModuleLeft 	= new ParadoxModule(VicLeft, EncoLeft);
+	ModuleRight	= new ParadoxModule(VicRight, EncoRight);
+	ModuleLeft->ResetRevolutions();
+	ModuleRight->ResetRevolutions();
 }
 
 /**
  * Calibrates each Jaguar's top speed to the top speed of the
  * slowest Jaguar.
  */
+
+void ParadoxDrive::ResetDistance()
+{
+	ModuleLeft->ResetRevolutions();
+	ModuleRight->ResetRevolutions();
+}
+
+float ParadoxDrive::GetDistance()
+{
+	return ((ModuleLeft->GetRevolutions() + ModuleRight->GetRevolutions()) / 2) * CIRCUMFRENCE;
+}
 
 void ParadoxDrive::Calibrate(bool enabled)
 {

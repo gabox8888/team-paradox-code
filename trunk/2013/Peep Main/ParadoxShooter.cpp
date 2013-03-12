@@ -82,8 +82,8 @@ bool ParadoxShooter::IsCalibrated()
 void  ParadoxShooter::SetRPM(float speed)
 {
 	FltSetSpeed = speed;
-	JagFront->Set(-FltSetSpeed);
-	JagBack->Set(FltSetSpeed);
+	JagFront->Set(FltSetSpeed);
+	JagBack->Set(-FltSetSpeed);
 	FltDiffFront = fabs(FltSetSpeed - (JagFront->GetSpeed()));
 	FltDiffBack  = fabs(FltSetSpeed - (JagBack->GetSpeed()));
 
@@ -95,7 +95,7 @@ void  ParadoxShooter::Feed(bool primed)
 	FltDiffFront = fabs(fabs(FltSetSpeed) - (JagFront->GetSpeed()));
 	FltDiffBack  = fabs(fabs(FltSetSpeed) - (JagBack->GetSpeed()));
 	BlnFire = primed;
-	if ((FltDiffBack < 100.0f) && (FltDiffFront < 100.0f) && (BlnFire == true) && (JagFront->GetOutputCurrent() < 20) && (JagBack->GetOutputCurrent() < 20))
+	if ((FltDiffBack < 100.0f) && (FltDiffFront < 100.0f) && (BlnFire == true) && (JagFront->GetOutputCurrent() < 25) && (JagBack->GetOutputCurrent() < 25))
 	{
 		RlyFeeder->Set(Relay::kForward);
 		BlnFire = false;
@@ -115,19 +115,34 @@ void  ParadoxShooter::Feed(bool primed)
 
 void ParadoxShooter::Shoot(int disks, float speed)
 {
-	BlnDoneShooting = false;
-	int IntDisks = disks;
 	float FltSpeed = speed;
+	bool BlnFired;
 	
 	ParadoxShooter::SetRPM(FltSpeed);
 	
-	for (int i = 0; i < IntDisks; i++)
+	if (disks > IntDisks)
 	{
+		BlnDoneShooting = false;
 		ParadoxShooter::Feed(true);
+		if ((JagFront->GetOutputCurrent() > 16) && (JagBack->GetOutputCurrent() > 16) && (JagFront->GetOutputCurrent() < 33) && (JagBack->GetOutputCurrent() < 33))
+		{
+			BlnFired = true;
+		}
+		else 
+		{
+			BlnFired = false;
+		}
+		if (BlnFired == true) 
+		{
+			printf ("Shoot \n");
+			IntDisks++;
+		}
 	}
-	
-	ParadoxShooter::Feed(false);
-	BlnDoneShooting = true;
+	if (IntDisks == disks)
+	{
+		ParadoxShooter::Feed(false);
+		BlnDoneShooting = true;
+	}
 }
 
 /**
@@ -173,6 +188,8 @@ void ParadoxShooter::InitParadoxShooter()
 
 	BlnIsCal = false;
 	BlnFire = false;
+	BlnDoneShooting = false;
+	IntDisks = 0;
 	FltTopSpeed = 999.0f;
 	FltSetSpeed = 0.0f;
 }
