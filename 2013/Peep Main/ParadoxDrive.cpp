@@ -3,22 +3,22 @@
  * Copyright (c) Team Paradox 2102 Year: 2013. All rights reserved.
  * Paradox Drive.
  * This class serves to create an object in the code that represents a collection
- * of four independently controlled gearboxes, the Jaguars controlling them, and 
- * the encoders attached to those Jaguars.
+ * of four independently controlled gearboxes, the Victors controlling them, and
+ * the encoders associated with those Victors.
  * Authors: Paradox++
  */
 
 #include "ParadoxDrive.h"
 
+#define CIRCUMFRENCE 28
+
 /**
  * Constructor
- * @param JagOne The the address of a Jaguar on the CAN bus.
- * @param JagTwo The the address of a Jaguar on the CAN bus.
- * @param JagThree The the address of a Jaguar on the CAN bus.
- * @param JagFour The the address of a Jaguar on the CAN bus.
+ * @param VicLeft The port number of the left side victors on the digital sidecar.
+ * @param VicRight The port number of the right side victors on the digital sidecar.
+ * @param EncoLeft The port number of the left side encoders on the digital sidecar.
+ * @param EncoRight The port number of the right side encoders on the digital sidecar.
  */
-
-#define CIRCUMFRENCE 28
 
 ParadoxDrive::ParadoxDrive(UINT32 VicLeft, UINT32 VicRight, UINT32 EncoLeft, UINT32 EncoRight)
 {
@@ -26,27 +26,6 @@ ParadoxDrive::ParadoxDrive(UINT32 VicLeft, UINT32 VicRight, UINT32 EncoLeft, UIN
 	ModuleRight	= new ParadoxModule(VicRight, EncoRight);
 	ModuleLeft->ResetRevolutions();
 	ModuleRight->ResetRevolutions();
-}
-
-/**
- * Calibrates each Jaguar's top speed to the top speed of the
- * slowest Jaguar.
- */
-
-void ParadoxDrive::ResetDistance()
-{
-	ModuleLeft->ResetRevolutions();
-	ModuleRight->ResetRevolutions();
-}
-
-float ParadoxDrive::GetDistance()
-{
-	return ((ModuleLeft->GetRevolutions() + ModuleRight->GetRevolutions()) / 2) * CIRCUMFRENCE;
-}
-
-void ParadoxDrive::Calibrate(bool enabled)
-{
-	
 }
 
 /**
@@ -112,25 +91,13 @@ void ParadoxDrive::ArcadeDrive(float rotate, float move)
 	ParadoxDrive::TankDrive(FltLeft,FltRight);
 }
 
-/**
- * Drives by running all wheels fowards at the same speed.
- * @param rpm The speed to run all motors at.
- */
-
-void ParadoxDrive::Drive(float rpm)
+void ParadoxDrive::ResetDistance()
 {
-	
+	ModuleLeft->ResetRevolutions();
+	ModuleRight->ResetRevolutions();
 }
 
-/**
- * Dumps the following information, in order, to the Driver Station LCD:
- * The callibrated top speed, the current speed of module one, the current
- * speed of module two, the current speed of module three, and the current
- * speed of module four.
- * @param ds A Driver Station object.
- */
-
-void ParadoxDrive::Dump(DriverStationLCD *ds)
+float ParadoxDrive::GetDistance()
 {
-	
+	return ((ModuleLeft->GetRevolutions() + ModuleRight->GetRevolutions()) / 2) * CIRCUMFRENCE;
 }
