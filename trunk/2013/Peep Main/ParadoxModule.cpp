@@ -11,17 +11,19 @@
 
 #include "ParadoxModule.h"
 
+//Counts per revolution
 #define CPR 81;
+
 /**
  * Constructor
- * @param channel The the address of the Jaguar on the CAN bus.
+ * @param channel The port number of the victor on the digital sidecar.
+ * @param enco The port number of the encoder on the digital sidecar.
  */
 
 ParadoxModule::ParadoxModule(UINT32 channel, UINT32 enco)
 {
   VicSpeed = new Victor(channel);
   EncoCounter = new Encoder(enco, NULL);
-  InitParadoxModule();
   
   EncoCounter->Start();
 }
@@ -36,6 +38,7 @@ void ParadoxModule::ResetRevolutions()
 	EncoCounter->Start();
 	EncoCounter->Reset();
 }
+
 /**
  * Gets the current speed in rotations per minute.
  * @return The current speed as a double.
@@ -65,33 +68,4 @@ void ParadoxModule::SetRPM(float speed)
 void ParadoxModule::SetSpeedVoltage(float speed)
 {
   VicSpeed->Set(speed);
-}
-
-/**
- * Sets the top speed based on input.
- * @param speed The number the top speed should be set to.
- */
-
-void ParadoxModule::SetTopSpeed(float speed)
-{
-	
-}
-
-/**
- * Determines the the speed at a certain voltage.
- * @return The speed of the Jaguar, in RPM, at a set voltage.
- */
-
-float ParadoxModule::Calibrate()
-{
-		return 1;
-}
-
-/**
- * Initialization code for the Jaguar.
- */
-
-void ParadoxModule::InitParadoxModule()
-{   
-
 }

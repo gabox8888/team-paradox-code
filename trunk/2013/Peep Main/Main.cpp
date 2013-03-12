@@ -113,6 +113,23 @@ public:
 	void TeleopPeriodic(void)
 	{
 		printf("TeleopPeriodic\n");
+		
+		ParadoxBot::RobotDrive();
+		ParadoxBot::RobotShoot();
+		ParadoxBot::RobotDiskManagement();
+		ParadoxBot::RobotClimb();
+		ParadoxBot::Dump();
+	}
+	
+	void TestPeriodic(void) 
+	{
+		printf("Test In");
+		
+		printf("Test Out");
+	}
+	
+	void RobotDrive(void)
+	{
 		//Eliminates sensitivity issues on the main joystick
 		if (fabs(JoyMain->GetMagnitude()) <= 0.05)
 		{
@@ -124,50 +141,10 @@ public:
 		{
 			Drive->ArcadeDrive(-JoyMain->GetY(),JoyMain->GetX());
 		}
-		
-		//Eliminates sensitivity issues on the shooter joystick
-		if (fabs(JoyShoot->GetMagnitude()) <= 0.05)
-		{
-			FltShooterJoy = 0.0f;
-		}
-		
-		//Reads from the shooter joystick
-		else
-		{
-			FltShooterJoy = JoyShoot->GetY();
-		}
+	}
 	
-		//Raises the shooter if the slider is pushed forward
-		if (JoyShoot->GetRawAxis(4)>= 0.0f)
-		{
-			Shooter->Angle(true);
-			
-			//Runs the intake if button 4 is pressed
-			if (JoyShoot->GetRawButton(4))
-			{
-				BlnIntake = true;
-			}
-			else if (JoyShoot->GetRawButton(5))
-			{
-				BlnIntake = false;
-			}
-			
-			
-			if (BlnIntake == false)
-			{
-				Indexer->ManualIndex(JoyShoot);
-			}
-			else
-			{
-				Indexer->Intake(JoyShoot->GetRawButton(3), BlnIntake);
-			}
-		}
-		else 
-		{
-			Shooter->Angle(false);
-			Indexer->AllStop();
-		}
-		
+	void RobotShoot(void)
+	{
 		/* Sets the speed of the shooter based on button presses.
 		 * If button 6 is pressed, then the shooter is stopped.
 		 * If button 11 is pressed, then the shooter runs at 2900 RPM.
@@ -195,22 +172,60 @@ public:
 				break;
 		}
 		
-		//Alters speed based on throttle applied to the shooter joystick and then applies it to the shooter.
+		//Eliminates sensitivity issues on the shooter joystick.
+		if (fabs(JoyShoot->GetMagnitude()) <= 0.05)
+		{
+			FltShooterJoy = 0.0f;
+		}
+		else
+		{
+			FltShooterJoy = JoyShoot->GetY();
+		}
+		
+		//Alters shooter speed based on throttle applied to the shooter joystick.
 		Shooter->SetRPM(FltShooterSpeed + (FltShooterJoy*1000.0f));
 		
 		//Shoots when the trigger on the shooter joystick is pressed.
 		Shooter->Feed(JoyShoot->GetTrigger());
-		
-		//If button 7 on the main joystick is pressed, calibrate the drive. If button 8 is pressed, stop calibrating.
-		if (JoyMain->GetRawButton(7) == true)
+	}
+	
+	void ParadoxBot::RobotDiskManagement(void)
+	{
+		//Raises the shooter if the slider is pushed forward
+		if (JoyShoot->GetRawAxis(4)>= 0.0f)
 		{
-			BlnCal = true;
+			Shooter->Angle(true);
+			
+			//Runs the intake if button 4 is pressed
+			if (JoyShoot->GetRawButton(4))
+			{
+				BlnIntake = true;
+			}
+			else if (JoyShoot->GetRawButton(5))
+			{
+				BlnIntake = false;
+			}
+			
+			
+			if (BlnIntake == false)
+			{
+				Indexer->ManualIndex(JoyShoot);
+			}
+			else
+			{
+				Indexer->Intake(JoyShoot->GetRawButton(3), BlnIntake);
+			}
 		}
-		else if (JoyMain->GetRawButton(8) == true)
+		//Lowers the shooter and stops the intake if the slider is not pushed forward
+		else 
 		{
-			BlnCal = false;
+			Shooter->Angle(false);
+			Indexer->AllStop();
 		}
-		
+	}
+	
+	void ParadoxBot::RobotClimb(void)
+	{
 		//If button 9 on the main joystick is pressed, raise the lifting arms.
 		if (JoyMain->GetRawAxis(4)> 0.0f)
 		{
@@ -223,7 +238,10 @@ public:
 			SolLifterDown->Set(true);
 			SolLifterUp->Set(false);
 		}
-		
+	}
+	
+	void ParadoxBot::Dump(void)
+	{
 		float test = EncTest->GetRaw();
 		
 		//Update Driver Station display
@@ -234,13 +252,6 @@ public:
 		//DsLCD->PrintfLine(DriverStationLCD::kUser_Line6,"Distance: %f",Drive->GetDistance());
 		//DsLCD->PrintfLine(DriverStationLCD::kUser_Line6,"RawEncoder: %f",test);
 		DsLCD->UpdateLCD();
-	}
-	
-	void TestPeriodic(void) 
-	{
-		printf("Test In");
-		
-		printf("Test Out");
 	}
 };
 
