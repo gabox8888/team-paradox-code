@@ -91,6 +91,13 @@ void ParadoxDrive::ArcadeDrive(float rotate, float move)
 	ParadoxDrive::TankDrive(FltLeft,FltRight);
 }
 
+void ParadoxDrive::TwoStickDrive(float left, float right)
+{
+	ModuleRight->SetSpeedVoltage(right);
+	ModuleLeft->SetSpeedVoltage(left);
+}
+
+
 void ParadoxDrive::ResetDistance()
 {
 	ModuleLeft->ResetRevolutions();
