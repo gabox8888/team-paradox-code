@@ -24,6 +24,7 @@ class ParadoxDrive
 		ParadoxDrive(UINT32 VicLeft, UINT32 VicRight, UINT32 EncoLeft, UINT32 EncoRight);
 		virtual ~ParadoxDrive(){};
 		
+    void TwoStickDrive (float left, float right);
 		void TankDrive(float left, float right);
 		void ArcadeDrive(float move, float rotate);
 		float GetDistance();
