@@ -6,6 +6,7 @@
  * Authors: Paradox++ 
  */ 
 
+#define TwoStickButton 4
 #include "ParadoxLib.h"
 
 enum AutoDelay
@@ -130,12 +131,14 @@ public:
 	
 	void RobotDrive(void)
 	{
-		//Eliminates sensitivity issues on the main joystick
-		if (fabs(JoyMain->GetMagnitude()) <= 0.05)
+    
+    //twostickdrive
+    if (JoyMain->GetRawButton(TwoStickButton))
 		{
-			Drive->ArcadeDrive(0.0,0.0);
+			Drive->TwoStickDrive(JoyMain->GetY(), JoyShoot->GetY());
 		}
 		
+      
 		//Arcade drive
 		else
 		{
