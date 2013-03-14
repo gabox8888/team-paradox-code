@@ -86,7 +86,6 @@ void  ParadoxShooter::SetRPM(float speed)
 	JagBack->Set(-FltSetSpeed);
 	FltDiffFront = fabs(FltSetSpeed - (JagFront->GetSpeed()));
 	FltDiffBack  = fabs(FltSetSpeed - (JagBack->GetSpeed()));
-
 }
 
 //actuates pistons

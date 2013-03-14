@@ -48,7 +48,7 @@ public:
 	ParadoxBot()
 	{
 		Drive			= new ParadoxDrive (7,9,11,5);
-		Shooter			= new ParadoxShooter (6,7,2,4,3);
+		Shooter			= new ParadoxShooter (7,6,2,4,3);
 		Indexer 		= new ParadoxIndexer(3,10,1,2);
 		Auto			= new ParadoxAutonomous(Shooter,Drive,Indexer);
 		
@@ -60,7 +60,7 @@ public:
 		SolLifterDown 	= new Solenoid(2);
 		SolLifterUp 	= new Solenoid(1);
 		
-		EncTest			= new Encoder(4, NULL);
+//		EncTest			= new Encoder(4, NULL);
 		
 		ADelay = Delay;
 		
@@ -131,13 +131,11 @@ public:
 	
 	void RobotDrive(void)
 	{
-    
-    //twostickdrive
-    if (JoyMain->GetRawButton(TwoStickButton))
+		//twostickdrive
+		if (JoyMain->GetRawButton(TwoStickButton))
 		{
 			Drive->TwoStickDrive(JoyMain->GetY(), JoyShoot->GetY());
 		}
-		
       
 		//Arcade drive
 		else
