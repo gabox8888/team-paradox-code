@@ -81,11 +81,20 @@ bool ParadoxShooter::IsCalibrated()
 //sets percent of topspeed
 void  ParadoxShooter::SetRPM(float speed)
 {
+	if (JagFront->GetControlMode() != CANJaguar::kSpeed)
+	{
+		JagFront->ChangeControlMode(CANJaguar::kSpeed);
+	}
+	if (JagBack->GetControlMode() != CANJaguar::kSpeed)
+	{
+		JagBack->ChangeControlMode(CANJaguar::kSpeed);
+	}
 	FltSetSpeed = speed;
-	JagFront->Set(FltSetSpeed);
-	JagBack->Set(-FltSetSpeed);
+	JagFront->Set(-FltSetSpeed);
+	JagBack->Set(FltSetSpeed);
 	FltDiffFront = fabs(FltSetSpeed - (JagFront->GetSpeed()));
 	FltDiffBack  = fabs(FltSetSpeed - (JagBack->GetSpeed()));
+
 }
 
 //actuates pistons
@@ -175,10 +184,24 @@ void ParadoxShooter::AllStop()
 
 void ParadoxShooter::Dump(DriverStationLCD *ds)
 {
-	ds->PrintfLine(DriverStationLCD::kUser_Line2, "front amps %f", JagFront->GetOutputCurrent());
-	ds->PrintfLine(DriverStationLCD::kUser_Line3, "back amps %f", JagBack->GetOutputCurrent());
-	ds->PrintfLine(DriverStationLCD::kUser_Line4, "front spd %f", JagFront->GetSpeed());
-	ds->PrintfLine(DriverStationLCD::kUser_Line5, "back spd %f", JagBack->GetSpeed());
+	ds->PrintfLine(DriverStationLCD::kUser_Line2, "front amps %d", (int)JagFront->IsAlive());
+	ds->PrintfLine(DriverStationLCD::kUser_Line3, "back amps %d", (int)JagBack->IsAlive());
+	ds->PrintfLine(DriverStationLCD::kUser_Line4, "front spd %d", (int)JagFront->GetPowerCycled());
+	ds->PrintfLine(DriverStationLCD::kUser_Line5, "back spd %d", (int)JagBack->GetPowerCycled());
+}
+
+void ParadoxShooter::SetVoltage(float voltage)
+{
+	if (JagFront->GetControlMode() != CANJaguar::kPercentVbus)
+	{
+		JagFront->ChangeControlMode(CANJaguar::kPercentVbus);
+	}
+	if (JagBack->GetControlMode() != CANJaguar::kPercentVbus)
+	{
+		JagBack->ChangeControlMode(CANJaguar::kPercentVbus);
+	}
+	JagFront->Set(voltage);
+	JagBack->Set(-voltage);
 }
 
 void ParadoxShooter::InitParadoxShooter()

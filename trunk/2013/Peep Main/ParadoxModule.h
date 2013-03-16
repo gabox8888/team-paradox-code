@@ -25,10 +25,13 @@ class ParadoxModule
 		double GetRPM();
 		void SetRPM(float speed);
 		void SetSpeedVoltage(float speed);
+		void SetTopSpeed(float speed);
+		float Calibrate();
 		float GetRevolutions();
 		void ResetRevolutions();
 		
 	protected:
+		void InitParadoxModule();
 		Victor *VicSpeed;
 		Encoder *EncoCounter;
 		float FltTopSpeed;
