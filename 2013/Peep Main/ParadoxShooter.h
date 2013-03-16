@@ -1,3 +1,4 @@
+
 #ifndef PARADOXSHOOTER_H_
 #define PARADOXSHOOTER_H_
 
@@ -34,6 +35,7 @@ class ParadoxShooter
     void Angle(bool up);
     void AllStop();//turns off just motors
     void Dump(DriverStationLCD *ds);
+    void SetVoltage(float voltage);
 
   protected:
     CANJaguar 		*JagFront;
