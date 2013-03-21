@@ -25,17 +25,16 @@ class ParadoxShooter
     ParadoxShooter(UINT32 front, UINT32 back, UINT32 feeder, UINT32 anglein, UINT32 angleout);
     virtual ~ParadoxShooter(){}
     
-    float Calibrate();//writes topspeed to shootercalibration.txt and returns topspeed
-    bool IsCalibrated();//returns yes or no if is calibrated or not
-    void SetTopSpeed(float topspeed);//manually sets topspeed
-    void SetRPM(float speed);//does not actually take RPM, but 1-0 value that gets multiplied by topspeed
+    void SetMode(const bool BoolMode);
     void Feed(bool primed);
     void Shoot(int disks, float speed);
     bool DoneShooting();
     void Angle(bool up);
     void AllStop();//turns off just motors
     void Dump(DriverStationLCD *ds);
+    void SetRPM(float speed);
     void SetVoltage(float voltage);
+    void ResetJaguars();
 
   protected:
     CANJaguar 		*JagFront;
@@ -43,21 +42,18 @@ class ParadoxShooter
     Relay	 		*RlyFeeder;
     Solenoid 		*SolAngleUp;
     Solenoid 		*SolAngleDown;
-    ParadoxMath		*ModuleCalculator;
-    ParadoxPersistentArray  *PersArrayCalibration;
     bool 		BlnIsCal;
     bool		BlnFire;
     bool		BlnDoneShooting;
+    bool		BlnControlMode;
     int			IntTimer;
     int 		IntDisks;
-    float		FltTopSpeed;
     float 		FltSetSpeed;
     float 		FltActualBack;
     float 		FltActualFront;
     float		FltDiffFront;
     float		FltDiffBack;
-    float 		FltArray[4];
-	
+
 private:
     void InitParadoxShooter();
     void InitJaguar();

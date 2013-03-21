@@ -13,13 +13,25 @@ ParadoxAutonomous::ParadoxAutonomous(ParadoxShooter *shoot, ParadoxDrive *drive,
 	Shoot 	= shoot;
 	Drive 	= drive;
 	Indexer = index;
+	TimerA  = new Timer();
+	TimerB  = new Timer();
+	
+	Shoot->SetMode(true);
 	
 	AutoTime[AutoTime_A] = 99.0;
 	AutoTime[AutoTime_B] = 99.0;
 	
+	TimerA->Start();
+	TimerA->Reset();
+	TimerB->Start();
+	TimerB->Reset();
+	
 	StpCenter	= CenterInit;
 	StpLeft		= LeftInit;
 	StpRight	= RightInit;
+	
+	IntLoopCenter = 0;
+	DblTimer = 0.0;
 }
 
 void ParadoxAutonomous::Initialize(float period)
@@ -29,7 +41,7 @@ void ParadoxAutonomous::Initialize(float period)
 	AutoTime[AutoTime_B] = 99.0;
 }
 
-float ParadoxAutonomous::Timer(char letter)
+float ParadoxAutonomous::GetTimer(char letter)
 {
 	if (letter = 'A')
 	{
@@ -44,7 +56,7 @@ float ParadoxAutonomous::Timer(char letter)
 }
 
 void ParadoxAutonomous::AutoCenter(int pointsc)
-{
+{	
 	switch (pointsc)
 	{
 		case 12:
@@ -56,8 +68,8 @@ void ParadoxAutonomous::AutoCenter(int pointsc)
 					Shoot->Angle(false);
 					Indexer->AllStop();
 					AutoTime[AutoTime_B] = 99.0f;
-					if (ParadoxAutonomous::Timer('B') > 90.0f) AutoTime[AutoTime_A] = 3.0f;
-					if (ParadoxAutonomous::Timer('A') <= 0.0f) StpCenter = CenterShootThree;
+					if (ParadoxAutonomous::GetTimer('B') > 90.0f) AutoTime[AutoTime_A] = 3.0f;
+					if (ParadoxAutonomous::GetTimer('A') <= 0.0f) StpCenter = CenterShootThree;
 					break;
 				case CenterShootThree:
 					printf ("CenterShootThree \n");
@@ -89,9 +101,10 @@ void ParadoxAutonomous::AutoCenter(int pointsc)
 					Shoot->SetRPM(-2000.0f);
 					Shoot->Angle(false);
 					Indexer->AllStop();
-					AutoTime[AutoTime_B] = 99.0f;
-					if (ParadoxAutonomous::Timer('B') > 90.0f) AutoTime[AutoTime_A] = 3.0f;
-					if (ParadoxAutonomous::Timer('A') <= 0.0f) StpCenter = CenterShootThree;
+					if ((DblTimer = TimerA->Get())>= 3.0)
+					{
+						StpCenter = CenterShootThree;
+					}
 					break;
 				case CenterShootThree:
 					printf ("CenterShootThree \n");
@@ -116,65 +129,91 @@ void ParadoxAutonomous::AutoCenter(int pointsc)
 			}
 			break;
 		case 30:
+			TimerA->Start();
+			TimerA->Reset();
 			switch (StpCenter)
 			{
 				case CenterInit:
 					printf ("CenterInit \n");
-					Shoot->SetRPM(-2000.0f);
-					Shoot->Angle(false);
-					Indexer->AllStop();
-					AutoTime[AutoTime_B] = 99.0f;
-					if (ParadoxAutonomous::Timer('B') > 90.0f) AutoTime[AutoTime_A] = 3.0f;
-					if (ParadoxAutonomous::Timer('A') <= 0.0f) StpCenter = CenterShootThree;
+					while ((DblTimer = TimerA->Get())<= 1.0)
+					{
+						Shoot->SetRPM(-2000.0f);
+						Shoot->Angle(false);
+						Indexer->AllStop();
+					}
+					StpCenter = CenterMoveForward;
 					break;
 				case CenterShootThree:
 					printf ("CenterShootThree \n");
-					Shoot->Angle(false);
-					Shoot->Shoot(3,-2000.0f);
-					if (Shoot->DoneShooting() == true)
+					TimerA->Reset();
+					while ((DblTimer = TimerA->Get())<= 3.0)
 					{
-						StpCenter = CenterMoveForward;
+						Shoot->Angle(false);
+						Shoot->SetRPM(-2000.0f);
+						Shoot->Feed(true);
 					}
+					StpCenter = CenterMoveForward;
 					break;
 				case CenterMoveForward:
 					printf ("CenterMoveForward \n");
-					Shoot->SetRPM(0.0f);
+					IntLoopCenter++;
 					Shoot->Angle(true);
-					Drive->ArcadeDrive(-0.2f,0.0f);
-					Indexer->Intake(true,true);
-					Indexer->Suck(true);
-					if (Drive->GetDistance()>= 10.0 ) StpCenter = CenterPickUp;
+					while(Drive->GetDistance() < 30.0)
+					{
+						Shoot->SetRPM(0.0f);
+						Drive->ArcadeDrive(-0.3f,0.0f);
+						Indexer->Intake(true,true);
+						Indexer->Suck(true);
+					}
+					StpCenter = CenterPickUp;					
 					break;
 				case CenterPickUp:
 					printf ("CenterPickUp \n");
+					Shoot->Feed(false);
+					Drive->ArcadeDrive(0.0f,0.0f);
 					Drive->ResetDistance();
-					Drive->ArcadeDrive(-0.2f,0.0f);
-					Indexer->Intake(true,true);
-					Indexer->Suck(true);
-					if (Drive->GetDistance()>= 10.0 ) StpCenter = CenterAlign;
+					TimerA->Reset();
+					while ((DblTimer = TimerA->Get())<= 6.0)
+					{	
+						Indexer->Intake(true,true);
+						Indexer->Suck(true);
+					}
+					StpCenter = CenterAlign;
 					break;
 				case CenterAlign:
 					printf ("CenterAlign \n");
 					Drive->ResetDistance();
-					Drive->ArcadeDrive(-0.2f,0.0f);
-					Indexer->Intake(true,true);
-					Indexer->Suck(true);
-					Shoot->Angle(true);
-					if (Drive->GetDistance()>= 5.0 ) StpCenter = CenterShootTwo;
+					while (Drive->GetDistance() < 5.0)
+					{	
+						Drive->ArcadeDrive(-0.3f,0.0f);
+						Indexer->Intake(true,true);
+						Indexer->Suck(true);
+						Shoot->Angle(true);
+					}
+					StpCenter = CenterShootTwo;
 					break;
 				case CenterShootTwo:
 					printf ("CenterShootTwo \n");
 					Drive->ArcadeDrive(0.0f,0.0f);
-					Indexer->Intake(false,false);
-					Indexer->Suck(false);
 					Shoot->Angle(false);
-					Shoot->Shoot(5,-2000.0f);
-					if (Shoot->DoneShooting() == true)
+					TimerA->Reset();
+					while ((DblTimer = TimerA->Get())<= 5.0)
+					{
+						Shoot->Angle(false);
+						Shoot->SetRPM(-2000.0f);
+						Shoot->Feed(true);
+					}
+					if (IntLoopCenter == 1)
+					{
+						StpCenter = CenterMoveForward;
+					}
+					else
 					{
 						StpCenter = CenterDone;
 					}
 					break;
 				case CenterDone:
+					Shoot->Feed(false);
 					Shoot->SetRPM(0.0f);
 					Indexer->AllStop();
 					Drive->TankDrive(0,0);
@@ -194,8 +233,8 @@ void ParadoxAutonomous::AutoCenter(int pointsc)
 					Shoot->Angle(true);
 					Indexer->AllStop();
 					AutoTime[AutoTime_B] = 99.0f;
-					if (ParadoxAutonomous::Timer('B') > 90.0f) AutoTime[AutoTime_A] = 1.0f;
-					if (ParadoxAutonomous::Timer('A') <= 0.0f) StpCenter = CenterShootThree;
+					if (ParadoxAutonomous::GetTimer('B') > 90.0f) AutoTime[AutoTime_A] = 1.0f;
+					if (ParadoxAutonomous::GetTimer('A') <= 0.0f) StpCenter = CenterShootThree;
 					break;
 				case CenterShootThree:
 					if (Shoot->DoneShooting() == false)
@@ -228,150 +267,3 @@ void ParadoxAutonomous::AutoCenter(int pointsc)
 	}
 }
 
-void ParadoxAutonomous::AutoLeft(int pointsl)
-{
-	switch (pointsl)
-	{
-		case 12:
-			switch (StpCenter)
-			{
-				case CenterInit:
-					printf ("CenterInit \n");
-					Shoot->SetRPM(-2000.0f);
-					Shoot->Angle(false);
-					Indexer->AllStop();
-					AutoTime[AutoTime_B] = 99.0f;
-					if (ParadoxAutonomous::Timer('B') > 90.0f) AutoTime[AutoTime_A] = 3.0f;
-					if (ParadoxAutonomous::Timer('A') <= 0.0f) StpCenter = CenterShootThree;
-					break;
-				case CenterShootThree:
-					printf ("CenterShootThree \n");
-					Shoot->Angle(false);
-					Shoot->Shoot(5,-2450.0f);
-					if (Shoot->DoneShooting() == true)
-					{
-						StpCenter = CenterDone;
-					}
-					break;
-				case CenterDone:
-					printf ("CenterDone \n");
-					Shoot->SetRPM(0.0f);
-					Indexer->AllStop();
-					Drive->TankDrive(0,0);					
-					break;
-				default:
-					Shoot->SetRPM(0.0f);
-					Indexer->AllStop();
-					Drive->TankDrive(0,0);
-					break;
-			}
-			break;
-		case 18:
-			switch (StpCenter)
-			{
-				case CenterInit:
-					printf ("CenterInit \n");
-					Shoot->SetRPM(-1600.0f);
-					Shoot->Angle(false);
-					Indexer->AllStop();
-					AutoTime[AutoTime_B] = 99.0f;
-					if (ParadoxAutonomous::Timer('B') > 90.0f) AutoTime[AutoTime_A] = 6.0f;
-					if (ParadoxAutonomous::Timer('A') <= 0.0f) StpCenter = CenterShootThree;
-					break;
-				case CenterShootThree:
-					printf ("CenterShootThree \n");
-					Shoot->Angle(false);
-					Shoot->Shoot(20,-1600.0f);
-					if (Shoot->DoneShooting() == true)
-					{
-						StpCenter = CenterDone;
-					}
-					break;
-				case CenterDone:
-					printf ("CenterDone \n");
-					Shoot->SetRPM(0.0f);
-					Indexer->AllStop();
-					Drive->TankDrive(0,0);					
-					break;
-				default:
-					Shoot->SetRPM(0.0f);
-					Indexer->AllStop();
-					Drive->TankDrive(0,0);
-					break;
-			}
-	}
-}
-
-void ParadoxAutonomous::AutoRight(int pointsr)
-{
-	switch (pointsr)
-	{
-		case 12:
-			switch (StpCenter)
-			{
-				case CenterInit:
-					printf ("CenterInit \n");
-					Shoot->SetRPM(-2000.0f);
-					Shoot->Angle(false);
-					Indexer->AllStop();
-					AutoTime[AutoTime_B] = 99.0f;
-					if (ParadoxAutonomous::Timer('B') > 90.0f) AutoTime[AutoTime_A] = 3.0f;
-					if (ParadoxAutonomous::Timer('A') <= 0.0f) StpCenter = CenterShootThree;
-					break;
-				case CenterShootThree:
-					printf ("CenterShootThree \n");
-					Shoot->Angle(false);
-					Shoot->Shoot(5,-2450.0f);
-					if (Shoot->DoneShooting() == true)
-					{
-						StpCenter = CenterDone;
-					}
-					break;
-				case CenterDone:
-					printf ("CenterDone \n");
-					Shoot->SetRPM(0.0f);
-					Indexer->AllStop();
-					Drive->TankDrive(0,0);					
-					break;
-				default:
-					Shoot->SetRPM(0.0f);
-					Indexer->AllStop();
-					Drive->TankDrive(0,0);
-					break;
-			}
-			break;
-		case 18:
-			switch (StpCenter)
-			{
-				case CenterInit:
-					printf ("CenterInit \n");
-					Shoot->SetRPM(-2000.0f);
-					Shoot->Angle(false);
-					Indexer->AllStop();
-					AutoTime[AutoTime_B] = 99.0f;
-					if (ParadoxAutonomous::Timer('B') > 90.0f) AutoTime[AutoTime_A] = 3.0f;
-					if (ParadoxAutonomous::Timer('A') <= 0.0f) StpCenter = CenterShootThree;
-					break;
-				case CenterShootThree:
-					printf ("CenterShootThree \n");
-					Shoot->Angle(false);
-					Shoot->Shoot(5,-2000.0f);
-					if (Shoot->DoneShooting() == true)
-					{
-						StpCenter = CenterDone;
-					}
-					break;
-				case CenterDone:
-					printf ("CenterDone \n");
-					Shoot->SetRPM(0.0f);
-					Indexer->AllStop();
-					Drive->TankDrive(0,0);					
-					break;
-				default:
-					Shoot->SetRPM(0.0f);
-					Indexer->AllStop();
-					Drive->TankDrive(0,0);
-					break;
-			}
-	}
-}

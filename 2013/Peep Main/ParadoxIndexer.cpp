@@ -23,10 +23,13 @@ ParadoxIndexer::ParadoxIndexer(UINT32 relay,UINT32 victor, UINT32 digbump, UINT3
 	RlyIntake 		= new Relay(relay);	
 	DigPhotoFrisbee	= new DigitalInput(digbump);
 	DigPhotoFinger 	= new DigitalInput(digphoto);
+	TimerMain		= new Timer();
+	
+	TimerMain->Start();
 	
 	PickUp 			= Align;
-	BlnAlternate	= false;
-		
+	
+	BlnAlternate	= false;	
 	BlnIntakeIsReady = false;
 	BlnIsUpTaken = false;
 	BlnNextFinger = false;
@@ -46,33 +49,49 @@ void ParadoxIndexer::Intake(bool suck, bool safety)
 		{
 			//Positions a finger on the internal belt in front of the lower photo sensor.
 			case Align:
+				printf("Align /n");
 				if (DigPhotoFinger->Get() == 1)
 				{
 					VicIntake->Set(0.8f);
+					if (suck == true)
+					{
+						RlyIntake->Set(Relay::kForward);
+					}
 				}
-				else if (DigPhotoFinger->Get() == 0)
+				else 
 				{
-					PickUp = Rollers;
 					VicIntake->Set(0.0f);
+					PickUp = Rollers;
 				}
 				break;
 			
 			//If the input is true, runs the intake belt until a disk is detected.
 			case Rollers:
-				VicIntake->Set(0.0f);
-				if ((DigPhotoFrisbee->Get() == 0)&&(suck == true))
+				printf("Roll /n");
+				if (suck == true)
 				{
 					RlyIntake->Set(Relay::kForward);
+					VicIntake->Set(0.0f);
 				}
 				else if (DigPhotoFrisbee->Get() == 1)
 				{
 					RlyIntake->Set(Relay::kOff);
+					TimerMain->Reset();
 					PickUp = Up;
 				}
 				break;
 				
 			//If a disk is detected, draws it up to the magazine. Then realigns for the next disk.
 			case Up:
+				printf("Up /n");
+				if (TimerMain->Get() < 0.25)
+				{
+					RlyIntake->Set(Relay::kReverse);
+				}
+				else
+				{
+					RlyIntake->Set(Relay::kOff);
+				}
 				if (DigPhotoFrisbee->Get() == 1)
 				{
 					VicIntake->Set(0.8f);
@@ -140,7 +159,7 @@ void ParadoxIndexer::AllStop()
 
 void ParadoxIndexer::Dump(DriverStationLCD *ds)
 {
-	if (DigPhotoFrisbee->Get() == true )ds->PrintfLine(DriverStationLCD::kUser_Line6, "GO!");
+	if (DigPhotoFinger->Get() == true )ds->PrintfLine(DriverStationLCD::kUser_Line6, "GO!");
 	else ds->PrintfLine(DriverStationLCD::kUser_Line6,"NO FRISBEE");
 }
 

@@ -20,8 +20,8 @@ enum Center
 {
 	CenterInit,
 	CenterShootThree,
-	CenterPickUp,
 	CenterMoveForward,
+	CenterPickUp,
 	CenterAlign,
 	CenterShootTwo,
 	CenterShootFour,
@@ -60,12 +60,16 @@ private:
 	ParadoxShooter	*Shoot;
 	ParadoxDrive	*Drive;
 	ParadoxIndexer	*Indexer;
+	Timer 			*TimerA; 
+	Timer 			*TimerB; 
 	Center			StpCenter;
 	Left 			StpLeft;
 	Right			StpRight;
+	int				IntLoopCenter;
+	double			DblTimer;
 	float			Period;
 	float 			AutoTime[NumOfAutoTimers];
-	float			Timer(char letter);
+	float			GetTimer(char letter);
 	
 protected:
 	DISALLOW_COPY_AND_ASSIGN(ParadoxAutonomous);

@@ -20,7 +20,7 @@
 ParadoxModule::ParadoxModule(UINT32 channel, UINT32 enco)
 {
   VicSpeed = new Victor(channel);
-  EncoCounter = new Encoder(enco, NULL);
+  EncoCounter = new Counter(enco);
   InitParadoxModule();
   
   EncoCounter->Start();
@@ -28,7 +28,7 @@ ParadoxModule::ParadoxModule(UINT32 channel, UINT32 enco)
 
 float ParadoxModule::GetRevolutions()
 {
-	return EncoCounter->GetRaw() / CPR;
+	return EncoCounter->Get() / CPR;
 }
 
 void ParadoxModule::ResetRevolutions()

@@ -37,6 +37,7 @@ protected:
 	Relay *RlyIntake;
 	DigitalInput *DigPhotoFrisbee;
 	DigitalInput *DigPhotoFinger;
+	Timer		*TimerMain;
 	
 	PickUpStates PickUp;
 	

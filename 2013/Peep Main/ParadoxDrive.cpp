@@ -41,7 +41,7 @@ void ParadoxDrive::ResetDistance()
 
 float ParadoxDrive::GetDistance()
 {
-	return ((ModuleLeft->GetRevolutions() + ModuleRight->GetRevolutions()) / 2) * CIRCUMFRENCE;
+	return (ModuleLeft->GetRevolutions()) * CIRCUMFRENCE;
 }
 
 void ParadoxDrive::Calibrate(bool enabled)
