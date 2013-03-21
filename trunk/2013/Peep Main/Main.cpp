@@ -18,7 +18,6 @@ class ParadoxBot : public IterativeRobot
 {
 	ParadoxDrive		*Drive;
 	ParadoxShooter		*Shooter;
-	//ParadoxTracker		*Tracker;
 	ParadoxIndexer		*Indexer;	
 	ParadoxAutonomous	*Auto;
 		
@@ -28,16 +27,14 @@ class ParadoxBot : public IterativeRobot
 	Joystick			*JoyShoot;
 	Compressor			*CompMain;
 	DriverStationLCD	*DsLCD;
-	AxisCamera			*CamMain;
 	Solenoid 			*SolLifterDown;
 	Solenoid			*SolLifterUp;
-	
-	Encoder				*EncTest;
-	
+		
 	bool BlnIsSucking;
 	bool BlnIntake;
 	bool BlnCal;
 	bool BlnStop;
+	bool BlnJagReset;
 	int	 IntShooterSpeed;
 	float FltShooterSpeed;
 	float FltShooterJoy;
@@ -46,34 +43,33 @@ class ParadoxBot : public IterativeRobot
 public:
 	ParadoxBot()
 	{
-		Drive			= new ParadoxDrive (7,9,11,5);
+		printf ("consin");
+		Drive			= new ParadoxDrive (7,9,2,1);
 		Shooter			= new ParadoxShooter (6,7,2,4,3);
-		Indexer 		= new ParadoxIndexer(3,10,1,2);
+		Indexer 		= new ParadoxIndexer(3,1,12,11);//1,2
 		Auto			= new ParadoxAutonomous(Shooter,Drive,Indexer);
 		
 		JoyMain	 		= new Joystick(1);
 		JoyShoot		= new Joystick(2);
 		CompMain		= new Compressor(14,1);
 		DsLCD			= DriverStationLCD::GetInstance();
-		//CamMain 		= &AxisCamera::GetInstance("10.21.2.11");
 		SolLifterDown 	= new Solenoid(2);
 		SolLifterUp 	= new Solenoid(1);
-		
-		//EncTest			= new Encoder(4, NULL);
-		
+				
 		ADelay = Delay;
 		
 		BlnIntake = false;
 		BlnCal = false;
+		BlnJagReset = false;
 		IntShooterSpeed = 0;
 		FltShooterSpeed = 0.0f;
 		FltShooterJoy = 0.0f;
 		FltTimer = 0.0f;
 				
-		CompMain->Start();	
 		SetPeriod(0.05);
 		
-		//EncTest->Start();
+		printf ("consout");
+		
 	};
 	~ParadoxBot(){}
 	
@@ -81,6 +77,7 @@ public:
 	{
 		const float period = GetPeriod();
 		Auto->Initialize(period);
+		//CompMain->Start();	
 	}
 	
 	void DisabledInit(void)
@@ -105,7 +102,7 @@ public:
 			}
 			break;
 		case Go:
-			Auto->AutoCenter(18);
+			Auto->AutoCenter(30);
 			break;
 		}
 	}
@@ -198,12 +195,36 @@ public:
 		float FltTempSpeed = FltShooterSpeed + (FltShooterJoy*1000.0f);
 		if (FltTempSpeed>0.0f)
 		{
-					FltTempSpeed = 0.0f;
+				FltTempSpeed = 0.0f;
+		}
+		if (FltTempSpeed != 0.0f)
+		{
+			CompMain->Stop();	
+		}
+		else
+		{
+			CompMain->Start();
+		}
+		if (FltTempSpeed < 1000.0f)
+		{
+			BlnJagReset = true;
+		}
+		
+		if ((BlnJagReset == true)&&(FltTempSpeed == 0.0f))
+		{
+			Shooter->ResetJaguars();
+			BlnJagReset = false;
 		}
 		
 		//Alters speed based on throttle applied to the shooter joystick and then applies it to the shooter.
-		if(JoyShoot->GetRawButton(2))Shooter->SetVoltage(JoyShoot->GetY());
-		else Shooter->SetRPM(FltTempSpeed);
+		if(JoyShoot->GetRawButton(2)== true)
+		{
+			Shooter->SetVoltage(JoyShoot->GetY());
+		}
+		else 
+		{
+			Shooter->SetRPM(FltTempSpeed);
+		}
 		//
 		//Shoots when the trigger on the shooter joystick is pressed.
 		Shooter->Feed(JoyShoot->GetTrigger());
@@ -232,7 +253,7 @@ public:
 		}
 			
 		//Update Driver Station display
-		DsLCD->PrintfLine(DriverStationLCD::kUser_Line1,"Speed: %f",FltShooterSpeed + (JoyShoot->GetY()*1000.0f));
+		DsLCD->PrintfLine(DriverStationLCD::kUser_Line1,"Speed: %f",FltTempSpeed);
 		//Drive->Dump(DsLCD);
 		Shooter->Dump(DsLCD);
 		Indexer->Dump(DsLCD);
@@ -240,14 +261,11 @@ public:
 		//DsLCD->PrintfLine(DriverStationLCD::kUser_Line6,"RawEncoder: %f",test);
 		DsLCD->UpdateLCD();
 		
-		Watchdog(feed);
 	}
 	
 	void TestPeriodic(void) 
 	{
-		printf("Test In");
 		
-		printf("Test Out");
 	}
 };
 

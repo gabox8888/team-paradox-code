@@ -33,7 +33,7 @@ class ParadoxModule
 	protected:
 		void InitParadoxModule();
 		Victor *VicSpeed;
-		Encoder *EncoCounter;
+		Counter *EncoCounter;
 		float FltTopSpeed;
 		float FltAvgNum[4];  	
 
