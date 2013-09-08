@@ -75,6 +75,17 @@ void  ParadoxShooter::SetRPM(float speed)
 
 }
 
+void ParadoxShooter::ManualFeed(bool feed)
+{
+	if (feed)
+	{
+		RlyFeeder->Set(Relay::kForward);
+	}
+	else
+	{
+		RlyFeeder->Set(Relay::kOff);
+	}
+}
 //actuates pistons
 void  ParadoxShooter::Feed(bool primed)
 {
@@ -170,8 +181,8 @@ void ParadoxShooter::Dump(DriverStationLCD *ds)
 
 void ParadoxShooter::SetVoltage(float voltage)
 {
-	JagFront->Set(voltage);
-	JagBack->Set(-voltage);
+	JagFront->Set(-voltage);
+	JagBack->Set(voltage);
 }
 
 void ParadoxShooter::ResetJaguars()

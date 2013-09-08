@@ -27,6 +27,7 @@ class ParadoxShooter
     
     void SetMode(const bool BoolMode);
     void Feed(bool primed);
+    void ManualFeed(bool feed);
     void Shoot(int disks, float speed);
     bool DoneShooting();
     void Angle(bool up);
