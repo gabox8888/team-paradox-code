@@ -1,0 +1,9 @@
+OUTPUT
+Mag
+Turn
+Dir
+SENS
+RUN
+DO	Mag 1 Turn 90 Dir 45 UNTIL Time 10
+DO	Mag 1 Turn 0  Dir 90 UNTIL Time .5
+END
